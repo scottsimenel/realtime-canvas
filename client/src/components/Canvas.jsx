@@ -28,6 +28,7 @@ export default function Canvas({
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [redrawTrigger, setRedrawTrigger] = useState(0);
   const [virtualDimensions, setVirtualDimensions] = useState({ width: 1920, height: 1080 });
+  const [hoveredElementId, setHoveredElementId] = useState(null);
 
   // Load background image to set virtual dimensions state
   useEffect(() => {
@@ -420,6 +421,30 @@ export default function Canvas({
     return null;
   }, [elements, getLocalCoords, checkEraserIntersectsPath]);
 
+  const getHoveredElement = useCallback((x, y) => {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el.type !== 'rectangle' && el.type !== 'circle' && el.type !== 'image') continue;
+      
+      const local = getLocalCoords(x, y, el);
+      const hw = el.width / 2;
+      const hh = el.height / 2;
+      
+      if (el.type === 'rectangle' || el.type === 'image') {
+        if (local.x >= -hw && local.x <= hw && local.y >= -hh && local.y <= hh) {
+          return el;
+        }
+      } else if (el.type === 'circle') {
+        const dx = local.x / hw;
+        const dy = local.y / hh;
+        if (dx * dx + dy * dy <= 1) {
+          return el;
+        }
+      }
+    }
+    return null;
+  }, [elements, getLocalCoords]);
+
   // Group Transform helpers
   const getGroupBoundingBox = useCallback((selectedIds) => {
     if (!selectedIds || selectedIds.length === 0) return null;
@@ -778,6 +803,70 @@ export default function Canvas({
         }
       }
 
+      // Draw tooltip info icon in top-right corner if enabled
+      if (element.properties?.tooltip?.enabled) {
+        ctx.save();
+        // Translate to top right corner (slightly offset inwards)
+        ctx.translate(w / 2 - 10 / scale, -h / 2 + 10 / scale);
+        
+        // Circular background
+        ctx.beginPath();
+        ctx.arc(0, 0, 7 / scale, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)'; // Sky blue border
+        ctx.lineWidth = 1 / scale;
+        ctx.stroke();
+        
+        // Info letter 'i'
+        ctx.fillStyle = '#38bdf8'; // Sky blue text
+        ctx.font = `bold ${8 / scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('i', 0, -0.5 / scale); // tiny vertical adjustment
+        
+        ctx.restore();
+      }
+
+      // Draw canvas-visible tracker bars below the element bounds
+      if (element.properties?.tooltip?.enabled) {
+        const trackers = element.properties.tooltip.trackers || [];
+        const canvasTrackers = trackers.filter(t => t.showOnCanvas);
+        if (canvasTrackers.length > 0) {
+          const barHeight = 5 / scale;
+          const barWidth = w;
+          let startY = h / 2 + 6 / scale; // start 6px below element bounds
+          
+          canvasTrackers.forEach((tracker) => {
+            const val = Number(tracker.value) || 0;
+            const max = Number(tracker.max) || 10;
+            const pct = max > 0 ? Math.min(Math.max(val / max, 0), 1) : 0;
+            
+            // Bar background (semi-transparent slate)
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            ctx.fillRect(-barWidth / 2, startY, barWidth, barHeight);
+            
+            // Bar fill
+            let fillColor = '#ef4444'; // default red
+            if (tracker.color === 'green') fillColor = '#10b981';
+            else if (tracker.color === 'blue') fillColor = '#3b82f6';
+            else if (tracker.color === 'yellow' || tracker.color === 'amber') fillColor = '#f59e0b';
+            else if (tracker.color === 'purple') fillColor = '#8b5cf6';
+            else if (tracker.color === 'rose') fillColor = '#f43f5e';
+            
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(-barWidth / 2, startY, barWidth * pct, barHeight);
+            
+            // Border outline
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1 / scale;
+            ctx.strokeRect(-barWidth / 2, startY, barWidth, barHeight);
+            
+            startY += barHeight + 3 / scale; // vertical stack offset
+          });
+        }
+      }
+
       ctx.restore();
     });
 
@@ -1015,6 +1104,7 @@ export default function Canvas({
   }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
 
   const handleMouseDown = (e) => {
+    setHoveredElementId(null);
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
     const coords = getCanvasCoords(e);
@@ -1266,6 +1356,9 @@ export default function Canvas({
 
     const drag = dragStateRef.current;
     if (drag) {
+      if (hoveredElementId !== null) {
+        setHoveredElementId(null);
+      }
       if (drag.mode === 'draw') {
         if (tempDrawingPathRef.current) {
           tempDrawingPathRef.current.points.push(coords);
@@ -1548,6 +1641,17 @@ export default function Canvas({
           }
         }
       }
+    } else {
+      const hovered = getHoveredElement(coords.x, coords.y);
+      if (hovered && hovered.properties?.tooltip?.enabled) {
+        if (hoveredElementId !== hovered.id) {
+          setHoveredElementId(hovered.id);
+        }
+      } else {
+        if (hoveredElementId !== null) {
+          setHoveredElementId(null);
+        }
+      }
     }
   };
 
@@ -1688,6 +1792,7 @@ export default function Canvas({
   };
 
   const handleMouseLeave = () => {
+    setHoveredElementId(null);
     eraserHoverRef.current = null;
     handleMouseUp();
   };
@@ -1708,6 +1813,30 @@ export default function Canvas({
 
   const { scale, offsetX, offsetY } = getViewportTransform();
 
+  const hoveredElement = hoveredElementId ? elements.find((el) => el.id === hoveredElementId) : null;
+  const showTooltip = hoveredElement && hoveredElement.properties?.tooltip?.enabled;
+
+  let tooltipLeft = 0;
+  let tooltipTop = 0;
+  let isFlipped = false;
+
+  if (showTooltip) {
+    const cx = hoveredElement.x + hoveredElement.width / 2;
+    const screenCx = offsetX + cx * scale;
+    const screenTopY = offsetY + hoveredElement.y * scale;
+    const screenH = hoveredElement.height * scale;
+
+    tooltipLeft = screenCx;
+
+    // Flip if too close to the top boundary
+    if (screenTopY < 165) {
+      tooltipTop = screenTopY + screenH + 10;
+      isFlipped = true;
+    } else {
+      tooltipTop = screenTopY - 10;
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -1724,6 +1853,87 @@ export default function Canvas({
       onMouseLeave={handleMouseLeave}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
+
+      {/* Floating Tooltip Card */}
+      {showTooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: tooltipLeft,
+            top: tooltipTop,
+            transform: isFlipped ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+            zIndex: 40,
+            pointerEvents: 'none',
+          }}
+          className="w-64 p-4 rounded-xl bg-slate-950/90 backdrop-blur-md border border-slate-800/80 text-left shadow-2xl flex flex-col gap-3 transition-all duration-150 select-none"
+        >
+          {/* Header/Title */}
+          <div className="border-b border-slate-800/85 pb-1.5 flex items-center justify-between">
+            <span className="font-bold text-slate-100 text-sm truncate max-w-[190px]">
+              {hoveredElement.properties.tooltip.title || (hoveredElement.type.charAt(0).toUpperCase() + hoveredElement.type.slice(1))}
+            </span>
+            <span className="text-[9px] text-sky-400/80 bg-sky-500/10 px-1.5 py-0.5 rounded font-mono uppercase">
+              {hoveredElement.type}
+            </span>
+          </div>
+
+          {/* Trackers / Bars */}
+          {hoveredElement.properties.tooltip.trackers && hoveredElement.properties.tooltip.trackers.length > 0 && (
+            <div className="space-y-2.5">
+              {hoveredElement.properties.tooltip.trackers.map((tracker) => {
+                const val = Number(tracker.value) || 0;
+                const max = Number(tracker.max) || 10;
+                const pct = max > 0 ? Math.min(Math.max(val / max, 0), 1) : 0;
+                
+                const bgMap = {
+                  red: 'bg-red-500',
+                  green: 'bg-emerald-500',
+                  blue: 'bg-blue-500',
+                  amber: 'bg-amber-500',
+                  purple: 'bg-purple-500',
+                  rose: 'bg-rose-500',
+                };
+                
+                return (
+                  <div key={tracker.id} className="space-y-1">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                      <span className="uppercase tracking-wider truncate max-w-[120px]">{tracker.label}</span>
+                      <span className="font-mono text-slate-300">
+                        {val} <span className="text-slate-600">/</span> {max}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded bg-slate-900 overflow-hidden border border-slate-800/40">
+                      <div
+                        style={{ width: `${pct * 100}%` }}
+                        className={`h-full rounded transition-all duration-300 ${bgMap[tracker.color] || 'bg-red-500'}`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Key-Value Stats capsules */}
+          {hoveredElement.properties.tooltip.stats && hoveredElement.properties.tooltip.stats.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-800/50">
+              {hoveredElement.properties.tooltip.stats.map((stat) => (
+                <div
+                  key={stat.id}
+                  className="px-2 py-1.5 rounded-lg bg-slate-900/50 border border-slate-800/60 flex flex-col min-w-0"
+                >
+                  <span className="text-[8px] font-extrabold text-slate-500 uppercase tracking-widest truncate">
+                    {stat.label}
+                  </span>
+                  <span className="text-xs font-bold text-slate-200 truncate mt-0.5">
+                    {stat.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Render active cursors with names */}
       {users
