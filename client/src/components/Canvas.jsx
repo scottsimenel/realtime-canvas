@@ -10,12 +10,17 @@ export default function Canvas({
   currentUser,
   selectedElementIds,
   setSelectedElementIds,
+  activeTool,
+  penColor,
+  penSize,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const dragStateRef = useRef(null);
   const lastCursorEmitRef = useRef(0);
   const imageCache = useRef({});
+  const tempDrawingPathRef = useRef(null); // Ref for local drawing stroke: { points, stroke, strokeWidth }
+  const eraserHoverRef = useRef(null); // Ref for tracking eraser mouse cursor hover coordinate: { x, y }
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [redrawTrigger, setRedrawTrigger] = useState(0);
 
@@ -97,6 +102,49 @@ export default function Canvas({
     return null;
   }, [getLocalCoords]);
 
+  // Check if circular eraser (or click point) intersects with any segment of a path element (Feature 1)
+  const checkEraserIntersectsPath = useCallback((ex, ey, eraserRad, pathEl) => {
+    const points = pathEl.properties?.points || [];
+    if (points.length < 2) return false;
+
+    // Translate coordinates into path local rotated space
+    const local = getLocalCoords(ex, ey, pathEl);
+    const w = pathEl.width;
+    const h = pathEl.height;
+
+    // Math helper to get shortest distance from a point to a segment
+    const getDistanceToSegment = (px, py, ax, ay, bx, by) => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+
+      let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t)); // Clamp projection inside segment bounds
+
+      const closestX = ax + t * dx;
+      const closestY = ay + t * dy;
+      return Math.hypot(px - closestX, py - closestY);
+    };
+
+    const pathStrokeWidth = pathEl.properties?.strokeWidth || 4;
+    const hitTolerance = eraserRad + pathStrokeWidth / 2;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      // Map normalized coordinates back to local element space
+      const ax = -w / 2 + points[i].x * w;
+      const ay = -h / 2 + points[i].y * h;
+      const bx = -w / 2 + points[i + 1].x * w;
+      const by = -h / 2 + points[i + 1].y * h;
+
+      const dist = getDistanceToSegment(local.x, local.y, ax, ay, bx, by);
+      if (dist <= hitTolerance) {
+        return true;
+      }
+    }
+    return false;
+  }, [getLocalCoords]);
+
   // Check if coordinates hit an element, checking top-most first
   const getElementAtCoords = useCallback((x, y) => {
     for (let i = elements.length - 1; i >= 0; i--) {
@@ -115,10 +163,15 @@ export default function Canvas({
         if (dx * dx + dy * dy <= 1) {
           return el;
         }
+      } else if (el.type === 'path') {
+        // High fidelity check close to actual line segments of the path (Feature 1 selection)
+        if (checkEraserIntersectsPath(x, y, 8, el)) {
+          return el;
+        }
       }
     }
     return null;
-  }, [elements, getLocalCoords]);
+  }, [elements, getLocalCoords, checkEraserIntersectsPath]);
 
   // Group Transform helpers
   const getGroupBoundingBox = useCallback((selectedIds) => {
@@ -332,7 +385,28 @@ export default function Canvas({
 
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = 1;
-        ctx.strokeRect(-w / 2, -h / 2, w, h);
+        ctx.strokeRect(-w / 2 - 1, -h / 2 - 1, w + 2, h + 2);
+      } else if (element.type === 'path') {
+        const points = element.properties?.points || [];
+        if (points.length > 1) {
+          ctx.beginPath();
+          ctx.strokeStyle = element.properties?.stroke || '#3b82f6';
+          ctx.lineWidth = element.properties?.strokeWidth || 4;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          // First point mapped to local coordinate bounds
+          const startX = -w / 2 + points[0].x * w;
+          const startY = -h / 2 + points[0].y * h;
+          ctx.moveTo(startX, startY);
+
+          for (let p = 1; p < points.length; p++) {
+            const px = -w / 2 + points[p].x * w;
+            const py = -h / 2 + points[p].y * h;
+            ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
       }
 
       // Draw lock highlighting (for individual elements)
@@ -512,6 +586,37 @@ export default function Canvas({
       }
     }
 
+    // Draw active local drawing stroke (Feature 1)
+    const activeStroke = tempDrawingPathRef.current;
+    if (activeStroke && activeStroke.points && activeStroke.points.length > 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = activeStroke.stroke || '#3b82f6';
+      ctx.lineWidth = activeStroke.strokeWidth || 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      ctx.moveTo(activeStroke.points[0].x, activeStroke.points[0].y);
+      for (let p = 1; p < activeStroke.points.length; p++) {
+        ctx.lineTo(activeStroke.points[p].x, activeStroke.points[p].y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw eraser circular cursor indicator (Feature 1)
+    if (activeTool === 'eraser' && eraserHoverRef.current) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = '#f43f5e'; // rose-500
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      const eraserRad = Math.max(penSize * 1.5, 12);
+      ctx.arc(eraserHoverRef.current.x, eraserHoverRef.current.y, eraserRad, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw drag-select box
     const drag = dragStateRef.current;
     if (drag && drag.mode === 'select') {
@@ -530,7 +635,7 @@ export default function Canvas({
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox]);
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, penSize]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {
@@ -595,6 +700,51 @@ export default function Canvas({
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
     const coords = getCanvasCoords(e);
+
+    // Feature 1: Pen tool drawing initiation
+    if (activeTool === 'pen') {
+      tempDrawingPathRef.current = {
+        points: [coords],
+        stroke: penColor,
+        strokeWidth: penSize,
+      };
+      dragStateRef.current = {
+        mode: 'draw',
+      };
+      triggerRedraw();
+      return;
+    }
+
+    // Feature 1: Eraser tool activation
+    if (activeTool === 'eraser') {
+      dragStateRef.current = {
+        mode: 'erase',
+      };
+      eraserHoverRef.current = coords;
+
+      // Perform click erase intersection check immediately
+      const eraserRad = Math.max(penSize * 1.5, 12);
+      const elementsToErase = elements.filter(
+        (el) => el.type === 'path' && checkEraserIntersectsPath(coords.x, coords.y, eraserRad, el)
+      );
+
+      if (elementsToErase.length > 0) {
+        const unlockableIds = elementsToErase
+          .filter((el) => {
+            const lockHolderId = locks[el.id];
+            return !lockHolderId || lockHolderId === currentUser?.id;
+          })
+          .map((el) => el.id);
+
+        if (unlockableIds.length > 0) {
+          setElements((prev) => prev.filter((el) => !unlockableIds.includes(el.id)));
+          setSelectedElementIds((prev) => prev.filter((id) => !unlockableIds.includes(id)));
+          socket.emit('element-delete', { elementIds: unlockableIds });
+        }
+      }
+      triggerRedraw();
+      return;
+    }
 
     // 1. Check if clicking handles of group bounding box (if >1 elements selected)
     if (selectedElementIds.length > 1) {
@@ -772,8 +922,47 @@ export default function Canvas({
     const coords = getCanvasCoords(e);
     throttleCursorMove(coords.x, coords.y);
 
+    if (activeTool === 'eraser') {
+      eraserHoverRef.current = coords;
+      triggerRedraw();
+    }
+
     const drag = dragStateRef.current;
     if (drag) {
+      if (drag.mode === 'draw') {
+        if (tempDrawingPathRef.current) {
+          tempDrawingPathRef.current.points.push(coords);
+          triggerRedraw();
+        }
+        return;
+      }
+
+      if (drag.mode === 'erase') {
+        const socket = socketRef.current;
+        const eraserRad = Math.max(penSize * 1.5, 12);
+        const elementsToErase = elements.filter(
+          (el) => el.type === 'path' && checkEraserIntersectsPath(coords.x, coords.y, eraserRad, el)
+        );
+
+        if (elementsToErase.length > 0) {
+          const unlockableIds = elementsToErase
+            .filter((el) => {
+              const lockHolderId = locks[el.id];
+              return !lockHolderId || lockHolderId === currentUser?.id;
+            })
+            .map((el) => el.id);
+
+          if (unlockableIds.length > 0) {
+            setElements((prev) => prev.filter((el) => !unlockableIds.includes(el.id)));
+            setSelectedElementIds((prev) => prev.filter((id) => !unlockableIds.includes(id)));
+            if (socket && socket.connected) {
+              socket.emit('element-delete', { elementIds: unlockableIds });
+            }
+          }
+        }
+        return;
+      }
+
       if (drag.mode === 'select') {
         drag.currentX = coords.x;
         drag.currentY = coords.y;
@@ -1008,6 +1197,69 @@ export default function Canvas({
   const handleMouseUp = () => {
     const drag = dragStateRef.current;
     if (drag) {
+      if (drag.mode === 'draw') {
+        const strokePath = tempDrawingPathRef.current;
+        if (strokePath && strokePath.points && strokePath.points.length > 1) {
+          // Calculate bounding box boundaries of the raw drawn points
+          let minX = Infinity;
+          let maxX = -Infinity;
+          let minY = Infinity;
+          let maxY = -Infinity;
+
+          strokePath.points.forEach((p) => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          });
+
+          // Ensure width and height are non-zero to avoid division by zero
+          const w = Math.max(maxX - minX, 4);
+          const h = Math.max(maxY - minY, 4);
+
+          // Normalize the raw points relative to the bounding box
+          const normalizedPoints = strokePath.points.map((p) => ({
+            x: (p.x - minX) / w,
+            y: (p.y - minY) / h,
+          }));
+
+          const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+          const element = {
+            id,
+            type: 'path',
+            x: minX,
+            y: minY,
+            width: w,
+            height: h,
+            properties: {
+              points: normalizedPoints,
+              stroke: strokePath.stroke,
+              strokeWidth: strokePath.strokeWidth,
+              rotation: 0,
+            },
+          };
+
+          // Optimistically update locally
+          setElements((prev) => [...prev, element]);
+
+          // Emit to server
+          const socket = socketRef.current;
+          if (socket && socket.connected) {
+            socket.emit('element-create', { element });
+          }
+        }
+        tempDrawingPathRef.current = null;
+        dragStateRef.current = null;
+        triggerRedraw();
+        return;
+      }
+
+      if (drag.mode === 'erase') {
+        dragStateRef.current = null;
+        triggerRedraw();
+        return;
+      }
+
       if (drag.mode === 'select') {
         const minX = Math.min(drag.startX, drag.currentX);
         const maxX = Math.max(drag.startX, drag.currentX);
@@ -1078,6 +1330,7 @@ export default function Canvas({
   };
 
   const handleMouseLeave = () => {
+    eraserHoverRef.current = null;
     handleMouseUp();
   };
 
@@ -1094,7 +1347,13 @@ export default function Canvas({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-[#0b0f19] select-none overflow-hidden cursor-crosshair border border-slate-800/80 rounded-xl shadow-inner shadow-black/50"
+      className={`relative w-full h-full bg-[#0b0f19] select-none overflow-hidden border border-slate-800/80 rounded-xl shadow-inner shadow-black/50 ${
+        activeTool === 'pen'
+          ? 'cursor-crosshair'
+          : activeTool === 'eraser'
+          ? 'cursor-none'
+          : 'cursor-default'
+      }`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

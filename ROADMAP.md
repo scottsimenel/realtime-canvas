@@ -6,7 +6,7 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
 
 ## 📋 Feature Checklist
 
-- [ ] **Feature 1: Collaborative Freehand Drawing Brush**
+- [x] **Feature 1: Collaborative Freehand Drawing Brush**
   - Ability to draw lines on the canvas in real-time.
   - Brush options: Custom colors, pen size, and eraser mode.
   - Action: "Clear Canvas" button to reset freehand drawings.

@@ -82,6 +82,11 @@ export default function App() {
   const [isHeightFocused, setIsHeightFocused] = useState(false);
   const [isRotationFocused, setIsRotationFocused] = useState(false);
 
+  // States for collaborative drawing tool (Feature 1)
+  const [activeTool, setActiveTool] = useState('select'); // 'select', 'pen', 'eraser'
+  const [penColor, setPenColor] = useState('#3b82f6');
+  const [penSize, setPenSize] = useState(4);
+
   // Sync state during rendering to avoid useEffect cascading renders
   const [prevSelectedElementIds, setPrevSelectedElementIds] = useState([]);
   const [prevElements, setPrevElements] = useState([]);
@@ -471,6 +476,31 @@ export default function App() {
     });
   }, [selectedElementIds, locks, currentUser]);
 
+  const handleClearDrawings = useCallback(() => {
+    const drawingElementIds = elements
+      .filter((el) => el.type === 'path')
+      .map((el) => el.id);
+
+    if (drawingElementIds.length === 0) return;
+
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
+      const unlockableDrawingIds = drawingElementIds.filter((id) => {
+        const lockHolderId = locks[id];
+        return !lockHolderId || lockHolderId === currentUser?.id;
+      });
+
+      if (unlockableDrawingIds.length === 0) return;
+
+      socket.emit('element-delete', { elementIds: unlockableDrawingIds }, (res) => {
+        if (res && res.success) {
+          setElements((prev) => prev.filter((el) => !unlockableDrawingIds.includes(el.id)));
+          setSelectedElementIds((prev) => prev.filter((id) => !unlockableDrawingIds.includes(id)));
+        }
+      });
+    }
+  }, [elements, locks, currentUser, setSelectedElementIds]);
+
   // Lobby (Join Screen)
   if (!joined) {
     return (
@@ -698,6 +728,115 @@ export default function App() {
 
         {/* Center Canvas Area */}
         <main className="flex-1 p-5 flex flex-col overflow-hidden relative">
+          {/* Floating Toolbar */}
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+            <div className="backdrop-blur-md bg-slate-900/75 border border-slate-800 rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveTool('select')}
+                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                  activeTool === 'select'
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+                title="Select Tool"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.303.197-1.593 1.593M21.75 12h-2.25m-.197 5.303-1.593-1.593M3.071 6.25 4.664 4.664M12 19.75v2.25M6.25 3.071 4.664 4.664M4.5 12H2.25" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTool('pen')}
+                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                  activeTool === 'pen'
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+                title="Pen Tool"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTool('eraser')}
+                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                  activeTool === 'eraser'
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+                title="Eraser Tool"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+              <div className="w-px h-6 bg-slate-800 self-center mx-1" />
+              <button
+                type="button"
+                onClick={handleClearDrawings}
+                className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
+                title="Clear All Drawings"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Slide-out sub-toolbar when Pen Tool is active */}
+            {activeTool === 'pen' && (
+              <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+                {/* Pen Color presets */}
+                <div className="flex items-center gap-1.5">
+                  {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ffffff'].map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setPenColor(color)}
+                      style={{ backgroundColor: color }}
+                      className={`w-5 h-5 rounded-full transition-all border border-black/10 cursor-pointer ${
+                        penColor === color
+                          ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900 scale-110'
+                          : 'hover:scale-105'
+                      }`}
+                    />
+                  ))}
+                  {/* Custom color picker */}
+                  <div className="relative w-5 h-5 rounded-full overflow-hidden border border-slate-700 cursor-pointer flex items-center justify-center">
+                    <input
+                      type="color"
+                      value={penColor}
+                      onChange={(e) => setPenColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                    />
+                    <span className="text-[10px] text-slate-400 font-bold select-none">+</span>
+                  </div>
+                </div>
+
+                <div className="w-px h-4 bg-slate-800" />
+
+                {/* Pen size selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 select-none">Size</span>
+                  <input
+                    type="range"
+                    min="2"
+                    max="24"
+                    value={penSize}
+                    onChange={(e) => setPenSize(parseInt(e.target.value, 10))}
+                    className="w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <span className="text-[10px] font-mono text-slate-400 select-none w-5 text-right">
+                    {penSize}px
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           <Canvas
             socketRef={socketRef}
             elements={elements}
@@ -708,6 +847,9 @@ export default function App() {
             currentUser={currentUser}
             selectedElementIds={selectedElementIds}
             setSelectedElementIds={setSelectedElementIds}
+            activeTool={activeTool}
+            penColor={penColor}
+            penSize={penSize}
           />
         </main>
 
