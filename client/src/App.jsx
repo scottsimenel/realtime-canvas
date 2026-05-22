@@ -87,6 +87,10 @@ export default function App() {
   const [penColor, setPenColor] = useState('#3b82f6');
   const [penSize, setPenSize] = useState(4);
 
+  // Upload states (Feature 3)
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
   // Sync state during rendering to avoid useEffect cascading renders
   const [prevSelectedElementIds, setPrevSelectedElementIds] = useState([]);
   const [prevElements, setPrevElements] = useState([]);
@@ -371,6 +375,48 @@ export default function App() {
       });
     },
     []
+  );
+
+  const handleImageUpload = useCallback(
+    async (file) => {
+      if (!file) return;
+
+      // Basic client-side validation
+      if (!file.type.startsWith('image/')) {
+        setUploadError('Selected file is not a valid image.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Image size exceeds 5MB limit.');
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadError('');
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      try {
+        const response = await fetch(`${SOCKET_URL}/api/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          handleSpawnImage(data.url);
+        } else {
+          setUploadError(data.error || 'Failed to upload image.');
+        }
+      } catch (err) {
+        console.error('Error uploading image:', err);
+        setUploadError('Server connection error.');
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [handleSpawnImage]
   );
 
   const inspectorLockRef = useRef(false);
@@ -722,6 +768,70 @@ export default function App() {
                   </div>
                 </button>
               ))}
+            </div>
+
+            {/* Custom File Upload Panel */}
+            <div className="mt-5 pt-4 border-t border-slate-800/80">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                Upload Custom Image
+              </h3>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add('border-blue-500/80', 'bg-blue-500/5');
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-blue-500/80', 'bg-blue-500/5');
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove('border-blue-500/80', 'bg-blue-500/5');
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleImageUpload(e.dataTransfer.files[0]);
+                  }
+                }}
+                className="group relative border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/40 text-center hover:border-slate-700 transition cursor-pointer flex flex-col items-center justify-center min-h-[90px]"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleImageUpload(e.target.files[0]);
+                    }
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={isUploading}
+                />
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[10px] font-bold text-sky-400">Uploading image...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-1">
+                    <svg
+                      className="w-6 h-6 text-slate-500 group-hover:text-slate-400 transition"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 transition">
+                      Drag image here or browse
+                    </span>
+                    <span className="text-[9px] text-slate-600">Supports PNG, JPG, GIF, WEBP up to 5MB</span>
+                  </div>
+                )}
+              </div>
+              {uploadError && (
+                <p className="text-[9px] text-rose-400 mt-1.5 font-medium flex items-center gap-1">
+                  ⚠️ {uploadError}
+                </p>
+              )}
             </div>
           </div>
         </aside>
