@@ -90,18 +90,29 @@ io.on('connection', (socket) => {
    * Prevents multiple users from moving the same element simultaneously.
    */
   socket.on('element-lock', (data, callback) => {
-    const { elementId } = data || {};
+    const { elementId, elementIds } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+
+    if (elementIds && Array.isArray(elementIds)) {
+      const lockedIds = registry.lockElements(elementIds, socket.id);
+      console.log(`Elements locked: [${lockedIds.join(', ')}] by ${socket.id}`);
+      lockedIds.forEach((id) => {
+        socket.to(room).emit('element-locked', { elementId: id, userId: socket.id });
+      });
+      if (typeof callback === 'function') {
+        callback({ success: lockedIds.length > 0, lockedIds });
+      }
+      return;
+    }
+
     if (!elementId) {
       if (typeof callback === 'function') callback({ success: false, error: 'Element ID is required' });
       return;
     }
 
     const success = registry.lockElement(elementId, socket.id);
-    const room = socket.room || DEFAULT_ROOM;
-
     if (success) {
       console.log(`Element locked: ${elementId} by ${socket.id}`);
-      // Notify others that the element is locked by this user
       socket.to(room).emit('element-locked', { elementId, userId: socket.id });
       if (typeof callback === 'function') callback({ success: true });
     } else {
@@ -121,18 +132,29 @@ io.on('connection', (socket) => {
    * Handle element unlock request when a user deselects or stops dragging an element.
    */
   socket.on('element-unlock', (data, callback) => {
-    const { elementId } = data || {};
+    const { elementId, elementIds } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+
+    if (elementIds && Array.isArray(elementIds)) {
+      const unlockedIds = registry.unlockElements(elementIds, socket.id);
+      console.log(`Elements unlocked: [${unlockedIds.join(', ')}] by ${socket.id}`);
+      unlockedIds.forEach((id) => {
+        socket.to(room).emit('element-unlocked', { elementId: id, userId: socket.id });
+      });
+      if (typeof callback === 'function') {
+        callback({ success: unlockedIds.length > 0, unlockedIds });
+      }
+      return;
+    }
+
     if (!elementId) {
       if (typeof callback === 'function') callback({ success: false, error: 'Element ID is required' });
       return;
     }
 
     const success = registry.unlockElement(elementId, socket.id);
-    const room = socket.room || DEFAULT_ROOM;
-
     if (success) {
       console.log(`Element unlocked: ${elementId} by ${socket.id}`);
-      // Notify others that the lock has been released
       socket.to(room).emit('element-unlocked', { elementId, userId: socket.id });
       if (typeof callback === 'function') callback({ success: true });
     } else {
@@ -147,17 +169,31 @@ io.on('connection', (socket) => {
    * Verifies locks before applying updates and broadcasts changes.
    */
   socket.on('element-update', (data, callback) => {
-    const { elementId, updates } = data || {};
+    const { elementId, updates, batch } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+
+    if (batch && Array.isArray(batch)) {
+      const updatedElements = registry.updateElements(batch, socket.id);
+      if (updatedElements.length > 0) {
+        // Broadcast batch updates to other clients
+        socket.to(room).emit('element-updated-batch', {
+          batch: batch.filter(item => updatedElements.some(el => el.id === item.elementId)),
+          userId: socket.id
+        });
+      }
+      if (typeof callback === 'function') {
+        callback({ success: updatedElements.length > 0, elements: updatedElements });
+      }
+      return;
+    }
+
     if (!elementId || !updates) {
       if (typeof callback === 'function') callback({ success: false, error: 'Missing parameters' });
       return;
     }
 
     const updatedElement = registry.updateElement(elementId, updates, socket.id);
-    const room = socket.room || DEFAULT_ROOM;
-
     if (updatedElement) {
-      // Broadcast the changes to all other clients in the room
       socket.to(room).emit('element-updated', {
         elementId,
         updates,
@@ -188,10 +224,6 @@ io.on('connection', (socket) => {
     const createdElement = registry.createElement(element);
     const room = socket.room || DEFAULT_ROOM;
 
-    // Broadcast element creation to all users in the room (including creator for consistency check or simply io.to)
-    // Here we broadcast to everyone so that they get the event. 
-    // Usually, socket.to(room).emit is preferred if the creator already has it,
-    // but io.to(room) is safer to keep everyone in sync. Let's broadcast to other clients in the room.
     socket.to(room).emit('element-created', {
       element: createdElement,
       userId: socket.id
@@ -206,18 +238,29 @@ io.on('connection', (socket) => {
    * Handle deletion of an element.
    */
   socket.on('element-delete', (data, callback) => {
-    const { elementId } = data || {};
+    const { elementId, elementIds } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+
+    if (elementIds && Array.isArray(elementIds)) {
+      const deletedIds = registry.deleteElements(elementIds, socket.id);
+      console.log(`Elements deleted: [${deletedIds.join(', ')}] by ${socket.id}`);
+      deletedIds.forEach((id) => {
+        socket.to(room).emit('element-deleted', { elementId: id, userId: socket.id });
+      });
+      if (typeof callback === 'function') {
+        callback({ success: deletedIds.length > 0, deletedIds });
+      }
+      return;
+    }
+
     if (!elementId) {
       if (typeof callback === 'function') callback({ success: false, error: 'Element ID is required' });
       return;
     }
 
     const success = registry.deleteElement(elementId, socket.id);
-    const room = socket.room || DEFAULT_ROOM;
-
     if (success) {
       console.log(`Element deleted: ${elementId} by ${socket.id}`);
-      // Notify all other clients in the room
       socket.to(room).emit('element-deleted', { elementId, userId: socket.id });
       if (typeof callback === 'function') callback({ success: true });
     } else {

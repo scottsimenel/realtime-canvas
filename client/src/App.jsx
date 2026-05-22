@@ -71,7 +71,7 @@ export default function App() {
   const [elements, setElements] = useState([]);
   const [locks, setLocks] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
-  const [selectedElementId, setSelectedElementId] = useState(null);
+  const [selectedElementIds, setSelectedElementIds] = useState([]);
 
   // Update refs when inputs or connection state changes
   useEffect(() => {
@@ -162,7 +162,38 @@ export default function App() {
 
     s.on('element-updated', ({ elementId, updates }) => {
       setElements((prev) =>
-        prev.map((el) => (el.id === elementId ? { ...el, ...updates } : el))
+        prev.map((el) => {
+          if (el.id === elementId) {
+            return {
+              ...el,
+              ...updates,
+              properties: {
+                ...(el.properties || {}),
+                ...(updates.properties || {}),
+              },
+            };
+          }
+          return el;
+        })
+      );
+    });
+
+    s.on('element-updated-batch', ({ batch }) => {
+      setElements((prev) =>
+        prev.map((el) => {
+          const match = batch.find((item) => item.elementId === el.id);
+          if (match) {
+            return {
+              ...el,
+              ...match.updates,
+              properties: {
+                ...(el.properties || {}),
+                ...(match.updates.properties || {}),
+              },
+            };
+          }
+          return el;
+        })
       );
     });
 
@@ -172,7 +203,7 @@ export default function App() {
 
     s.on('element-deleted', ({ elementId }) => {
       setElements((prev) => prev.filter((el) => el.id !== elementId));
-      setSelectedElementId((prev) => (prev === elementId ? null : prev));
+      setSelectedElementIds((prev) => prev.filter((id) => id !== elementId));
     });
 
     return () => {
@@ -286,6 +317,109 @@ export default function App() {
     },
     []
   );
+
+  const inspectorLockRef = useRef(false);
+
+  const handleStartInspectorTransform = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const unlockedIds = selectedElementIds.filter((id) => {
+      const lockHolderId = locks[id];
+      return !lockHolderId || lockHolderId === currentUser?.id;
+    });
+
+    if (unlockedIds.length === 0) return;
+
+    socket.emit('element-lock', { elementIds: unlockedIds }, (res) => {
+      if (res && res.success) {
+        inspectorLockRef.current = true;
+        setLocks((prev) => {
+          const next = { ...prev };
+          unlockedIds.forEach((id) => {
+            next[id] = currentUser.id;
+          });
+          return next;
+        });
+      }
+    });
+  }, [selectedElementIds, locks, currentUser]);
+
+  const handleEndInspectorTransform = useCallback(() => {
+    if (!inspectorLockRef.current) return;
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
+      const activeIds = selectedElementIds.filter((id) => locks[id] === currentUser?.id);
+      socket.emit('element-unlock', { elementIds: activeIds });
+      setLocks((prev) => {
+        const next = { ...prev };
+        activeIds.forEach((id) => {
+          delete next[id];
+        });
+        return next;
+      });
+    }
+    inspectorLockRef.current = false;
+  }, [selectedElementIds, locks, currentUser]);
+
+  const handleInspectorChange = useCallback(
+    (updatesMap) => {
+      const socket = socketRef.current;
+      if (!socket || !socket.connected) return;
+
+      const activeIds = selectedElementIds.filter((id) => {
+        return locks[id] === currentUser?.id || !locks[id];
+      });
+
+      if (activeIds.length === 0) return;
+
+      const batch = activeIds.map((id) => {
+        const el = elements.find((item) => item.id === id);
+        const updates = typeof updatesMap === 'function' ? updatesMap(el) : updatesMap;
+        return { elementId: id, updates };
+      });
+
+      // Optimistically update locally
+      setElements((prev) =>
+        prev.map((el) => {
+          const match = batch.find((b) => b.elementId === el.id);
+          if (match) {
+            return {
+              ...el,
+              ...match.updates,
+              properties: {
+                ...(el.properties || {}),
+                ...(match.updates.properties || {}),
+              },
+            };
+          }
+          return el;
+        })
+      );
+
+      socket.emit('element-update', { batch });
+    },
+    [selectedElementIds, elements, locks, currentUser]
+  );
+
+  const handleDeleteSelected = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const unlockedIds = selectedElementIds.filter((id) => {
+      const lockHolderId = locks[id];
+      return !lockHolderId || lockHolderId === currentUser?.id;
+    });
+
+    if (unlockedIds.length === 0) return;
+
+    socket.emit('element-delete', { elementIds: unlockedIds }, (res) => {
+      if (res && res.success) {
+        setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
+        setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
+      }
+    });
+  }, [selectedElementIds, locks, currentUser]);
 
   // Lobby (Join Screen)
   if (!joined) {
@@ -522,8 +656,8 @@ export default function App() {
             setLocks={setLocks}
             users={users}
             currentUser={currentUser}
-            selectedElementId={selectedElementId}
-            setSelectedElementId={setSelectedElementId}
+            selectedElementIds={selectedElementIds}
+            setSelectedElementIds={setSelectedElementIds}
           />
         </main>
 
@@ -579,6 +713,156 @@ export default function App() {
 
           <hr className="border-slate-800/80" />
 
+          {/* Transform Inspector */}
+          {selectedElementIds.length > 0 && (
+            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                  Transform Inspector
+                </h2>
+                <span className="text-[10px] bg-sky-500/10 text-sky-400 font-bold px-1.5 py-0.5 rounded">
+                  {selectedElementIds.length} selected
+                </span>
+              </div>
+
+              {/* Width & Height Inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Width (px)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="2000"
+                    value={
+                      selectedElementIds.length === 1
+                        ? elements.find((e) => e.id === selectedElementIds[0])?.width || ''
+                        : ''
+                    }
+                    placeholder={selectedElementIds.length > 1 ? 'Mixed' : 'Width'}
+                    onFocus={handleStartInspectorTransform}
+                    onBlur={handleEndInspectorTransform}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        handleInspectorChange({ width: val });
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Height (px)
+                  </label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="2000"
+                    value={
+                      selectedElementIds.length === 1
+                        ? elements.find((e) => e.id === selectedElementIds[0])?.height || ''
+                        : ''
+                    }
+                    placeholder={selectedElementIds.length > 1 ? 'Mixed' : 'Height'}
+                    onFocus={handleStartInspectorTransform}
+                    onBlur={handleEndInspectorTransform}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        handleInspectorChange({ height: val });
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Rotation Control */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Rotation
+                  </label>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {(() => {
+                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
+                      const rotRad = firstEl?.properties?.rotation || 0;
+                      const deg = Math.round((rotRad * 180) / Math.PI) % 360;
+                      return `${deg < 0 ? deg + 360 : deg}°`;
+                    })()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    value={(() => {
+                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
+                      const rotRad = firstEl?.properties?.rotation || 0;
+                      const deg = Math.round((rotRad * 180) / Math.PI) % 360;
+                      return deg < 0 ? deg + 360 : deg;
+                    })()}
+                    onMouseDown={handleStartInspectorTransform}
+                    onTouchStart={handleStartInspectorTransform}
+                    onMouseUp={handleEndInspectorTransform}
+                    onTouchEnd={handleEndInspectorTransform}
+                    onChange={(e) => {
+                      const deg = parseInt(e.target.value, 10);
+                      const rad = (deg * Math.PI) / 180;
+                      handleInspectorChange((el) => ({
+                        properties: {
+                          ...(el.properties || {}),
+                          rotation: rad,
+                        },
+                      }));
+                    }}
+                    className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max="360"
+                    value={(() => {
+                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
+                      const rotRad = firstEl?.properties?.rotation || 0;
+                      const deg = Math.round((rotRad * 180) / Math.PI) % 360;
+                      return deg < 0 ? deg + 360 : deg;
+                    })()}
+                    onFocus={handleStartInspectorTransform}
+                    onBlur={handleEndInspectorTransform}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        const deg = val % 360;
+                        const rad = (deg * Math.PI) / 180;
+                        handleInspectorChange((el) => ({
+                          properties: {
+                            ...(el.properties || {}),
+                            rotation: rad,
+                          },
+                        }));
+                      }
+                    }}
+                    className="w-16 px-2 py-1 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-center text-slate-200 focus:outline-none focus:border-sky-500 transition"
+                  />
+                </div>
+              </div>
+
+              {/* Delete Button */}
+              <button
+                onClick={handleDeleteSelected}
+                className="w-full py-2 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/35 hover:border-rose-500/60 text-xs text-rose-400 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                🗑️ Delete Selected
+              </button>
+            </div>
+          )}
+
+          <hr className="border-slate-800/80" />
+
           {/* Board Elements & Locks */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -601,14 +885,22 @@ export default function App() {
                   const isLocked = !!lockHolderId;
                   const lockHolder = isLocked ? users.find((u) => u.id === lockHolderId) : null;
                   const isLockedByOther = isLocked && lockHolderId !== currentUser?.id;
-                  const isSelected = el.id === selectedElementId;
+                  const isSelected = selectedElementIds.includes(el.id);
                   const shapeName = el.type.charAt(0).toUpperCase() + el.type.slice(1);
 
                   return (
                     <div
                       key={el.id}
-                      onClick={() => {
-                        setSelectedElementId(el.id);
+                      onClick={(e) => {
+                        if (e.shiftKey) {
+                          setSelectedElementIds((prev) =>
+                            prev.includes(el.id)
+                              ? prev.filter((id) => id !== el.id)
+                              : [...prev, el.id]
+                          );
+                        } else {
+                          setSelectedElementIds([el.id]);
+                        }
                       }}
                       className={`p-2.5 rounded-xl flex flex-col gap-1.5 transition cursor-pointer select-none ${
                         isSelected
@@ -667,7 +959,7 @@ export default function App() {
                               socket.emit('element-delete', { elementId: el.id }, (response) => {
                                 if (response && response.success) {
                                   setElements((prev) => prev.filter((item) => item.id !== el.id));
-                                  setSelectedElementId(null);
+                                  setSelectedElementIds((prev) => prev.filter((id) => id !== el.id));
                                 }
                               });
                             }

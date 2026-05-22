@@ -10,10 +10,15 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
   - Ability to draw lines on the canvas in real-time.
   - Brush options: Custom colors, pen size, and eraser mode.
   - Action: "Clear Canvas" button to reset freehand drawings.
-- [ ] **Feature 2: Image Transforms (Resize, Rotate, Delete)**
+- [x] **Feature 2: Image Transforms (Resize, Rotate, Delete)**
   - Click to select spawned images and show interactive transform handles.
   - Support dragging handles to resize and rotate (angle state syncing).
   - Delete button/key to purge elements from the board.
+- [x] **Feature 2.5: Drag Selection (Multi-Select) & Group Transforms**
+  - Drag select intersecting elements on empty space.
+  - Apply unified selection outline, bounding box, and group resizing/rotation.
+  - Acquire batch locks and handle partial concurrency locks gracefully.
+  - Global Transform Inspector control panel with batch resizing, absolute rotation, and delete button.
 - [ ] **Feature 3: Custom Image Asset Upload**
   - Drag-and-drop or file selector to upload custom files from local computers.
   - Server-side static uploads storage or Base64 streaming fallback.

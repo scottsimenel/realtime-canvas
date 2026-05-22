@@ -8,8 +8,8 @@ export default function Canvas({
   setLocks,
   users,
   currentUser,
-  selectedElementId,
-  setSelectedElementId,
+  selectedElementIds,
+  setSelectedElementIds,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -120,6 +120,133 @@ export default function Canvas({
     return null;
   }, [elements, getLocalCoords]);
 
+  // Group Transform helpers
+  const getGroupBoundingBox = useCallback((selectedIds) => {
+    if (!selectedIds || selectedIds.length === 0) return null;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    selectedIds.forEach((id) => {
+      const el = elements.find((e) => e.id === id);
+      if (!el) return;
+
+      const w = el.width;
+      const h = el.height;
+      const cx = el.x + w / 2;
+      const cy = el.y + h / 2;
+      const rad = el.properties?.rotation || 0;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // 4 corners relative to center
+      const corners = [
+        { x: -w / 2, y: -h / 2 },
+        { x: w / 2, y: -h / 2 },
+        { x: w / 2, y: h / 2 },
+        { x: -w / 2, y: h / 2 },
+      ];
+
+      corners.forEach((c) => {
+        const gx = cx + c.x * cos - c.y * sin;
+        const gy = cy + c.x * sin + c.y * cos;
+        if (gx < minX) minX = gx;
+        if (gx > maxX) maxX = gx;
+        if (gy < minY) minY = gy;
+        if (gy > maxY) maxY = gy;
+      });
+    });
+
+    if (minX === Infinity) return null;
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+    };
+  }, [elements]);
+
+  const getGroupHandleAtCoords = useCallback((mx, my, bbox) => {
+    if (!bbox) return null;
+    const r = 10; // hit tolerance radius
+
+    // NW
+    if (Math.hypot(mx - (bbox.x - 4), my - (bbox.y - 4)) <= r) return 'nw';
+    // NE
+    if (Math.hypot(mx - (bbox.x + bbox.width + 4), my - (bbox.y - 4)) <= r) return 'ne';
+    // SE
+    if (Math.hypot(mx - (bbox.x + bbox.width + 4), my - (bbox.y + bbox.height + 4)) <= r) return 'se';
+    // SW
+    if (Math.hypot(mx - (bbox.x - 4), my - (bbox.y + bbox.height + 4)) <= r) return 'sw';
+    // Rotation handle (24px above top edge)
+    if (Math.hypot(mx - bbox.cx, my - (bbox.y - 24)) <= r) return 'rotate';
+
+    return null;
+  }, []);
+
+  const checkElementIntersectsBox = useCallback((el, sMinX, sMaxX, sMinY, sMaxY) => {
+    const w = el.width;
+    const h = el.height;
+    const cx = el.x + w / 2;
+    const cy = el.y + h / 2;
+    const rad = el.properties?.rotation || 0;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const isPointInSelectionBox = (px, py) => {
+      return px >= sMinX && px <= sMaxX && py >= sMinY && py <= sMaxY;
+    };
+
+    const isPointInRotatedElement = (px, py) => {
+      const dx = px - cx;
+      const dy = py - cy;
+      const lx = dx * cos + dy * sin;
+      const ly = -dx * sin + dy * cos;
+      return lx >= -w / 2 && lx <= w / 2 && ly >= -h / 2 && ly <= h / 2;
+    };
+
+    // 1. Check if any of the element's 4 corners is in the selection box
+    const elementCorners = [
+      { x: -w / 2, y: -h / 2 },
+      { x: w / 2, y: -h / 2 },
+      { x: w / 2, y: h / 2 },
+      { x: -w / 2, y: h / 2 },
+    ];
+    for (const c of elementCorners) {
+      const gx = cx + c.x * cos - c.y * sin;
+      const gy = cy + c.x * sin + c.y * cos;
+      if (isPointInSelectionBox(gx, gy)) {
+        return true;
+      }
+    }
+
+    // 2. Check if any of the selection box's 4 corners is inside the rotated element
+    const boxCorners = [
+      { x: sMinX, y: sMinY },
+      { x: sMaxX, y: sMinY },
+      { x: sMaxX, y: sMaxY },
+      { x: sMinX, y: sMaxY },
+    ];
+    for (const bc of boxCorners) {
+      if (isPointInRotatedElement(bc.x, bc.y)) {
+        return true;
+      }
+    }
+
+    // 3. Check if the center of the selection box is inside the element
+    const sCx = (sMinX + sMaxX) / 2;
+    const sCy = (sMinY + sMaxY) / 2;
+    if (isPointInRotatedElement(sCx, sCy)) {
+      return true;
+    }
+
+    return false;
+  }, []);
+
   // Drawing loop
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -208,52 +335,7 @@ export default function Canvas({
         ctx.strokeRect(-w / 2, -h / 2, w, h);
       }
 
-      // Draw Selection Outline & Handles
-      const isSelected = element.id === selectedElementId;
-      if (isSelected) {
-        const outlineColor = '#38bdf8'; // sky-400
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
-
-        // Rotation handle line
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, -h / 2 - 4);
-        ctx.lineTo(0, -h / 2 - 24);
-        ctx.stroke();
-
-        // Rotation handle circle
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, -h / 2 - 24, 5, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
-
-        // Corner handles
-        const handleSize = 7;
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1.5;
-
-        // Top-Left
-        ctx.fillRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        // Top-Right
-        ctx.fillRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        // Bottom-Right
-        ctx.fillRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-        // Bottom-Left
-        ctx.fillRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-      }
-
-      // Draw lock highlighting
+      // Draw lock highlighting (for individual elements)
       if (isLockedByMe || isLockedByOther) {
         const lockColor = isLockedByMe
           ? currentUser?.color || '#3b82f6'
@@ -303,6 +385,7 @@ export default function Canvas({
             20
           );
 
+          // Draw label text
           ctx.fillStyle = '#ffffff';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
@@ -312,7 +395,142 @@ export default function Canvas({
 
       ctx.restore();
     });
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementId]);
+
+    // Draw individual outlines for selected elements
+    selectedElementIds.forEach((id) => {
+      const element = elements.find((e) => e.id === id);
+      if (!element) return;
+
+      const w = element.width;
+      const h = element.height;
+      const cx = element.x + w / 2;
+      const cy = element.y + h / 2;
+      const rad = element.properties?.rotation || 0;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rad);
+
+      ctx.strokeStyle = '#38bdf8'; // sky-400
+      ctx.lineWidth = 1;
+
+      // Draw individual handles only if exactly 1 element is selected
+      if (selectedElementIds.length === 1) {
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+
+        // Rotation handle line
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -h / 2 - 4);
+        ctx.lineTo(0, -h / 2 - 24);
+        ctx.stroke();
+
+        // Rotation handle circle
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, -h / 2 - 24, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        // Corner handles
+        const handleSize = 7;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+
+        // Top-Left
+        ctx.fillRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        // Top-Right
+        ctx.fillRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        // Bottom-Right
+        ctx.fillRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+        // Bottom-Left
+        ctx.fillRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+      } else {
+        // Draw simple selection outline if in a group
+        ctx.strokeRect(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4);
+      }
+
+      ctx.restore();
+    });
+
+    // Draw unified group bounding box & handles if selectedElementIds.length > 1
+    if (selectedElementIds.length > 1) {
+      const bbox = getGroupBoundingBox(selectedElementIds);
+      if (bbox) {
+        ctx.save();
+        ctx.strokeStyle = '#0ea5e9'; // sky-500
+        ctx.lineWidth = 1.5;
+        // Group bounding box outline
+        ctx.strokeRect(bbox.x - 4, bbox.y - 4, bbox.width + 8, bbox.height + 8);
+
+        // Rotation stem
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bbox.cx, bbox.y - 4);
+        ctx.lineTo(bbox.cx, bbox.y - 24);
+        ctx.stroke();
+
+        // Rotation circle
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(bbox.cx, bbox.y - 24, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        // Corner handles
+        const handleSize = 7;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0ea5e9';
+        ctx.lineWidth = 1.5;
+
+        // Top-Left
+        ctx.fillRect(bbox.x - 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x - 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        // Top-Right
+        ctx.fillRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        // Bottom-Right
+        ctx.fillRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+        // Bottom-Left
+        ctx.fillRect(bbox.x - 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x - 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+
+        ctx.restore();
+      }
+    }
+
+    // Draw drag-select box
+    const drag = dragStateRef.current;
+    if (drag && drag.mode === 'select') {
+      const x = Math.min(drag.startX, drag.currentX);
+      const y = Math.min(drag.startY, drag.currentY);
+      const w = Math.abs(drag.startX - drag.currentX);
+      const h = Math.abs(drag.startY - drag.currentY);
+
+      ctx.save();
+      ctx.strokeStyle = '#0ea5e9'; // sky-500
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.fillStyle = 'rgba(14, 165, 233, 0.08)'; // 8% opacity sky blue
+
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+    }
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {
@@ -345,17 +563,24 @@ export default function Canvas({
   // Keyboard listener for element deletion
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (selectedElementId && (e.key === 'Delete' || e.key === 'Backspace')) {
+      if (selectedElementIds.length > 0 && (e.key === 'Delete' || e.key === 'Backspace')) {
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
           return; // Ignore if typing inside text fields
         }
 
         const socket = socketRef.current;
         if (socket && socket.connected) {
-          socket.emit('element-delete', { elementId: selectedElementId }, (response) => {
+          const unlockedIds = selectedElementIds.filter((id) => {
+            const lockHolderId = locks[id];
+            return !lockHolderId || lockHolderId === currentUser?.id;
+          });
+
+          if (unlockedIds.length === 0) return;
+
+          socket.emit('element-delete', { elementIds: unlockedIds }, (response) => {
             if (response && response.success) {
-              setElements((prev) => prev.filter((el) => el.id !== selectedElementId));
-              setSelectedElementId(null);
+              setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
+              setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
             }
           });
         }
@@ -364,16 +589,52 @@ export default function Canvas({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementId, socketRef, setElements, setSelectedElementId]);
+  }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds]);
 
   const handleMouseDown = (e) => {
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
     const coords = getCanvasCoords(e);
 
-    // 1. Check if clicking handles of the currently selected element
-    if (selectedElementId) {
-      const activeElement = elements.find((el) => el.id === selectedElementId);
+    // 1. Check if clicking handles of group bounding box (if >1 elements selected)
+    if (selectedElementIds.length > 1) {
+      const bbox = getGroupBoundingBox(selectedElementIds);
+      if (bbox) {
+        const handle = getGroupHandleAtCoords(coords.x, coords.y, bbox);
+        if (handle) {
+          dragStateRef.current = {
+            mode: handle === 'rotate' ? 'group-rotate' : 'group-resize',
+            handleType: handle,
+            bbox,
+            initialMouseX: coords.x,
+            initialMouseY: coords.y,
+            initialElements: elements.map(el => ({ ...el, properties: { ...el.properties } })),
+            lockedIds: [],
+          };
+
+          const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
+          socket.emit('element-lock', { elementIds: targetIds }, (response) => {
+            if (response && response.success && response.lockedIds) {
+              if (dragStateRef.current) {
+                dragStateRef.current.lockedIds = response.lockedIds;
+                setLocks(prev => {
+                  const next = { ...prev };
+                  response.lockedIds.forEach(id => {
+                    next[id] = currentUser.id;
+                  });
+                  return next;
+                });
+              }
+            }
+          });
+          return;
+        }
+      }
+    }
+
+    // 2. Check if clicking handles of the currently selected element (if exactly 1 element selected)
+    if (selectedElementIds.length === 1) {
+      const activeElement = elements.find((el) => el.id === selectedElementIds[0]);
       if (activeElement) {
         const lockHolderId = locks[activeElement.id];
         const isLockedBySomeoneElse = lockHolderId && lockHolderId !== currentUser?.id;
@@ -405,7 +666,6 @@ export default function Canvas({
                   setLocks((prev) => ({ ...prev, [activeElement.id]: currentUser.id }));
                 }
               } else {
-                // Cancel drag if lock failed
                 dragStateRef.current = null;
               }
             });
@@ -415,17 +675,60 @@ export default function Canvas({
       }
     }
 
-    // 2. Check if clicking an element to select and move it
+    // 3. Check if clicking an element
     const element = getElementAtCoords(coords.x, coords.y);
     if (element) {
       const lockHolderId = locks[element.id];
       if (lockHolderId && lockHolderId !== currentUser?.id) {
         // Locked by someone else, select it but don't drag
-        setSelectedElementId(element.id);
+        setSelectedElementIds([element.id]);
         return;
       }
 
-      setSelectedElementId(element.id);
+      // If shift is pressed, toggle selection
+      if (e.shiftKey) {
+        const isSelected = selectedElementIds.includes(element.id);
+        const newSelection = isSelected
+          ? selectedElementIds.filter(id => id !== element.id)
+          : [...selectedElementIds, element.id];
+        setSelectedElementIds(newSelection);
+        return;
+      }
+
+      // If already in selection group (and not shift), we initiate group move for the whole group
+      if (selectedElementIds.includes(element.id) && selectedElementIds.length > 1) {
+        const bbox = getGroupBoundingBox(selectedElementIds);
+        if (bbox) {
+          dragStateRef.current = {
+            mode: 'group-move',
+            bbox,
+            offsetX: coords.x,
+            offsetY: coords.y,
+            initialElements: elements.map(el => ({ ...el, properties: { ...el.properties } })),
+            lockedIds: [],
+          };
+
+          const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
+          socket.emit('element-lock', { elementIds: targetIds }, (response) => {
+            if (response && response.success && response.lockedIds) {
+              if (dragStateRef.current) {
+                dragStateRef.current.lockedIds = response.lockedIds;
+                setLocks(prev => {
+                  const next = { ...prev };
+                  response.lockedIds.forEach(id => {
+                    next[id] = currentUser.id;
+                  });
+                  return next;
+                });
+              }
+            }
+          });
+          return;
+        }
+      }
+
+      // Otherwise select just this element and start single move
+      setSelectedElementIds([element.id]);
 
       dragStateRef.current = {
         elementId: element.id,
@@ -448,8 +751,20 @@ export default function Canvas({
         }
       });
     } else {
-      // 3. Clicked on empty space: deselect
-      setSelectedElementId(null);
+      // 4. Clicked on empty space: start drag selection
+      if (!e.shiftKey) {
+        setSelectedElementIds([]);
+      }
+
+      dragStateRef.current = {
+        mode: 'select',
+        startX: coords.x,
+        startY: coords.y,
+        currentX: coords.x,
+        currentY: coords.y,
+        isAddingSelection: e.shiftKey,
+        initialSelection: [...selectedElementIds],
+      };
     }
   };
 
@@ -459,95 +774,232 @@ export default function Canvas({
 
     const drag = dragStateRef.current;
     if (drag) {
-      const element = elements.find((el) => el.id === drag.elementId);
-      if (!element) return;
-
-      let updates = {};
-
-      if (drag.mode === 'move') {
-        const newX = Math.round(coords.x - drag.offsetX);
-        const newY = Math.round(coords.y - drag.offsetY);
-        updates = { x: newX, y: newY };
-      } else if (drag.mode === 'rotate') {
-        // Calculate angle between center of element and mouse pointer
-        const cx = drag.initialX + drag.initialWidth / 2;
-        const cy = drag.initialY + drag.initialHeight / 2;
-        const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) + Math.PI / 2;
-        updates = {
-          properties: {
-            ...element.properties,
-            rotation: currentAngle,
-          },
-        };
-      } else if (drag.mode === 'resize') {
-        // Find local coordinates of mouse relative to the initial center
-        const cx = drag.initialX + drag.initialWidth / 2;
-        const cy = drag.initialY + drag.initialHeight / 2;
-        const dx = coords.x - cx;
-        const dy = coords.y - cy;
-        const rad = drag.initialRotation;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-
-        // Local mouse coordinate
-        const lx = dx * cos + dy * sin;
-        const ly = -dx * sin + dy * cos;
-
-        // Scaling multipliers based on clicked corner
-        let signX = 1;
-        let signY = 1;
-        if (drag.handleType === 'nw') { signX = -1; signY = -1; }
-        else if (drag.handleType === 'ne') { signX = 1; signY = -1; }
-        else if (drag.handleType === 'sw') { signX = -1; signY = 1; }
-        else if (drag.handleType === 'se') { signX = 1; signY = 1; }
-
-        let newWidth = Math.max(Math.round(2 * lx * signX), 24);
-        let newHeight = Math.max(Math.round(2 * ly * signY), 24);
-
-        // Aspect ratio retention for images
-        if (element.type === 'image') {
-          const scale = Math.max(newWidth / drag.initialWidth, newHeight / drag.initialHeight);
-          newWidth = Math.round(drag.initialWidth * scale);
-          newHeight = Math.round(drag.initialHeight * scale);
-        }
-
-        // Adjust top-left coordinate to keep center coordinate fixed
-        const newX = Math.round(cx - newWidth / 2);
-        const newY = Math.round(cy - newHeight / 2);
-
-        updates = {
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        };
+      if (drag.mode === 'select') {
+        drag.currentX = coords.x;
+        drag.currentY = coords.y;
+        triggerRedraw();
+        return;
       }
 
-      // Optimistic local state update
-      setElements((prev) =>
-        prev.map((el) => {
-          if (el.id === drag.elementId) {
-            return {
-              ...el,
-              ...updates,
-              properties: {
-                ...(el.properties || {}),
-                ...(updates.properties || {}),
-              },
-            };
-          }
-          return el;
-        })
-      );
+      let updatesBatch = [];
 
-      // Emit updates to the server once lock is acquired
-      if (drag.hasLock) {
+      if (drag.mode === 'group-move') {
+        const dx = Math.round(coords.x - drag.offsetX);
+        const dy = Math.round(coords.y - drag.offsetY);
+
+        const activeIds = drag.lockedIds.length > 0
+          ? drag.lockedIds
+          : selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
+
+        updatesBatch = activeIds.map((id) => {
+          const initEl = drag.initialElements.find(item => item.id === id);
+          if (!initEl) return null;
+          return {
+            elementId: id,
+            updates: {
+              x: initEl.x + dx,
+              y: initEl.y + dy,
+            }
+          };
+        }).filter(Boolean);
+      }
+      else if (drag.mode === 'group-rotate') {
+        const cx = drag.bbox.cx;
+        const cy = drag.bbox.cy;
+        const initialAngle = Math.atan2(drag.initialMouseY - cy, drag.initialMouseX - cx);
+        const currentAngle = Math.atan2(coords.y - cy, coords.x - cx);
+        const deltaAngle = currentAngle - initialAngle;
+
+        const activeIds = drag.lockedIds.length > 0
+          ? drag.lockedIds
+          : selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
+
+        updatesBatch = activeIds.map((id) => {
+          const initEl = drag.initialElements.find(item => item.id === id);
+          if (!initEl) return null;
+
+          const elW = initEl.width;
+          const elH = initEl.height;
+          const elCx = initEl.x + elW / 2;
+          const elCy = initEl.y + elH / 2;
+
+          const rx = elCx - cx;
+          const ry = elCy - cy;
+          const newCx = cx + rx * Math.cos(deltaAngle) - ry * Math.sin(deltaAngle);
+          const newCy = cy + rx * Math.sin(deltaAngle) + ry * Math.cos(deltaAngle);
+
+          const newRotation = (initEl.properties?.rotation || 0) + deltaAngle;
+
+          return {
+            elementId: id,
+            updates: {
+              x: Math.round(newCx - elW / 2),
+              y: Math.round(newCy - elH / 2),
+              properties: {
+                ...initEl.properties,
+                rotation: newRotation,
+              }
+            }
+          };
+        }).filter(Boolean);
+      }
+      else if (drag.mode === 'group-resize') {
+        const dx = coords.x - drag.initialMouseX;
+        const dy = coords.y - drag.initialMouseY;
+        const bbox = drag.bbox;
+
+        let scaleX = 1;
+        let scaleY = 1;
+
+        if (drag.handleType === 'nw') {
+          scaleX = (bbox.width - dx) / bbox.width;
+          scaleY = (bbox.height - dy) / bbox.height;
+        } else if (drag.handleType === 'ne') {
+          scaleX = (bbox.width + dx) / bbox.width;
+          scaleY = (bbox.height - dy) / bbox.height;
+        } else if (drag.handleType === 'se') {
+          scaleX = (bbox.width + dx) / bbox.width;
+          scaleY = (bbox.height + dy) / bbox.height;
+        } else if (drag.handleType === 'sw') {
+          scaleX = (bbox.width - dx) / bbox.width;
+          scaleY = (bbox.height + dy) / bbox.height;
+        }
+
+        scaleX = Math.max(scaleX, 0.05);
+        scaleY = Math.max(scaleY, 0.05);
+
+        const activeIds = drag.lockedIds.length > 0
+          ? drag.lockedIds
+          : selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
+
+        updatesBatch = activeIds.map((id) => {
+          const initEl = drag.initialElements.find(item => item.id === id);
+          if (!initEl) return null;
+
+          const elW = initEl.width;
+          const elH = initEl.height;
+          const elCx = initEl.x + elW / 2;
+          const elCy = initEl.y + elH / 2;
+
+          let newW = Math.round(elW * scaleX);
+          let newH = Math.round(elH * scaleY);
+          newW = Math.max(newW, 10);
+          newH = Math.max(newH, 10);
+
+          const rx = elCx - bbox.cx;
+          const ry = elCy - bbox.cy;
+          const newCx = bbox.cx + rx * scaleX;
+          const newCy = bbox.cy + ry * scaleY;
+
+          return {
+            elementId: id,
+            updates: {
+              x: Math.round(newCx - newW / 2),
+              y: Math.round(newCy - newH / 2),
+              width: newW,
+              height: newH,
+            }
+          };
+        }).filter(Boolean);
+      }
+      else {
+        // Single element transform
+        const element = elements.find((el) => el.id === drag.elementId);
+        if (!element) return;
+
+        let updates = {};
+
+        if (drag.mode === 'move') {
+          const newX = Math.round(coords.x - drag.offsetX);
+          const newY = Math.round(coords.y - drag.offsetY);
+          updates = { x: newX, y: newY };
+        } else if (drag.mode === 'rotate') {
+          const cx = drag.initialX + drag.initialWidth / 2;
+          const cy = drag.initialY + drag.initialHeight / 2;
+          const currentAngle = Math.atan2(coords.y - cy, coords.x - cx) + Math.PI / 2;
+          updates = {
+            properties: {
+              ...element.properties,
+              rotation: currentAngle,
+            },
+          };
+        } else if (drag.mode === 'resize') {
+          const cx = drag.initialX + drag.initialWidth / 2;
+          const cy = drag.initialY + drag.initialHeight / 2;
+          const dx = coords.x - cx;
+          const dy = coords.y - cy;
+          const rad = drag.initialRotation;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+
+          const lx = dx * cos + dy * sin;
+          const ly = -dx * sin + dy * cos;
+
+          let signX = 1;
+          let signY = 1;
+          if (drag.handleType === 'nw') { signX = -1; signY = -1; }
+          else if (drag.handleType === 'ne') { signX = 1; signY = -1; }
+          else if (drag.handleType === 'sw') { signX = -1; signY = 1; }
+          else if (drag.handleType === 'se') { signX = 1; signY = 1; }
+
+          let newWidth = Math.max(Math.round(2 * lx * signX), 24);
+          let newHeight = Math.max(Math.round(2 * ly * signY), 24);
+
+          if (element.type === 'image') {
+            const scale = Math.max(newWidth / drag.initialWidth, newHeight / drag.initialHeight);
+            newWidth = Math.round(drag.initialWidth * scale);
+            newHeight = Math.round(drag.initialHeight * scale);
+          }
+
+          const newX = Math.round(cx - newWidth / 2);
+          const newY = Math.round(cy - newHeight / 2);
+
+          updates = {
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight,
+          };
+        }
+
+        updatesBatch = [{ elementId: drag.elementId, updates }];
+      }
+
+      if (updatesBatch.length > 0) {
+        // Optimistic local state update
+        setElements((prev) =>
+          prev.map((el) => {
+            const match = updatesBatch.find((u) => u.elementId === el.id);
+            if (match) {
+              return {
+                ...el,
+                ...match.updates,
+                properties: {
+                  ...(el.properties || {}),
+                  ...(match.updates.properties || {}),
+                },
+              };
+            }
+            return el;
+          })
+        );
+
+        // Emit updates to the server once lock is acquired
         const socket = socketRef.current;
         if (socket && socket.connected) {
-          socket.emit('element-update', {
-            elementId: drag.elementId,
-            updates,
-          });
+          if (drag.mode.startsWith('group-')) {
+            const unlockedBatch = updatesBatch.filter((item) => {
+              return drag.lockedIds.includes(item.elementId) || !locks[item.elementId] || locks[item.elementId] === currentUser?.id;
+            });
+            if (unlockedBatch.length > 0) {
+              socket.emit('element-update', { batch: unlockedBatch });
+            }
+          } else if (drag.hasLock) {
+            socket.emit('element-update', {
+              elementId: drag.elementId,
+              updates: updatesBatch[0].updates,
+            });
+          }
         }
       }
     }
@@ -556,7 +1008,60 @@ export default function Canvas({
   const handleMouseUp = () => {
     const drag = dragStateRef.current;
     if (drag) {
-      if (drag.hasLock) {
+      if (drag.mode === 'select') {
+        const minX = Math.min(drag.startX, drag.currentX);
+        const maxX = Math.max(drag.startX, drag.currentX);
+        const minY = Math.min(drag.startY, drag.currentY);
+        const maxY = Math.max(drag.startY, drag.currentY);
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        if (width > 3 || height > 3) {
+          const intersectingIds = [];
+          elements.forEach((el) => {
+            if (checkElementIntersectsBox(el, minX, maxX, minY, maxY)) {
+              intersectingIds.push(el.id);
+            }
+          });
+
+          if (drag.isAddingSelection) {
+            setSelectedElementIds((prev) => {
+              const next = [...prev];
+              intersectingIds.forEach((id) => {
+                if (!next.includes(id)) {
+                  next.push(id);
+                }
+              });
+              return next;
+            });
+          } else {
+            setSelectedElementIds(intersectingIds);
+          }
+        } else {
+          if (!drag.isAddingSelection) {
+            setSelectedElementIds([]);
+          }
+        }
+      } else if (drag.mode.startsWith('group-')) {
+        const activeIds = drag.lockedIds.length > 0
+          ? drag.lockedIds
+          : selectedElementIds.filter(id => locks[id] === currentUser?.id);
+
+        if (activeIds.length > 0) {
+          const socket = socketRef.current;
+          if (socket && socket.connected) {
+            socket.emit('element-unlock', { elementIds: activeIds });
+          }
+          setLocks((prev) => {
+            const next = { ...prev };
+            activeIds.forEach((id) => {
+              delete next[id];
+            });
+            return next;
+          });
+        }
+      } else if (drag.hasLock) {
         const socket = socketRef.current;
         if (socket && socket.connected) {
           socket.emit('element-unlock', { elementId: drag.elementId });
@@ -568,6 +1073,7 @@ export default function Canvas({
         });
       }
       dragStateRef.current = null;
+      triggerRedraw();
     }
   };
 

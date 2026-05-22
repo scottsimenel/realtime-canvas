@@ -203,6 +203,75 @@ export class CanvasRegistry {
   }
 
   /**
+   * Attempts to lock a list of elements for a user.
+   * 
+   * @param {string[]} elementIds - List of element IDs.
+   * @param {string} userId - Socket ID.
+   * @returns {string[]} List of successfully locked element IDs.
+   */
+  lockElements(elementIds, userId) {
+    const locked = [];
+    for (const id of elementIds) {
+      if (this.lockElement(id, userId)) {
+        locked.push(id);
+      }
+    }
+    return locked;
+  }
+
+  /**
+   * Unlocks a list of elements.
+   * 
+   * @param {string[]} elementIds - List of element IDs.
+   * @param {string} userId - Socket ID.
+   * @returns {string[]} List of successfully unlocked element IDs.
+   */
+  unlockElements(elementIds, userId) {
+    const unlocked = [];
+    for (const id of elementIds) {
+      if (this.unlockElement(id, userId)) {
+        unlocked.push(id);
+      }
+    }
+    return unlocked;
+  }
+
+  /**
+   * Deletes a list of elements.
+   * 
+   * @param {string[]} elementIds - List of element IDs.
+   * @param {string} userId - Socket ID.
+   * @returns {string[]} List of successfully deleted element IDs.
+   */
+  deleteElements(elementIds, userId) {
+    const deleted = [];
+    for (const id of elementIds) {
+      if (this.deleteElement(id, userId)) {
+        deleted.push(id);
+      }
+    }
+    return deleted;
+  }
+
+  /**
+   * Updates multiple elements in a batch.
+   * 
+   * @param {Array<{ elementId: string, updates: Partial<CanvasElement> }>} batchUpdates - Array of updates.
+   * @param {string} userId - Socket ID.
+   * @returns {CanvasElement[]} List of successfully updated elements.
+   */
+  updateElements(batchUpdates, userId) {
+    const updated = [];
+    for (const item of batchUpdates) {
+      const el = this.updateElement(item.elementId, item.updates, userId);
+      if (el) {
+        updated.push(el);
+      }
+    }
+    return updated;
+  }
+
+  /**
    * Cleans up state when a user disconnects:
    * Removes them from the users list and releases any locks they held.
    * 
