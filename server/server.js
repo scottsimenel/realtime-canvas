@@ -40,7 +40,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -53,19 +53,23 @@ const upload = multer({
 });
 
 // Custom file upload endpoint
-app.post('/api/upload', upload.single('image'), (req, res) => {
+app.post('/api/upload', upload.array('image', 50), (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: 'No files uploaded' });
     }
     const protocol = req.protocol;
     const host = req.get('host');
-    const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
+    
+    const filesData = req.files.map(file => ({
+      url: `${protocol}://${host}/uploads/${file.filename}`,
+      filename: file.filename,
+      originalname: file.originalname
+    }));
     
     res.status(200).json({
       success: true,
-      url: fileUrl,
-      filename: req.file.filename
+      files: filesData
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

@@ -552,24 +552,46 @@ export default function App() {
   );
 
   const handleImageUpload = useCallback(
-    async (file) => {
-      if (!file) return;
+    async (files) => {
+      if (!files || files.length === 0) return;
 
-      // Basic client-side validation
-      if (!file.type.startsWith('image/')) {
-        setUploadError('Selected file is not a valid image.');
+      const filesArray = Array.from(files);
+      const filesToUpload = filesArray.slice(0, 50);
+
+      // Validation
+      const invalidFiles = filesToUpload.filter(
+        (file) => !file.type.startsWith('image/') || file.size > 20 * 1024 * 1024
+      );
+      const validFiles = filesToUpload.filter(
+        (file) => file.type.startsWith('image/') && file.size <= 20 * 1024 * 1024
+      );
+
+      if (validFiles.length === 0) {
+        if (invalidFiles.length > 0) {
+          setUploadError('None of the selected files are valid images under 20MB.');
+        }
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError('Image size exceeds 5MB limit.');
-        return;
+
+      let warningText = '';
+      if (filesArray.length > 50) {
+        warningText = 'Only the first 50 files will be uploaded. ';
+      }
+      if (invalidFiles.length > 0) {
+        warningText += `${invalidFiles.length} file(s) skipped (must be images under 20MB).`;
+      }
+      if (warningText) {
+        setUploadError(warningText);
+      } else {
+        setUploadError('');
       }
 
       setIsUploading(true);
-      setUploadError('');
 
       const formData = new FormData();
-      formData.append('image', file);
+      validFiles.forEach((file) => {
+        formData.append('image', file);
+      });
 
       try {
         const response = await fetch(`${SOCKET_URL}/api/upload`, {
@@ -578,33 +600,35 @@ export default function App() {
         });
 
         const data = await response.json();
-        if (data.success) {
-          const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          const assetName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-          const newAsset = { id: assetId, name: assetName, url: data.url };
-          
-          const socket = socketRef.current;
-          if (socket && socket.connected) {
-            socket.emit('asset-create', { asset: newAsset }, (res) => {
-              if (res && res.success) {
-                setAssets((prev) => [...prev.filter((a) => a.id !== res.asset.id), res.asset]);
-              }
-            });
-          } else {
-            setAssets((prev) => [...prev, newAsset]);
-          }
-          handleSpawnImage(data.url);
+        if (data.success && data.files) {
+          data.files.forEach((uploadedFile) => {
+            const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const originalName = uploadedFile.originalname || uploadedFile.filename;
+            const assetName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+            const newAsset = { id: assetId, name: assetName, url: uploadedFile.url };
+
+            const socket = socketRef.current;
+            if (socket && socket.connected) {
+              socket.emit('asset-create', { asset: newAsset }, (res) => {
+                if (res && res.success) {
+                  setAssets((prev) => [...prev.filter((a) => a.id !== res.asset.id), res.asset]);
+                }
+              });
+            } else {
+              setAssets((prev) => [...prev, newAsset]);
+            }
+          });
         } else {
-          setUploadError(data.error || 'Failed to upload image.');
+          setUploadError(data.error || 'Failed to upload images.');
         }
       } catch (err) {
-        console.error('Error uploading image:', err);
+        console.error('Error uploading images:', err);
         setUploadError('Server connection error.');
       } finally {
         setIsUploading(false);
       }
     },
-    [handleSpawnImage]
+    []
   );
 
   const inspectorLockRef = useRef(false);
@@ -1091,18 +1115,19 @@ export default function App() {
                 onDrop={(e) => {
                   e.preventDefault();
                   e.currentTarget.classList.remove('border-blue-500/80', 'bg-blue-500/5');
-                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleImageUpload(e.dataTransfer.files[0]);
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleImageUpload(e.dataTransfer.files);
                   }
                 }}
                 className="group relative border border-dashed border-slate-800 rounded-xl p-4 bg-slate-950/40 text-center hover:border-slate-700 transition cursor-pointer flex flex-col items-center justify-center min-h-[90px]"
               >
                 <input
                   type="file"
+                  multiple
                   accept="image/*"
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      handleImageUpload(e.target.files[0]);
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleImageUpload(e.target.files);
                     }
                   }}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1111,7 +1136,7 @@ export default function App() {
                 {isUploading ? (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-[10px] font-bold text-sky-400">Uploading image...</span>
+                    <span className="text-[10px] font-bold text-sky-400">Uploading images...</span>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1">
@@ -1125,9 +1150,9 @@ export default function App() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                     <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 transition">
-                      Drag image here or browse
+                      Drag images here or browse
                     </span>
-                    <span className="text-[9px] text-slate-600">Supports PNG, JPG, GIF, WEBP up to 5MB</span>
+                    <span className="text-[9px] text-slate-600">Supports PNG, JPG, GIF, WEBP up to 20MB (max 50 files)</span>
                   </div>
                 )}
               </div>
