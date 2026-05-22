@@ -26,6 +26,37 @@ export default function Canvas({
   const eraserHoverRef = useRef(null); // Ref for tracking eraser mouse cursor hover coordinate: { x, y }
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [redrawTrigger, setRedrawTrigger] = useState(0);
+  const [virtualDimensions, setVirtualDimensions] = useState({ width: 1920, height: 1080 });
+
+  // Load background image to set virtual dimensions state
+  useEffect(() => {
+    const { backgroundImageUrl, showBackground } = roomSettings || {};
+    if (showBackground && backgroundImageUrl) {
+      const img = new Image();
+      img.src = backgroundImageUrl;
+      img.onload = () => {
+        setVirtualDimensions((prev) => {
+          if (prev.width === img.width && prev.height === img.height) return prev;
+          return { width: img.width, height: img.height };
+        });
+      };
+      img.onerror = () => {
+        setTimeout(() => {
+          setVirtualDimensions((prev) => {
+            if (prev.width === 1920 && prev.height === 1080) return prev;
+            return { width: 1920, height: 1080 };
+          });
+        }, 0);
+      };
+    } else {
+      setTimeout(() => {
+        setVirtualDimensions((prev) => {
+          if (prev.width === 1920 && prev.height === 1080) return prev;
+          return { width: 1920, height: 1080 };
+        });
+      }, 0);
+    }
+  }, [roomSettings]);
 
   // Trigger state update to force re-render/redraw on asynchronous assets (like images) loading
   const triggerRedraw = useCallback(() => {
@@ -69,6 +100,15 @@ export default function Canvas({
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Compute scale and translation offsets for mapping client to virtual coords
+  const getViewportTransform = useCallback(() => {
+    const { width: virtualWidth, height: virtualHeight } = virtualDimensions;
+    const scale = Math.min(canvasSize.width / virtualWidth, canvasSize.height / virtualHeight) || 1;
+    const offsetX = (canvasSize.width - virtualWidth * scale) / 2;
+    const offsetY = (canvasSize.height - virtualHeight * scale) / 2;
+    return { scale, offsetX, offsetY, virtualWidth, virtualHeight };
+  }, [canvasSize, virtualDimensions]);
+
   // Translate client coordinates to local coordinates relative to center of a rotated element
   const getLocalCoords = useCallback((x, y, element) => {
     const cx = element.x + element.width / 2;
@@ -85,22 +125,25 @@ export default function Canvas({
   }, []);
 
   // Check if mouse hits a handle on the selected element
-  const getHandleAtCoords = useCallback((x, y, element) => {
+  const getHandleAtCoords = useCallback((x, y, element, scale) => {
     const local = getLocalCoords(x, y, element);
     const w = element.width;
     const h = element.height;
-    const r = 10; // hit tolerance radius
+    const r = 10 / scale; // hit tolerance radius in virtual space
+    const offset = 4 / scale;
+    const rotOffset = 24 / scale;
 
     // NW
-    if (Math.hypot(local.x - (-w / 2 - 4), local.y - (-h / 2 - 4)) <= r) return 'nw';
+    if (Math.hypot(local.x - (-w / 2 - offset), local.y - (-h / 2 - offset)) <= r) return 'nw';
     // NE
-    if (Math.hypot(local.x - (w / 2 + 4), local.y - (-h / 2 - 4)) <= r) return 'ne';
+    if (Math.hypot(local.x - (w / 2 + offset), local.y - (-h / 2 - offset)) <= r) return 'ne';
     // SE
-    if (Math.hypot(local.x - (w / 2 + 4), local.y - (h / 2 + 4)) <= r) return 'se';
+    if (Math.hypot(local.x - (w / 2 + offset), local.y - (h / 2 + offset)) <= r) return 'se';
     // SW
-    if (Math.hypot(local.x - (-w / 2 - 4), local.y - (h / 2 + 4)) <= r) return 'sw';
-    // Rotation handle (24px above top edge)
-    if (Math.hypot(local.x - 0, local.y - (-h / 2 - 24)) <= r) return 'rotate';
+    if (Math.hypot(local.x - (-w / 2 - offset), local.y - (h / 2 + offset)) <= r) return 'sw';
+
+    // Rotation handle (located 24px above top center)
+    if (Math.hypot(local.x - 0, local.y - (-h / 2 - rotOffset)) <= r) return 'rotate';
 
     return null;
   }, [getLocalCoords]);
@@ -376,20 +419,22 @@ export default function Canvas({
     };
   }, [elements]);
 
-  const getGroupHandleAtCoords = useCallback((mx, my, bbox) => {
+  const getGroupHandleAtCoords = useCallback((mx, my, bbox, scale) => {
     if (!bbox) return null;
-    const r = 10; // hit tolerance radius
+    const r = 10 / scale; // hit tolerance radius
+    const offset = 4 / scale;
+    const rotOffset = 24 / scale;
 
     // NW
-    if (Math.hypot(mx - (bbox.x - 4), my - (bbox.y - 4)) <= r) return 'nw';
+    if (Math.hypot(mx - (bbox.x - offset), my - (bbox.y - offset)) <= r) return 'nw';
     // NE
-    if (Math.hypot(mx - (bbox.x + bbox.width + 4), my - (bbox.y - 4)) <= r) return 'ne';
+    if (Math.hypot(mx - (bbox.x + bbox.width + offset), my - (bbox.y - offset)) <= r) return 'ne';
     // SE
-    if (Math.hypot(mx - (bbox.x + bbox.width + 4), my - (bbox.y + bbox.height + 4)) <= r) return 'se';
+    if (Math.hypot(mx - (bbox.x + bbox.width + offset), my - (bbox.y + bbox.height + offset)) <= r) return 'se';
     // SW
-    if (Math.hypot(mx - (bbox.x - 4), my - (bbox.y + bbox.height + 4)) <= r) return 'sw';
+    if (Math.hypot(mx - (bbox.x - offset), my - (bbox.y + bbox.height + offset)) <= r) return 'sw';
     // Rotation handle (24px above top edge)
-    if (Math.hypot(mx - bbox.cx, my - (bbox.y - 24)) <= r) return 'rotate';
+    if (Math.hypot(mx - bbox.cx, my - (bbox.y - rotOffset)) <= r) return 'rotate';
 
     return null;
   }, []);
@@ -464,14 +509,20 @@ export default function Canvas({
     const {
       backgroundImageUrl = null,
       showBackground = true,
-      backgroundMode = 'fill',
       showGrid = true,
       gridType = 'square',
       gridSize = 40,
     } = roomSettings || {};
 
+    const { scale, offsetX, offsetY, virtualWidth, virtualHeight } = getViewportTransform();
+
     // Clear canvas
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    // Save global state and transform to virtual coordinates
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
 
     // Track whether a background image is actually drawn to adjust grid color
     let isBackgroundDrawn = false;
@@ -481,47 +532,7 @@ export default function Canvas({
       const bgImg = getOrLoadImage(backgroundImageUrl);
       if (bgImg && bgImg.width > 0) {
         isBackgroundDrawn = true;
-        ctx.save();
-        
-        const canvasAspect = canvasSize.width / canvasSize.height;
-        const imageAspect = bgImg.width / bgImg.height;
-        let drawW, drawH, drawX, drawY;
-
-        if (backgroundMode === 'stretch') {
-          drawW = canvasSize.width;
-          drawH = canvasSize.height;
-          drawX = 0;
-          drawY = 0;
-        } else if (backgroundMode === 'fit') {
-          // Aspect-fit (Contain)
-          if (imageAspect > canvasAspect) {
-            drawW = canvasSize.width;
-            drawH = canvasSize.width / imageAspect;
-            drawX = 0;
-            drawY = (canvasSize.height - drawH) / 2;
-          } else {
-            drawH = canvasSize.height;
-            drawW = canvasSize.height * imageAspect;
-            drawX = (canvasSize.width - drawW) / 2;
-            drawY = 0;
-          }
-        } else {
-          // Aspect-fill (Cover) - default
-          if (imageAspect > canvasAspect) {
-            drawH = canvasSize.height;
-            drawW = canvasSize.height * imageAspect;
-            drawX = (canvasSize.width - drawW) / 2;
-            drawY = 0;
-          } else {
-            drawW = canvasSize.width;
-            drawH = canvasSize.width / imageAspect;
-            drawX = 0;
-            drawY = (canvasSize.height - drawH) / 2;
-          }
-        }
-
-        ctx.drawImage(bgImg, drawX, drawY, drawW, drawH);
-        ctx.restore();
+        ctx.drawImage(bgImg, 0, 0, virtualWidth, virtualHeight);
       }
     }
 
@@ -529,23 +540,23 @@ export default function Canvas({
     if (showGrid) {
       ctx.save();
       ctx.strokeStyle = isBackgroundDrawn ? '#47556960' : '#1e293b';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 / scale;
 
       if (gridType === 'hexagon') {
         const R = gridSize;
         const hSpacing = 1.5 * R;
         const vSpacing = Math.sqrt(3) * R;
 
-        const cols = Math.ceil(canvasSize.width / hSpacing) + 2;
-        const rows = Math.ceil(canvasSize.height / vSpacing) + 2;
+        const cols = Math.ceil(virtualWidth / hSpacing) + 1;
+        const rows = Math.ceil(virtualHeight / vSpacing) + 1;
 
         ctx.beginPath();
-        for (let col = -1; col < cols; col++) {
+        for (let col = 0; col < cols; col++) {
           const cx = col * hSpacing;
           const isOdd = Math.abs(col) % 2 === 1;
           const yOffset = isOdd ? vSpacing / 2 : 0;
           
-          for (let row = -1; row < rows; row++) {
+          for (let row = 0; row < rows; row++) {
             const cy = row * vSpacing + yOffset;
             
             // Draw flat-topped hexagon
@@ -561,13 +572,13 @@ export default function Canvas({
         // Standard square grid
         const gridSpacing = gridSize;
         ctx.beginPath();
-        for (let x = 0; x < canvasSize.width; x += gridSpacing) {
+        for (let x = 0; x <= virtualWidth; x += gridSpacing) {
           ctx.moveTo(x, 0);
-          ctx.lineTo(x, canvasSize.height);
+          ctx.lineTo(x, virtualHeight);
         }
-        for (let y = 0; y < canvasSize.height; y += gridSpacing) {
+        for (let y = 0; y <= virtualHeight; y += gridSpacing) {
           ctx.moveTo(0, y);
-          ctx.lineTo(canvasSize.width, y);
+          ctx.lineTo(virtualWidth, y);
         }
         ctx.stroke();
       }
@@ -665,54 +676,54 @@ export default function Canvas({
           : lockHolder?.color || '#f43f5e';
 
         ctx.strokeStyle = lockColor;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = 2 / scale;
+        ctx.setLineDash([6 / scale, 4 / scale]);
         ctx.strokeRect(
-          -w / 2 - 6,
-          -h / 2 - 6,
-          w + 12,
-          h + 12
+          -w / 2 - 6 / scale,
+          -h / 2 - 6 / scale,
+          w + 12 / scale,
+          h + 12 / scale
         );
         ctx.setLineDash([]); // Reset dash
 
         // Draw padlock icon or text banner
         if (isLockedByOther && lockHolder) {
           ctx.fillStyle = lockColor;
-          ctx.font = '500 11px Inter, system-ui, sans-serif';
+          ctx.font = `500 ${11 / scale}px Inter, system-ui, sans-serif`;
           const labelText = `🔒 Locked by ${lockHolder.name}`;
           const textWidth = ctx.measureText(labelText).width;
 
           // Draw label background card
           ctx.fillRect(
-            -w / 2 - 6,
-            -h / 2 - 30,
-            textWidth + 12,
-            20
+            -w / 2 - 6 / scale,
+            -h / 2 - 30 / scale,
+            textWidth + 12 / scale,
+            20 / scale
           );
 
           // Draw label text
           ctx.fillStyle = '#ffffff';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, -w / 2, -h / 2 - 20);
+          ctx.fillText(labelText, -w / 2, -h / 2 - 20 / scale);
         } else if (isLockedByMe) {
           ctx.fillStyle = lockColor;
-          ctx.font = '500 11px Inter, system-ui, sans-serif';
+          ctx.font = `500 ${11 / scale}px Inter, system-ui, sans-serif`;
           const labelText = '✨ Transforming';
           const textWidth = ctx.measureText(labelText).width;
 
           ctx.fillRect(
-            -w / 2 - 6,
-            -h / 2 - 30,
-            textWidth + 12,
-            20
+            -w / 2 - 6 / scale,
+            -h / 2 - 30 / scale,
+            textWidth + 12 / scale,
+            20 / scale
           );
 
           // Draw label text
           ctx.fillStyle = '#ffffff';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(labelText, -w / 2, -h / 2 - 20);
+          ctx.fillText(labelText, -w / 2, -h / 2 - 20 / scale);
         }
       }
 
@@ -737,51 +748,52 @@ export default function Canvas({
       ctx.rotate(rad);
 
       ctx.strokeStyle = outlineColor;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 / scale;
 
       // Draw individual handles only if exactly 1 element is selected
       if (selectedElementIds.length === 1) {
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
+        ctx.lineWidth = 1.5 / scale;
+        ctx.strokeRect(-w / 2 - 4 / scale, -h / 2 - 4 / scale, w + 8 / scale, h + 8 / scale);
 
         // Rotation handle line
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 / scale;
         ctx.beginPath();
-        ctx.moveTo(0, -h / 2 - 4);
-        ctx.lineTo(0, -h / 2 - 24);
+        ctx.moveTo(0, -h / 2 - 4 / scale);
+        ctx.lineTo(0, -h / 2 - 24 / scale);
         ctx.stroke();
 
         // Rotation handle circle
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / scale;
         ctx.beginPath();
-        ctx.arc(0, -h / 2 - 24, 5, 0, 2 * Math.PI);
+        ctx.arc(0, -h / 2 - 24 / scale, 5 / scale, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
 
         // Corner handles
-        const handleSize = 7;
+        const handleSize = 7 / scale;
+        const offset = 4 / scale;
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = outlineColor;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / scale;
 
         // Top-Left
-        ctx.fillRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(-w / 2 - offset - handleSize / 2, -h / 2 - offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(-w / 2 - offset - handleSize / 2, -h / 2 - offset - handleSize / 2, handleSize, handleSize);
         // Top-Right
-        ctx.fillRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(w / 2 + 4 - handleSize / 2, -h / 2 - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(w / 2 + offset - handleSize / 2, -h / 2 - offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(w / 2 + offset - handleSize / 2, -h / 2 - offset - handleSize / 2, handleSize, handleSize);
         // Bottom-Right
-        ctx.fillRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(w / 2 + 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(w / 2 + offset - handleSize / 2, h / 2 + offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(w / 2 + offset - handleSize / 2, h / 2 + offset - handleSize / 2, handleSize, handleSize);
         // Bottom-Left
-        ctx.fillRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(-w / 2 - 4 - handleSize / 2, h / 2 + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(-w / 2 - offset - handleSize / 2, h / 2 + offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(-w / 2 - offset - handleSize / 2, h / 2 + offset - handleSize / 2, handleSize, handleSize);
       } else {
         // Draw simple selection outline if in a group
-        ctx.strokeRect(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4);
+        ctx.strokeRect(-w / 2 - 2 / scale, -h / 2 - 2 / scale, w + 4 / scale, h + 4 / scale);
       }
 
       ctx.restore();
@@ -793,45 +805,46 @@ export default function Canvas({
       if (bbox) {
         ctx.save();
         ctx.strokeStyle = '#0ea5e9'; // sky-500
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / scale;
         // Group bounding box outline
-        ctx.strokeRect(bbox.x - 4, bbox.y - 4, bbox.width + 8, bbox.height + 8);
+        ctx.strokeRect(bbox.x - 4 / scale, bbox.y - 4 / scale, bbox.width + 8 / scale, bbox.height + 8 / scale);
 
         // Rotation stem
         ctx.strokeStyle = '#0ea5e9';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 / scale;
         ctx.beginPath();
-        ctx.moveTo(bbox.cx, bbox.y - 4);
-        ctx.lineTo(bbox.cx, bbox.y - 24);
+        ctx.moveTo(bbox.cx, bbox.y - 4 / scale);
+        ctx.lineTo(bbox.cx, bbox.y - 24 / scale);
         ctx.stroke();
 
         // Rotation circle
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#0ea5e9';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / scale;
         ctx.beginPath();
-        ctx.arc(bbox.cx, bbox.y - 24, 5, 0, 2 * Math.PI);
+        ctx.arc(bbox.cx, bbox.y - 24 / scale, 5 / scale, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
 
         // Corner handles
-        const handleSize = 7;
+        const handleSize = 7 / scale;
+        const offset = 4 / scale;
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#0ea5e9';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / scale;
 
         // Top-Left
-        ctx.fillRect(bbox.x - 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(bbox.x - 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(bbox.x - offset - handleSize / 2, bbox.y - offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x - offset - handleSize / 2, bbox.y - offset - handleSize / 2, handleSize, handleSize);
         // Top-Right
-        ctx.fillRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y - 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(bbox.x + bbox.width + offset - handleSize / 2, bbox.y - offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x + bbox.width + offset - handleSize / 2, bbox.y - offset - handleSize / 2, handleSize, handleSize);
         // Bottom-Right
-        ctx.fillRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(bbox.x + bbox.width + 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(bbox.x + bbox.width + offset - handleSize / 2, bbox.y + bbox.height + offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x + bbox.width + offset - handleSize / 2, bbox.y + bbox.height + offset - handleSize / 2, handleSize, handleSize);
         // Bottom-Left
-        ctx.fillRect(bbox.x - 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
-        ctx.strokeRect(bbox.x - 4 - handleSize / 2, bbox.y + bbox.height + 4 - handleSize / 2, handleSize, handleSize);
+        ctx.fillRect(bbox.x - offset - handleSize / 2, bbox.y + bbox.height + offset - handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(bbox.x - offset - handleSize / 2, bbox.y + bbox.height + offset - handleSize / 2, handleSize, handleSize);
 
         ctx.restore();
       }
@@ -860,8 +873,8 @@ export default function Canvas({
       ctx.save();
       ctx.beginPath();
       ctx.strokeStyle = '#f43f5e'; // rose-500
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5 / scale;
+      ctx.setLineDash([4 / scale, 4 / scale]);
       const eraserRad = eraserSize / 2;
       ctx.arc(eraserHoverRef.current.x, eraserHoverRef.current.y, eraserRad, 0, 2 * Math.PI);
       ctx.stroke();
@@ -878,15 +891,18 @@ export default function Canvas({
 
       ctx.save();
       ctx.strokeStyle = '#0ea5e9'; // sky-500
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5 / scale;
+      ctx.setLineDash([4 / scale, 4 / scale]);
       ctx.fillStyle = 'rgba(14, 165, 233, 0.08)'; // 8% opacity sky blue
 
       ctx.fillRect(x, y, w, h);
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, eraserSize, roomSettings]);
+
+    // Restore global translation and scaling
+    ctx.restore();
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, eraserSize, roomSettings, getViewportTransform]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {
@@ -951,6 +967,7 @@ export default function Canvas({
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
     const coords = getCanvasCoords(e);
+    const { scale } = getViewportTransform();
 
     // Feature 1: Pen tool drawing initiation
     if (activeTool === 'pen') {
@@ -1019,7 +1036,7 @@ export default function Canvas({
     if (selectedElementIds.length > 1) {
       const bbox = getGroupBoundingBox(selectedElementIds);
       if (bbox) {
-        const handle = getGroupHandleAtCoords(coords.x, coords.y, bbox);
+        const handle = getGroupHandleAtCoords(coords.x, coords.y, bbox, scale);
         if (handle) {
           dragStateRef.current = {
             mode: handle === 'rotate' ? 'group-rotate' : 'group-resize',
@@ -1059,7 +1076,7 @@ export default function Canvas({
         const isLockedBySomeoneElse = lockHolderId && lockHolderId !== currentUser?.id;
 
         if (!isLockedBySomeoneElse) {
-          const handle = getHandleAtCoords(coords.x, coords.y, activeElement);
+          const handle = getHandleAtCoords(coords.x, coords.y, activeElement, scale);
           if (handle) {
             // Setup transform drag state
             dragStateRef.current = {
@@ -1628,11 +1645,17 @@ export default function Canvas({
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    const { scale, offsetX, offsetY } = getViewportTransform();
     return {
-      x: Math.round(e.clientX - rect.left),
-      y: Math.round(e.clientY - rect.top),
+      x: Math.round((screenX - offsetX) / scale),
+      y: Math.round((screenY - offsetY) / scale),
     };
   };
+
+  const { scale, offsetX, offsetY } = getViewportTransform();
 
   return (
     <div
@@ -1657,13 +1680,16 @@ export default function Canvas({
         .map((user) => {
           if (user.x === undefined || user.y === undefined) return null;
 
+          const screenX = offsetX + user.x * scale;
+          const screenY = offsetY + user.y * scale;
+
           return (
             <div
               key={user.id}
               style={{
                 position: 'absolute',
-                left: user.x,
-                top: user.y,
+                left: screenX,
+                top: screenY,
                 pointerEvents: 'none',
                 transform: 'translate(-2px, -2px)',
                 zIndex: 50,
