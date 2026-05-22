@@ -37,17 +37,20 @@ The project is structured as a decoupled monorepo:
 
 ### 1. In-Memory Transactional State Registry (`/server/registry.js`)
 *   **Active Users**: Tracks user socket IDs, names, assigned cursor colors, and real-time cursor positions.
-*   **Canvas Elements**: Tracks vector shapes (rectangles, circles) and image assets (URLs, widths, heights, X/Y coordinates).
-*   **Concurrency Locking (`locks`)**: Maps active element IDs to user socket IDs. When a user holds a mouse button down on a shape, they acquire a lock. Other clients are blocked from moving or modifying that shape until it is unlocked.
+*   **Canvas Elements**: Tracks vector shapes and image assets (URLs, widths, heights, X/Y coordinates, and rotation properties).
+*   **Concurrency Locking (`locks`)**: Maps active element IDs to user socket IDs. When a user holds a mouse down on an element, a handle, or a rotation stem, they acquire an exclusive mutex lock. Other clients are blocked from modifying that element until released.
+*   **Deletion**: Deletes the canvas element from the registry and releases any held lock when authorized.
 *   **Cleanup**: Automatically releases all locks held by a user and deletes their cursor state when they disconnect.
 
 ### 2. High-DPI & Double-Buffer Canvas (`/client/src/components/Canvas.jsx`)
-*   **Retina Display Support**: Utilizes `ResizeObserver` along with window `devicePixelRatio` to scale the canvas backing store, rendering crisp shapes and text regardless of device resolution.
-*   **Render Loop**: Draws grid backgrounds, shapes, images (from an image loading cache to prevent flickering), active lock boundaries (styled with the locking user's color scheme), and live overlay cursor tags.
+*   **Retina Display Support**: Utilizes `ResizeObserver` along with window `devicePixelRatio` to scale the canvas backing store, rendering crisp shapes, handles, and text regardless of device resolution.
+*   **Interactive Transform Handles**: Renders selection bounding boxes, four corner scale handles, and a center-fixed rotation anchor stem.
+*   **Rotated Coordinates Hit-Detection**: Translates click events to center-relative local coordinates and rotates them back by the negative element rotation angle $-\theta$. This performs accurate selection/drag bounds checking for elements at any angle.
+*   **Render Loop**: Draws grid backgrounds, shapes, images (from an image loading cache to prevent flickering), selection frames, handles, active lock boundaries (styled with the locking user's color scheme), and live overlay cursor tags.
 
 ### 3. Throttled Delta Streaming
 *   **Cursor Tracking**: Client-side pointer positions are tracked and throttled to a **30ms emission interval** over Socket.io. This minimizes payload overhead and network congestion while maintaining smooth cursor animations.
-*   **Optimistic Rendering**: Coordinates of drag-and-drop actions are rendered locally in React state instantly for zero-latency feedback, then pushed asynchronously to the server to synchronize with peer clients.
+*   **Optimistic Rendering**: Transforms and coordinates of drag-and-drop actions are rendered locally in React state instantly for zero-latency feedback, then pushed asynchronously to the server to synchronize with peer clients.
 
 ---
 
@@ -56,10 +59,11 @@ The project is structured as a decoupled monorepo:
 ### Client $\rightarrow$ Server
 *   `join-room`: Registers a user (`name`, `color`, `roomId`) and retrieves the current board snapshot.
 *   `cursor-move`: Sends throttled cursor coordinates (`{ x, y }`).
-*   `element-lock`: Requests an exclusive mutex lock on `{ elementId }` to start a drag action.
+*   `element-lock`: Requests an exclusive mutex lock on `{ elementId }` to start a drag, resize, or rotate action.
 *   `element-unlock`: Releases the lock on `{ elementId }` upon mouse release.
 *   `element-create`: Submits a newly spawned canvas `{ element }` schema.
-*   `element-update`: Streams current coordinates `{ elementId, updates: { x, y } }` while dragging.
+*   `element-update`: Streams coordinates and dimensions `{ elementId, updates: { x, y, width, height, properties: { rotation } } }` during transforms.
+*   `element-delete`: Request deletion of `{ elementId }` (checked against active locks).
 
 ### Server $\rightarrow$ Client
 *   `user-joined`: Broadcasts new participant details to the room.
@@ -68,7 +72,8 @@ The project is structured as a decoupled monorepo:
 *   `element-locked`: Notifies clients that an element is now locked.
 *   `element-unlocked`: Notifies clients that a lock has been released.
 *   `element-created`: Notifies clients of a new canvas element.
-*   `element-updated`: Synchronizes element coordinates and properties.
+*   `element-updated`: Synchronizes element coordinates, dimensions, and rotation properties.
+*   `element-deleted`: Notifies clients that an element has been removed from the canvas.
 
 ---
 
