@@ -858,13 +858,25 @@ export default function App() {
       img.onload = () => {
         const w = img.naturalWidth || 160;
         const h = img.naturalHeight || 110;
-        spawnWithDimensions(w, h);
+
+        let targetW;
+        let targetH;
+
+        if (w <= h) {
+          targetW = 150;
+          targetH = Math.round(h * (150 / w));
+        } else {
+          targetH = 150;
+          targetW = Math.round(w * (150 / h));
+        }
+
+        spawnWithDimensions(targetW, targetH);
       };
 
       img.onerror = () => {
         console.error('Failed to load image to determine native dimensions:', url);
-        // Fallback to default dimensions if loading fails
-        spawnWithDimensions(160, 110);
+        // Fallback with default 160x110 scaled aspect ratio (height is smaller, set to 150)
+        spawnWithDimensions(Math.round(160 * (150 / 110)), 150);
       };
     },
     [setElements]
