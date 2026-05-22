@@ -13,6 +13,7 @@ export default function Canvas({
   activeTool,
   penColor,
   penSize,
+  eraserSize = 20,
   roomSettings,
 }) {
   const canvasRef = useRef(null);
@@ -857,7 +858,7 @@ export default function Canvas({
       ctx.strokeStyle = '#f43f5e'; // rose-500
       ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
-      const eraserRad = Math.max(penSize * 1.5, 12);
+      const eraserRad = eraserSize / 2;
       ctx.arc(eraserHoverRef.current.x, eraserHoverRef.current.y, eraserRad, 0, 2 * Math.PI);
       ctx.stroke();
       ctx.restore();
@@ -881,7 +882,7 @@ export default function Canvas({
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, penSize, roomSettings]);
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, eraserSize, roomSettings]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {
@@ -969,7 +970,7 @@ export default function Canvas({
       eraserHoverRef.current = coords;
 
       // Perform click erase intersection check immediately
-      const eraserRad = Math.max(penSize * 1.5, 12);
+      const eraserRad = eraserSize / 2;
       const elementsToErase = elements.filter(
         (el) => el.type === 'path' && checkEraserIntersectsPath(coords.x, coords.y, eraserRad, el)
       );
@@ -1203,7 +1204,7 @@ export default function Canvas({
 
       if (drag.mode === 'erase') {
         const socket = socketRef.current;
-        const eraserRad = Math.max(penSize * 1.5, 12);
+        const eraserRad = eraserSize / 2;
         const elementsToErase = elements.filter(
           (el) => el.type === 'path' && checkEraserIntersectsPath(coords.x, coords.y, eraserRad, el)
         );

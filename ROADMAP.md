@@ -8,7 +8,7 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
 
 - [x] **Feature 1: Collaborative Freehand Drawing Brush**
   - Ability to draw lines on the canvas in real-time.
-  - Brush options: Custom colors, pen size, and eraser mode.
+  - Brush options: Custom colors, pen size, and resizable eraser mode (5px to 100px size options).
   - Action: "Clear Canvas" button to reset freehand drawings.
 - [x] **Feature 2: Image Transforms (Resize, Rotate, Delete)**
   - Click to select spawned images and show interactive transform handles.
@@ -38,7 +38,7 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
     1.  On `pointerdown`, client creates a unique path ID and emits `element-create` with the path shell.
     2.  On `pointermove`, client throttles updates and emits `path-point-add` with `{ pathId, point: {x, y} }` to stream path growth rather than re-sending the whole path array.
     3.  Server registry appends points to the path element and broadcasts `path-point-added` to room clients.
-*   **Eraser Mode**: Implemented by drawing using the canvas destination-out composite mode (`ctx.globalCompositeOperation = 'destination-out'`) or by drawing using the canvas background color as stroke.
+*   **Eraser Mode**: Implemented by calculating vector line segment intersections to split drawing strokes. Includes an independent, customizable eraser size state (`5px` to `100px`) that dynamically scales the collision detection radius and cursor indicator overlay.
 *   **Clear Drawings**: Emits `canvas-clear-drawings` to server, resetting all path-type elements in the registry.
 
 ---

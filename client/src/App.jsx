@@ -86,6 +86,7 @@ export default function App() {
   const [activeTool, setActiveTool] = useState('select'); // 'select', 'pen', 'eraser'
   const [penColor, setPenColor] = useState('#3b82f6');
   const [penSize, setPenSize] = useState(4);
+  const [eraserSize, setEraserSize] = useState(20);
 
   // Upload states (Feature 3)
   const [isUploading, setIsUploading] = useState(false);
@@ -1494,6 +1495,26 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* Slide-out sub-toolbar when Eraser Tool is active */}
+            {activeTool === 'eraser' && (
+              <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono text-slate-400 select-none">Eraser Size</span>
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    value={eraserSize}
+                    onChange={(e) => setEraserSize(parseInt(e.target.value, 10))}
+                    className="w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                  />
+                  <span className="text-[10px] font-mono text-slate-400 select-none w-8 text-right">
+                    {eraserSize}px
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <Canvas
@@ -1509,6 +1530,7 @@ export default function App() {
             activeTool={activeTool}
             penColor={penColor}
             penSize={penSize}
+            eraserSize={eraserSize}
             roomSettings={roomSettings}
           />
         </main>
