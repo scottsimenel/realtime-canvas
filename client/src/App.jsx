@@ -381,30 +381,34 @@ function TooltipInspector({ element, onChange }) {
                     </div>
 
                     {/* Quick Adjuster Math */}
-                    <div className="flex items-center gap-1 pt-1.5 border-t border-slate-900/60 select-none">
-                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mr-1">Quick Adj:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={quickAdjustValues[tracker.id] || ''}
-                        onChange={(e) => setQuickAdjustValues((prev) => ({ ...prev, [tracker.id]: e.target.value }))}
-                        placeholder="Qty"
-                        className="w-12 px-1.5 py-0.5 bg-slate-900 border border-slate-800 rounded text-[10px] text-center text-slate-200 focus:outline-none focus:border-sky-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(tracker.id, 'damage')}
-                        className="flex-1 px-1.5 py-0.5 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold transition cursor-pointer active:scale-95"
-                      >
-                        Damage (-)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickAdjust(tracker.id, 'heal')}
-                        className="flex-1 px-1.5 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold transition cursor-pointer active:scale-95"
-                      >
-                        Heal (+)
-                      </button>
+                    <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-900/60 select-none">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Quick Adjust</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={quickAdjustValues[tracker.id] || ''}
+                          onChange={(e) => setQuickAdjustValues((prev) => ({ ...prev, [tracker.id]: e.target.value }))}
+                          placeholder="Qty"
+                          className="w-16 px-2 py-0.5 bg-slate-900 border border-slate-800 rounded text-[10px] text-center text-slate-200 focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(tracker.id, 'damage')}
+                          className="flex-1 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold transition cursor-pointer active:scale-95 text-center"
+                        >
+                          Damage (-)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjust(tracker.id, 'heal')}
+                          className="flex-1 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold transition cursor-pointer active:scale-95 text-center"
+                        >
+                          Heal (+)
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
