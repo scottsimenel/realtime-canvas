@@ -264,6 +264,41 @@ export default function App() {
   const [isBgModalOpen, setIsBgModalOpen] = useState(false);
   const [selectedBgPreviewAsset, setSelectedBgPreviewAsset] = useState(null);
 
+  // Layout Panel Visibility States
+  const [showHeader, setShowHeader] = useState(true);
+  const [showLeftSidebar, setShowLeftSidebar] = useState(true);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showTabsBar, setShowTabsBar] = useState(true);
+
+  const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
+
+  const handleToggleZenMode = useCallback(() => {
+    const nextState = isZenMode;
+    setShowHeader(nextState);
+    setShowLeftSidebar(nextState);
+    setShowRightSidebar(nextState);
+    setShowTabsBar(nextState);
+  }, [isZenMode]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === '\\') {
+        const activeEl = document.activeElement;
+        const isInput = activeEl && (
+          activeEl.tagName === 'INPUT' || 
+          activeEl.tagName === 'TEXTAREA' || 
+          activeEl.isContentEditable
+        );
+        if (!isInput) {
+          e.preventDefault();
+          handleToggleZenMode();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [handleToggleZenMode]);
+
   useEffect(() => {
     localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
   }, [hiddenAssetUrls]);
@@ -1364,7 +1399,11 @@ export default function App() {
   return (
     <div className="flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full">
       {/* Header */}
-      <header className="h-16 px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md flex items-center justify-between z-10">
+      <header className={`transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-between z-10 ${
+        showHeader
+          ? 'h-16 px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md opacity-100'
+          : 'h-0 py-0 px-6 border-b-0 opacity-0 pointer-events-none'
+      }`}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/20">
             AG
@@ -1411,7 +1450,11 @@ export default function App() {
       {/* Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Control Panel */}
-        <aside className="w-80 border-r border-slate-800/80 bg-slate-900/10 p-5 flex flex-col gap-6 overflow-y-auto z-10">
+        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap z-10 flex flex-col gap-6 ${
+          showLeftSidebar
+            ? 'w-80 border-r border-slate-800/80 bg-slate-900/10 p-5 opacity-100'
+            : 'w-0 p-0 border-r-0 opacity-0 pointer-events-none'
+        }`}>
           <div>
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
               Spawn Elements
@@ -1859,9 +1902,13 @@ export default function App() {
         </aside>
 
         {/* Center Canvas Area */}
-        <main className="flex-1 p-5 flex flex-col overflow-hidden relative gap-4">
+        <main className="flex-1 p-5 flex flex-col overflow-hidden relative">
           {/* Collaborative Canvas Tabs Bar */}
-          <div className="flex items-center justify-between backdrop-blur-md bg-slate-900/30 border border-slate-800/80 rounded-xl p-1.5 shadow-lg z-20 overflow-hidden">
+          <div className={`flex items-center justify-between backdrop-blur-md bg-slate-900/30 border border-slate-800/80 rounded-xl p-1.5 shadow-lg z-20 overflow-hidden transition-all duration-300 ease-in-out ${
+            showTabsBar
+              ? 'max-h-16 opacity-100 mb-4'
+              : 'max-h-0 opacity-0 mb-0 p-0 border-0 pointer-events-none'
+          }`}>
             <div className="flex items-center gap-2 overflow-x-auto flex-1 mr-4 py-0.5 scrollbar-none">
               {tabs.map((tab) => {
                 const isActive = tab.id === activeTabId;
@@ -1948,6 +1995,25 @@ export default function App() {
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <div className="w-px h-6 bg-slate-800 self-center mx-1" />
+                <button
+                  type="button"
+                  onClick={handleToggleZenMode}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    isZenMode
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Toggle Zen Mode (Press \)"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    {isZenMode ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3 3m12 6V4.5m0 4.5h4.5M15 9l6-6m-6 12v4.5m0-4.5h4.5m-4.5 0l6 6m-6-12v4.5m0-4.5H4.5M9 15l-6 6" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 0v4.5m0-4.5h-4.5m4.5 0l-6-6" />
+                    )}
                   </svg>
                 </button>
               </div>
@@ -2041,10 +2107,143 @@ export default function App() {
               tabId={activeTabId}
             />
           </div>
+
+          {/* Left Sidebar Collapse/Expand boundary button */}
+          <button
+            type="button"
+            onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-5 h-16 bg-slate-900/80 hover:bg-slate-800 backdrop-blur border border-l-0 border-slate-700/50 rounded-r-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 cursor-pointer group"
+            title={showLeftSidebar ? "Collapse Left Panel" : "Expand Left Panel"}
+          >
+            <span className="text-[10px] transition-transform duration-300 group-hover:scale-110">
+              {showLeftSidebar ? '◀' : '▶'}
+            </span>
+          </button>
+
+          {/* Right Sidebar Collapse/Expand boundary button */}
+          <button
+            type="button"
+            onClick={() => setShowRightSidebar(!showRightSidebar)}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-30 w-5 h-16 bg-slate-900/80 hover:bg-slate-800 backdrop-blur border border-r-0 border-slate-700/50 rounded-l-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 cursor-pointer group"
+            title={showRightSidebar ? "Collapse Right Panel" : "Expand Right Panel"}
+          >
+            <span className="text-[10px] transition-transform duration-300 group-hover:scale-110">
+              {showRightSidebar ? '▶' : '◀'}
+            </span>
+          </button>
+
+          {/* Header Collapse/Expand boundary tab */}
+          <button
+            type="button"
+            onClick={() => setShowHeader(!showHeader)}
+            className="absolute top-0 left-6 -translate-y-0.5 z-30 w-12 h-5 bg-slate-900/80 hover:bg-slate-800 backdrop-blur border border-t-0 border-slate-700/50 rounded-b-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 cursor-pointer group"
+            title={showHeader ? "Collapse Header" : "Expand Header"}
+          >
+            <span className="text-[10px] transition-transform duration-300 group-hover:scale-110">
+              {showHeader ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {/* Workspace Layout Controller (bottom-left) */}
+          <div className="absolute bottom-6 left-6 z-30 backdrop-blur-md bg-slate-950/80 border border-slate-800/80 px-3 py-2 rounded-2xl flex items-center gap-1.5 shadow-2xl transition-all duration-300">
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mr-1.5 select-none" title="Workspace Layout Controller">
+              Layout
+            </span>
+            
+            {/* Toggle Header */}
+            <button
+              type="button"
+              onClick={() => setShowHeader(!showHeader)}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                showHeader
+                  ? 'bg-slate-800 text-sky-400 border border-slate-700/50'
+                  : 'text-slate-500 hover:bg-slate-900/60 hover:text-slate-300 border border-transparent'
+              }`}
+              title="Toggle Header"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18" />
+              </svg>
+            </button>
+
+            {/* Toggle Left Sidebar */}
+            <button
+              type="button"
+              onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                showLeftSidebar
+                  ? 'bg-slate-800 text-sky-400 border border-slate-700/50'
+                  : 'text-slate-500 hover:bg-slate-900/60 hover:text-slate-300 border border-transparent'
+              }`}
+              title="Toggle Left Sidebar"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v18" />
+              </svg>
+            </button>
+
+            {/* Toggle Tabs Bar */}
+            <button
+              type="button"
+              onClick={() => setShowTabsBar(!showTabsBar)}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                showTabsBar
+                  ? 'bg-slate-800 text-sky-400 border border-slate-700/50'
+                  : 'text-slate-500 hover:bg-slate-900/60 hover:text-slate-300 border border-transparent'
+              }`}
+              title="Toggle Tabs Bar"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8h18M8 3v5M13 3v5" />
+              </svg>
+            </button>
+
+            {/* Toggle Right Sidebar */}
+            <button
+              type="button"
+              onClick={() => setShowRightSidebar(!showRightSidebar)}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                showRightSidebar
+                  ? 'bg-slate-800 text-sky-400 border border-slate-700/50'
+                  : 'text-slate-500 hover:bg-slate-900/60 hover:text-slate-300 border border-transparent'
+              }`}
+              title="Toggle Right Sidebar"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 3v18" />
+              </svg>
+            </button>
+
+            <div className="w-px h-4 bg-slate-800 self-center mx-1" />
+
+            {/* Toggle Zen Mode */}
+            <button
+              type="button"
+              onClick={handleToggleZenMode}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                isZenMode
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'text-slate-500 hover:bg-slate-900/60 hover:text-slate-300 border border-transparent'
+              }`}
+              title="Zen Mode (Hide All Panels) (Press \ key)"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 0v4.5m0-4.5h-4.5m4.5 0l-6-6" />
+              </svg>
+            </button>
+          </div>
         </main>
 
         {/* Right Info Panel */}
-        <aside className="w-80 border-l border-slate-800/80 bg-slate-900/10 p-5 flex flex-col gap-6 overflow-y-auto z-10">
+        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap z-10 flex flex-col gap-6 ${
+          showRightSidebar
+            ? 'w-80 border-l border-slate-800/80 bg-slate-900/10 p-5 opacity-100'
+            : 'w-0 p-0 border-l-0 opacity-0 pointer-events-none'
+        }`}>
           {/* Active Users */}
           <div>
             <div className="flex items-center justify-between mb-3">
