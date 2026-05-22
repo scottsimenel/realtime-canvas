@@ -114,7 +114,6 @@ export default function App() {
     gridType: 'square',
     gridSize: 40,
   });
-  const [backgroundUrlInput, setBackgroundUrlInput] = useState('');
   const [isSettingsSectionCollapsed, setIsSettingsSectionCollapsed] = useState(false);
 
   useEffect(() => {
@@ -223,7 +222,6 @@ export default function App() {
               setAssets(res.assets || []);
               if (res.roomSettings) {
                 setRoomSettings(res.roomSettings);
-                setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
               }
               setCurrentUser({
                 id: s.id,
@@ -345,7 +343,6 @@ export default function App() {
 
     s.on('room-settings-updated', (updatedSettings) => {
       setRoomSettings(updatedSettings);
-      setBackgroundUrlInput(updatedSettings.backgroundImageUrl || '');
     });
 
     return () => {
@@ -490,7 +487,6 @@ export default function App() {
               setAssets(res.assets || []);
               if (res.roomSettings) {
                 setRoomSettings(res.roomSettings);
-                setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
               }
               setCurrentUser({
                 id: socket.id,
@@ -792,9 +788,6 @@ export default function App() {
       socket.emit('room-settings-update', { updates }, (res) => {
         if (res && res.success && res.roomSettings) {
           setRoomSettings(res.roomSettings);
-          if (updates.backgroundImageUrl !== undefined) {
-            setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
-          }
         }
       });
     }
@@ -1087,6 +1080,21 @@ export default function App() {
 
                             <button
                               type="button"
+                              onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
+                              className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-lg border text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center active:scale-95 transition cursor-pointer z-10 ${
+                                roomSettings.backgroundImageUrl === img.url
+                                  ? 'bg-sky-500 border-sky-400 text-white'
+                                  : 'bg-slate-900/90 border-slate-700 hover:bg-slate-800 hover:text-sky-400'
+                              }`}
+                              title="Set as Canvas Background"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a6 6 0 018.486 0l5.16 5.159m-16.5 0h16.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => toggleHideAsset(img.url)}
                               className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-700 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-400 active:scale-95 transition cursor-pointer z-10"
                               title="Hide Image"
@@ -1240,24 +1248,49 @@ export default function App() {
 
                     {roomSettings.showBackground && (
                       <div className="space-y-2.5 animate-in fade-in duration-200">
-                        {/* URL Input */}
+                        {/* Select Background Image */}
                         <div className="space-y-1">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={backgroundUrlInput}
-                              onChange={(e) => setBackgroundUrlInput(e.target.value)}
-                              placeholder="Paste background URL..."
-                              className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-950/60 border border-slate-800 rounded-lg text-[11px] text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: backgroundUrlInput })}
-                              className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
-                            >
-                              Apply
-                            </button>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Select Image Asset</span>
+                            {roomSettings.backgroundImageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: null })}
+                                className="text-[9px] font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
                           </div>
+                          {allImageAssets.length === 0 ? (
+                            <p className="text-[10px] text-slate-600 italic">No image assets available. Upload above first.</p>
+                          ) : (
+                            <div className="grid grid-cols-4 gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-950/60 rounded-lg border border-slate-900 custom-scrollbar">
+                              {allImageAssets.map((img) => (
+                                <button
+                                  key={img.id}
+                                  type="button"
+                                  onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
+                                  className={`group relative h-8 rounded-lg overflow-hidden border transition cursor-pointer ${
+                                    roomSettings.backgroundImageUrl === img.url
+                                      ? 'border-sky-500 ring-1 ring-sky-500/30'
+                                      : 'border-slate-800 hover:border-slate-700'
+                                  }`}
+                                  title={`Set "${img.name}" as background`}
+                                >
+                                  <img
+                                    src={img.url}
+                                    alt={img.name}
+                                    className={`w-full h-full object-cover transition duration-200 ${
+                                      roomSettings.backgroundImageUrl === img.url
+                                        ? 'opacity-90'
+                                        : 'opacity-50 group-hover:opacity-85'
+                                    }`}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Scaling mode */}
@@ -1276,46 +1309,6 @@ export default function App() {
                                 }`}
                               >
                                 {mode}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Presets */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-slate-500">Presets</span>
-                            {(roomSettings.backgroundImageUrl || backgroundUrlInput) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  handleUpdateRoomSettings({ backgroundImageUrl: null });
-                                  setBackgroundUrlInput('');
-                                }}
-                                className="text-[9px] font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer"
-                              >
-                                Clear
-                              </button>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {SAMPLE_IMAGES.map((img, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url })}
-                                className={`group relative h-8 rounded-lg overflow-hidden border transition cursor-pointer ${
-                                  roomSettings.backgroundImageUrl === img.url
-                                    ? 'border-sky-500'
-                                    : 'border-slate-800 hover:border-slate-700'
-                                }`}
-                                title={img.name}
-                              >
-                                <img
-                                  src={img.url}
-                                  alt={img.name}
-                                  className="w-full h-full object-cover opacity-50 group-hover:opacity-85 transition"
-                                />
                               </button>
                             ))}
                           </div>
