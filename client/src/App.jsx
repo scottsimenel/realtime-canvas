@@ -117,11 +117,14 @@ export default function App() {
 
   const toggleHideAsset = useCallback((url) => {
     setHiddenAssetUrls(prev => {
-      if (prev.includes(url)) {
-        return prev.filter(u => u !== url);
-      } else {
-        return [...prev, url];
+      const next = prev.includes(url)
+        ? prev.filter(u => u !== url)
+        : [...prev, url];
+      
+      if (next.length === 0) {
+        setShowHiddenMode(false);
       }
+      return next;
     });
   }, []);
 
@@ -925,7 +928,10 @@ export default function App() {
                     {showHiddenMode && (
                       <button
                         type="button"
-                        onClick={() => setHiddenAssetUrls([])}
+                        onClick={() => {
+                          setHiddenAssetUrls([]);
+                          setShowHiddenMode(false);
+                        }}
                         className="text-[9px] font-bold text-slate-500 hover:text-slate-300 transition cursor-pointer"
                       >
                         Restore All
