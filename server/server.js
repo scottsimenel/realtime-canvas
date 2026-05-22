@@ -374,6 +374,27 @@ io.on('connection', (socket) => {
   });
 
   /**
+   * Handle reordering of elements.
+   */
+  socket.on('elements-reorder', (data, callback) => {
+    const { orderedIds } = data || {};
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+      if (typeof callback === 'function') callback({ success: false, error: 'orderedIds array is required' });
+      return;
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    const finalOrderedIds = registry.reorderElements(orderedIds);
+
+    // Broadcast the new order to all other clients in the room
+    socket.to(room).emit('elements-reordered', { orderedIds: finalOrderedIds });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, orderedIds: finalOrderedIds });
+    }
+  });
+
+  /**
    * Handle user disconnection.
    * Clean up registry entries (user cursor and held locks) and notify other clients.
    */

@@ -102,6 +102,8 @@ export default function App() {
     }
   });
   const [showHiddenMode, setShowHiddenMode] = useState(false);
+  const [draggedElementId, setDraggedElementId] = useState(null);
+  const [dragOverElementId, setDragOverElementId] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
@@ -307,10 +309,139 @@ export default function App() {
       setAssets((prev) => [...prev.filter((a) => a.id !== asset.id), asset]);
     });
 
+    s.on('elements-reordered', ({ orderedIds }) => {
+      setElements((prev) => {
+        const elementMap = new Map(prev.map((el) => [el.id, el]));
+        const sorted = [];
+        orderedIds.forEach((id) => {
+          if (elementMap.has(id)) {
+            sorted.push(elementMap.get(id));
+          }
+        });
+        prev.forEach((el) => {
+          if (!orderedIds.includes(el.id)) {
+            sorted.push(el);
+          }
+        });
+        return sorted;
+      });
+    });
+
     return () => {
       s.disconnect();
     };
   }, []);
+
+  const adjustElementLayer = useCallback((elementId, direction) => {
+    setElements((prev) => {
+      const next = [...prev];
+      const index = next.findIndex((el) => el.id === elementId);
+      if (index === -1) return prev;
+
+      if (direction === 'forward' && index < next.length - 1) {
+        const temp = next[index];
+        next[index] = next[index + 1];
+        next[index + 1] = temp;
+      } else if (direction === 'backward' && index > 0) {
+        const temp = next[index];
+        next[index] = next[index - 1];
+        next[index - 1] = temp;
+      } else {
+        return prev;
+      }
+
+      const socket = socketRef.current;
+      if (socket && socket.connected) {
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+      }
+      return next;
+    });
+  }, []);
+
+  const adjustSelectedElementsLayer = useCallback((direction) => {
+    if (selectedElementIds.length === 0) return;
+
+    setElements((prev) => {
+      const next = [...prev];
+      const selectedIndices = selectedElementIds
+        .map((id) => next.findIndex((el) => el.id === id))
+        .filter((idx) => idx !== -1)
+        .sort((a, b) => a - b);
+
+      if (direction === 'forward') {
+        for (let i = selectedIndices.length - 1; i >= 0; i--) {
+          const idx = selectedIndices[i];
+          if (idx < next.length - 1) {
+            const temp = next[idx];
+            next[idx] = next[idx + 1];
+            next[idx + 1] = temp;
+          }
+        }
+      } else {
+        for (let i = 0; i < selectedIndices.length; i++) {
+          const idx = selectedIndices[i];
+          if (idx > 0) {
+            const temp = next[idx];
+            next[idx] = next[idx - 1];
+            next[idx - 1] = temp;
+          }
+        }
+      }
+
+      const socket = socketRef.current;
+      if (socket && socket.connected) {
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+      }
+      return next;
+    });
+  }, [selectedElementIds]);
+
+  const handleDragStart = useCallback((e, id) => {
+    e.dataTransfer.setData('text/plain', id);
+    setDraggedElementId(id);
+  }, []);
+
+  const handleDragOver = useCallback((e, id) => {
+    e.preventDefault();
+    if (draggedElementId && draggedElementId !== id) {
+      setDragOverElementId(id);
+    }
+  }, [draggedElementId]);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverElementId(null);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedElementId(null);
+    setDragOverElementId(null);
+  }, []);
+
+  const handleDrop = useCallback((e, targetId) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggedElementId;
+    setDraggedElementId(null);
+    setDragOverElementId(null);
+
+    if (!sourceId || sourceId === targetId) return;
+
+    setElements((prev) => {
+      const next = [...prev];
+      const sourceIndex = next.findIndex((el) => el.id === sourceId);
+      const targetIndex = next.findIndex((el) => el.id === targetId);
+
+      if (sourceIndex === -1 || targetIndex === -1) return prev;
+
+      const [removed] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, removed);
+
+      const socket = socketRef.current;
+      if (socket && socket.connected) {
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+      }
+      return next;
+    });
+  }, [draggedElementId]);
 
   const handleJoin = useCallback(
     (e) => {
@@ -1371,6 +1502,31 @@ export default function App() {
               </div>
 
 
+              {/* Layer Order Controls */}
+              <div className="border-t border-slate-800/80 pt-3">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  Layer Order
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => adjustSelectedElementsLayer('forward')}
+                    className="py-1.5 px-2 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Bring Forward"
+                  >
+                    ▲ Bring Forward
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustSelectedElementsLayer('backward')}
+                    className="py-1.5 px-2 rounded-lg bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                    title="Send Backward"
+                  >
+                    ▼ Send Backward
+                  </button>
+                </div>
+              </div>
+
               {/* Delete Button */}
               <button
                 onClick={handleDeleteSelected}
@@ -1400,7 +1556,7 @@ export default function App() {
               </p>
             ) : (
               <div className="space-y-2">
-                {elements.map((el) => {
+                {[...elements].reverse().map((el) => {
                   const lockHolderId = locks[el.id];
                   const isLocked = !!lockHolderId;
                   const lockHolder = isLocked ? users.find((u) => u.id === lockHolderId) : null;
@@ -1408,9 +1564,22 @@ export default function App() {
                   const isSelected = selectedElementIds.includes(el.id);
                   const shapeName = el.type.charAt(0).toUpperCase() + el.type.slice(1);
 
+                  const originalIndex = elements.findIndex((item) => item.id === el.id);
+                  const isFirst = originalIndex === elements.length - 1; // front-most (top of stack)
+                  const isLast = originalIndex === 0; // back-most (bottom of stack)
+
+                  const isDragging = draggedElementId === el.id;
+                  const isDragOver = dragOverElementId === el.id;
+
                   return (
                     <div
                       key={el.id}
+                      draggable="true"
+                      onDragStart={(e) => handleDragStart(e, el.id)}
+                      onDragOver={(e) => handleDragOver(e, el.id)}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={handleDragEnd}
+                      onDrop={(e) => handleDrop(e, el.id)}
                       onClick={(e) => {
                         if (e.shiftKey) {
                           setSelectedElementIds((prev) =>
@@ -1422,14 +1591,19 @@ export default function App() {
                           setSelectedElementIds([el.id]);
                         }
                       }}
-                      className={`p-2.5 rounded-xl flex flex-col gap-1.5 transition cursor-pointer select-none ${
+                      className={`p-2.5 rounded-xl flex flex-col gap-1.5 transition cursor-grab active:cursor-grabbing select-none ${
                         isSelected
                           ? 'bg-sky-500/10 border border-sky-500/80 shadow-md shadow-sky-500/5'
                           : 'bg-slate-900/40 border border-slate-800/50 hover:border-slate-800'
+                      } ${isDragging ? 'opacity-40' : ''} ${
+                        isDragOver ? 'border-dashed border-sky-400 bg-sky-500/5 scale-[1.02]' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
+                          <div className="text-slate-600 hover:text-slate-400 cursor-grab text-[10px] select-none mr-0.5">
+                            ⋮⋮
+                          </div>
                           <div
                             className="w-3.5 h-3.5 rounded border border-slate-700 flex items-center justify-center text-[9px]"
                           >
@@ -1439,9 +1613,46 @@ export default function App() {
                             {shapeName}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          X:{el.x} Y:{el.y}
-                        </span>
+                        
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={isFirst}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustElementLayer(el.id, 'forward');
+                            }}
+                            className={`w-5 h-5 rounded flex items-center justify-center text-[9px] border transition active:scale-95 cursor-pointer ${
+                              isFirst
+                                ? 'border-slate-800 text-slate-700 cursor-not-allowed bg-slate-950/20'
+                                : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
+                            }`}
+                            title="Bring Forward"
+                            draggable="false"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isLast}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              adjustElementLayer(el.id, 'backward');
+                            }}
+                            className={`w-5 h-5 rounded flex items-center justify-center text-[9px] border transition active:scale-95 cursor-pointer ${
+                              isLast
+                                ? 'border-slate-800 text-slate-700 cursor-not-allowed bg-slate-950/20'
+                                : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
+                            }`}
+                            title="Send Backward"
+                            draggable="false"
+                          >
+                            ▼
+                          </button>
+                          <span className="text-[10px] text-slate-500 font-mono ml-1">
+                            X:{el.x} Y:{el.y}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Lock Status Bar */}
@@ -1472,6 +1683,7 @@ export default function App() {
                       {/* Delete Element Button */}
                       {isSelected && !isLockedByOther && (
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             const socket = socketRef.current;
@@ -1485,6 +1697,7 @@ export default function App() {
                             }
                           }}
                           className="mt-1 w-full py-1.5 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-[10px] text-rose-400 font-bold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          draggable="false"
                         >
                           🗑️ Delete Element
                         </button>

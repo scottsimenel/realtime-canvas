@@ -314,4 +314,29 @@ export class CanvasRegistry {
 
     return { releasedLocks };
   }
+
+  /**
+   * Reorders the canvas elements based on a list of ordered element IDs.
+   * 
+   * @param {string[]} orderedIds - The new order of element IDs.
+   * @returns {string[]} The resulting ordered element IDs.
+   */
+  reorderElements(orderedIds) {
+    const newElements = new Map();
+    orderedIds.forEach((id) => {
+      if (this.elements.has(id)) {
+        newElements.set(id, this.elements.get(id));
+      }
+    });
+
+    // Add any remaining elements that weren't in orderedIds to prevent data loss
+    for (const [id, el] of this.elements.entries()) {
+      if (!newElements.has(id)) {
+        newElements.set(id, el);
+      }
+    }
+
+    this.elements = newElements;
+    return Array.from(this.elements.keys());
+  }
 }
