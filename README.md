@@ -119,6 +119,75 @@ The client will spin up at **`http://localhost:5173`** (or another port if 5173 
 
 ---
 
+## 🌐 Production & Self-Hosting (Cloudflare Tunnels)
+
+This application supports single-origin self-hosting. In production, the Express backend serves the compiled React client statically, allowing you to deploy the entire application under a single domain name using a Cloudflare Tunnel without opening router ports or running two separate web services.
+
+### 1. Build and Run in Production Mode
+
+To compile the React frontend and run the unified server locally:
+```bash
+# 1. Compile the React client assets
+cd client
+npm run build
+
+# 2. Run the Node server (will detect client/dist and serve it statically)
+cd ../server
+npm run start
+```
+By default, the server runs on port `5000`.
+
+### 2. Setting Up Cloudflare Tunnels (Zero Trust)
+
+A Cloudflare Tunnel securely exposes your local server to the internet using Cloudflare's edge network.
+
+#### Option A: Quick Tunnels (Free, No Domain or Account Required)
+Use this option to temporarily share your local deployment with friends or test touch features on mobile devices:
+1. Ensure `cloudflared` is installed.
+2. Spin up the server (`npm run start` in `/server`).
+3. Start the tunnel:
+   ```bash
+   cloudflared tunnel --url http://localhost:5000
+   ```
+4. Copy the temporary `https://*.trycloudflare.com` URL printed in your terminal and share it.
+
+#### Option B: Persistent Cloudflare Tunnel (Requires a Domain on Cloudflare)
+To host the application permanently under a custom subdomain (e.g., `canvas.yourdomain.com`):
+1. **Install cloudflared**:
+   - **Windows**: `winget install Cloudflare.cloudflared`
+   - **macOS**: `brew install cloudflared`
+   - **Linux**: `sudo apt install cloudflared` (or download `.deb`/`.rpm`)
+2. **Authenticate**:
+   ```bash
+   cloudflared tunnel login
+   ```
+3. **Create a Tunnel**:
+   ```bash
+   cloudflared tunnel create canvas-tunnel
+   ```
+4. **Configure the Tunnel**:
+   Create a `config.yml` in your Cloudflare directory (e.g., `~/.cloudflared/config.yml` or `C:\Users\<User>\.cloudflared\config.yml`):
+   ```yaml
+   tunnel: <TUNNEL_ID>
+   credentials-file: <PATH_TO_JSON_CREDENTIALS>
+
+   ingress:
+     - hostname: canvas.yourdomain.com
+       service: http://localhost:5000
+     - service: http_status:404
+   ```
+5. **Route DNS**:
+   ```bash
+   cloudflared tunnel route dns canvas-tunnel canvas.yourdomain.com
+   ```
+6. **Run the Tunnel**:
+   ```bash
+   cloudflared tunnel run canvas-tunnel
+   ```
+   To run it permanently as a background service on your server, run `cloudflared service install`.
+
+---
+
 ## 🗺️ Feature Roadmap & Planning
 
 For details on planned features, implementation designs, and upcoming socket event schemas, see the project [ROADMAP.md](file:///C:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md).

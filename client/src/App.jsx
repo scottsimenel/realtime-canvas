@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import Canvas from './components/Canvas';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:5000'
+  : window.location.origin;
 
 const RANDOM_NAMES = [
   'Creative Fox',
@@ -605,8 +607,8 @@ export default function App() {
 
   // Layout Panel Visibility States
   const [showHeader, setShowHeader] = useState(true);
-  const [showLeftSidebar, setShowLeftSidebar] = useState(true);
-  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showLeftSidebar, setShowLeftSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+  const [showRightSidebar, setShowRightSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [showTabsBar, setShowTabsBar] = useState(true);
 
   const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
@@ -1632,7 +1634,7 @@ export default function App() {
   // Lobby (Join Screen)
   if (!joined) {
     return (
-      <div className="flex-1 flex items-center justify-center p-6 bg-[#070b13] relative overflow-hidden">
+      <div className="flex-1 flex items-center justify-center p-6 bg-[#070b13] relative overflow-y-auto min-h-full">
         {/* Glow Effects */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
@@ -1740,15 +1742,15 @@ export default function App() {
       {/* Header */}
       <header className={`transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-between z-10 ${
         showHeader
-          ? 'h-16 px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md opacity-100'
+          ? 'h-16 px-4 sm:px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md opacity-100'
           : 'h-0 py-0 px-6 border-b-0 opacity-0 pointer-events-none'
       }`}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/20">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/20 shrink-0">
             AG
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-slate-200">
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-slate-200 line-clamp-1">
               Antigravity Canvas
             </h1>
             <p className="text-[10px] text-slate-500 font-mono">
@@ -1757,47 +1759,75 @@ export default function App() {
           </div>
         </div>
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-2 sm:gap-5">
           {/* Connection status badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs">
+          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs">
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full shrink-0 ${
                 connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
               }`}
             />
-            <span className="font-semibold text-slate-300">
+            <span className="font-semibold text-slate-300 hidden sm:inline">
               {connected ? 'Live Syncing' : 'Reconnecting'}
             </span>
           </div>
 
           {/* User count badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300">
-            👥 <span className="font-bold">{users.length}</span> online
+          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300">
+            👥 <span className="font-bold">{users.length}</span><span className="hidden sm:inline"> online</span>
           </div>
 
           {/* User profile capsule */}
-          <div className="flex items-center gap-2.5 pl-3 border-l border-slate-800">
+          <div className="flex items-center gap-2.5 pl-2.5 sm:pl-3 border-l border-slate-800">
             <span
-              className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm"
+              className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0"
               style={{ backgroundColor: currentUser?.color }}
             />
-            <span className="font-semibold text-sm text-slate-200">{currentUser?.name}</span>
+            <span className="font-semibold text-sm text-slate-200 hidden sm:inline">{currentUser?.name}</span>
           </div>
         </div>
       </header>
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Backdrop for Left Sidebar */}
+        {showLeftSidebar && (
+          <div
+            onClick={() => setShowLeftSidebar(false)}
+            className="lg:hidden fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-35 cursor-pointer"
+          />
+        )}
+        
+        {/* Mobile Backdrop for Right Sidebar */}
+        {showRightSidebar && (
+          <div
+            onClick={() => setShowRightSidebar(false)}
+            className="lg:hidden fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-35 cursor-pointer"
+          />
+        )}
+
         {/* Left Control Panel */}
-        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap z-10 flex flex-col gap-6 ${
+        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap flex flex-col gap-6 ${
           showLeftSidebar
-            ? 'w-80 border-r border-slate-800/80 bg-slate-900/10 p-5 opacity-100'
-            : 'w-0 p-0 border-r-0 opacity-0 pointer-events-none'
+            ? 'w-80 border-r border-slate-800/80 bg-[#0c101a]/95 lg:bg-slate-900/10 p-5 opacity-100 fixed lg:relative left-0 top-0 h-full lg:h-auto z-40 lg:z-10 shadow-2xl lg:shadow-none'
+            : 'w-0 p-0 border-r-0 opacity-0 pointer-events-none fixed lg:relative left-0 top-0 h-full lg:h-auto z-40 lg:z-10 shadow-none'
         }`}>
           <div>
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-              Spawn Elements
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Spawn Elements
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowLeftSidebar(false)}
+                className="lg:hidden text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/50 transition cursor-pointer active:scale-95 flex items-center justify-center"
+                title="Close Panel"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => handleSpawnShape('rectangle', '#3b82f6', '#2563eb')}
@@ -2308,7 +2338,7 @@ export default function App() {
 
           <div className="flex-1 min-h-0 relative">
             {/* Floating Toolbar */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+            <div className="absolute bottom-4 sm:top-4 sm:bottom-auto left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
               <div className="backdrop-blur-md bg-slate-900/75 border border-slate-800 rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5">
                 <button
                   type="button"
@@ -2322,6 +2352,20 @@ export default function App() {
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.303.197-1.593 1.593M21.75 12h-2.25m-.197 5.303-1.593-1.593M3.071 6.25 4.664 4.664M12 19.75v2.25M6.25 3.071 4.664 4.664M4.5 12H2.25" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('pan')}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    activeTool === 'pan'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Pan Tool (Hand)"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a2 2 0 114 0v4m0 0V5a2 2 0 114 0v6m0 0V3a2 2 0 114 0v8m0 0V9a2 2 0 114 0v10a7 7 0 01-7 7H9a7 7 0 01-7-7V11a2 2 0 114 0v4m0 0v-4" />
                   </svg>
                 </button>
                 <button
@@ -2606,10 +2650,10 @@ export default function App() {
         </main>
 
         {/* Right Info Panel */}
-        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap z-10 flex flex-col gap-6 ${
+        <aside className={`transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden whitespace-nowrap flex flex-col gap-6 ${
           showRightSidebar
-            ? 'w-80 border-l border-slate-800/80 bg-slate-900/10 p-5 opacity-100'
-            : 'w-0 p-0 border-l-0 opacity-0 pointer-events-none'
+            ? 'w-80 border-l border-slate-800/80 bg-[#0c101a]/95 lg:bg-slate-900/10 p-5 opacity-100 fixed lg:relative right-0 top-0 h-full lg:h-auto z-40 lg:z-10 shadow-2xl lg:shadow-none'
+            : 'w-0 p-0 border-l-0 opacity-0 pointer-events-none fixed lg:relative right-0 top-0 h-full lg:h-auto z-40 lg:z-10 shadow-none'
         }`}>
           {/* Active Users */}
           <div>
@@ -2617,9 +2661,21 @@ export default function App() {
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                 Active Users
               </h2>
-              <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold px-1.5 py-0.5 rounded">
-                {users.length}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold px-1.5 py-0.5 rounded">
+                  {users.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowRightSidebar(false)}
+                  className="lg:hidden text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/50 transition cursor-pointer active:scale-95 flex items-center justify-center"
+                  title="Close Panel"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {users.map((user) => {

@@ -30,6 +30,12 @@ export default function Canvas({
   const [virtualDimensions, setVirtualDimensions] = useState({ width: 1920, height: 1080 });
   const [hoveredElementId, setHoveredElementId] = useState(null);
 
+  const [userZoom, setUserZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const activePointersRef = useRef({}); // maps pointerId -> { clientX, clientY }
+  const touchStartRef = useRef(null); // { distance, midpoint, userZoom, panOffset }
+  const isSpacePressedRef = useRef(false);
+
   // Load background image to set virtual dimensions state
   useEffect(() => {
     const {
@@ -155,11 +161,14 @@ export default function Canvas({
   // Compute scale and translation offsets for mapping client to virtual coords
   const getViewportTransform = useCallback(() => {
     const { width: virtualWidth, height: virtualHeight } = virtualDimensions;
-    const scale = Math.min(canvasSize.width / virtualWidth, canvasSize.height / virtualHeight) || 1;
-    const offsetX = (canvasSize.width - virtualWidth * scale) / 2;
-    const offsetY = (canvasSize.height - virtualHeight * scale) / 2;
+    const baseScale = Math.min(canvasSize.width / virtualWidth, canvasSize.height / virtualHeight) || 1;
+    const scale = baseScale * userZoom;
+    const baseOffsetX = (canvasSize.width - virtualWidth * scale) / 2;
+    const baseOffsetY = (canvasSize.height - virtualHeight * scale) / 2;
+    const offsetX = baseOffsetX + panOffset.x;
+    const offsetY = baseOffsetY + panOffset.y;
     return { scale, offsetX, offsetY, virtualWidth, virtualHeight };
-  }, [canvasSize, virtualDimensions]);
+  }, [canvasSize, virtualDimensions, userZoom, panOffset]);
 
   // Translate client coordinates to local coordinates relative to center of a rotated element
   const getLocalCoords = useCallback((x, y, element) => {
@@ -1103,6 +1112,246 @@ export default function Canvas({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
 
+  // Spacebar panning key listeners
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+          return;
+        }
+        e.preventDefault();
+        isSpacePressedRef.current = true;
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  const handlePointerDown = (e) => {
+    // If user clicks interactive UI elements (buttons, inputs, sliders, etc.), do nothing on the canvas
+    if (
+      e.target.closest('button') ||
+      e.target.closest('input') ||
+      e.target.closest('select') ||
+      e.target.closest('textarea')
+    ) {
+      return;
+    }
+
+    setHoveredElementId(null);
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    // Capture pointer to track movements outside canvas bounds
+    containerRef.current?.setPointerCapture(e.pointerId);
+
+    // Register active pointer coordinates
+    activePointersRef.current[e.pointerId] = { clientX: e.clientX, clientY: e.clientY };
+
+    const activePointerIds = Object.keys(activePointersRef.current);
+
+    // Multi-touch touch gestures (pinch-to-zoom/pan)
+    if (activePointerIds.length === 2) {
+      // Abort any pen drawing or lock selections
+      if (dragStateRef.current && dragStateRef.current.mode === 'draw') {
+        tempDrawingPathRef.current = null;
+      }
+      if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds.length > 0) {
+        socket.emit('element-unlock', { elementIds: dragStateRef.current.lockedIds, tabId });
+        setLocks((prev) => {
+          const next = { ...prev };
+          dragStateRef.current.lockedIds.forEach((id) => delete next[id]);
+          return next;
+        });
+      } else if (dragStateRef.current && dragStateRef.current.hasLock) {
+        socket.emit('element-unlock', { elementId: dragStateRef.current.elementId, tabId });
+        setLocks((prev) => {
+          const next = { ...prev };
+          delete next[dragStateRef.current.elementId];
+          return next;
+        });
+      }
+
+      const [p1, p2] = activePointerIds.map(id => activePointersRef.current[id]);
+      const distance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+      const midpoint = { x: (p1.clientX + p2.clientX) / 2, y: (p1.clientY + p2.clientY) / 2 };
+
+      touchStartRef.current = {
+        distance,
+        midpoint,
+        userZoom,
+        panOffset: { ...panOffset }
+      };
+      dragStateRef.current = { mode: 'touch-gesture' };
+      triggerRedraw();
+      return;
+    }
+
+    if (activePointerIds.length === 1) {
+      // Initiate viewport panning
+      if (activeTool === 'pan' || isSpacePressedRef.current || e.button === 1 || e.button === 4) {
+        dragStateRef.current = {
+          mode: 'pan',
+          startX: e.clientX,
+          startY: e.clientY,
+          startPanOffset: { ...panOffset }
+        };
+        return;
+      }
+
+      // Delegate to standard draw/drag/resize/select mousedown handler
+      handleMouseDown(e);
+    }
+  };
+
+  const handlePointerMove = (e) => {
+    if (activePointersRef.current[e.pointerId]) {
+      activePointersRef.current[e.pointerId] = { clientX: e.clientX, clientY: e.clientY };
+    }
+
+    const activePointerIds = Object.keys(activePointersRef.current);
+    const drag = dragStateRef.current;
+
+    if (drag) {
+      if (drag.mode === 'touch-gesture' && activePointerIds.length === 2) {
+        const [p1, p2] = activePointerIds.map(id => activePointersRef.current[id]);
+        const newDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+        const newMidpoint = { x: (p1.clientX + p2.clientX) / 2, y: (p1.clientY + p2.clientY) / 2 };
+
+        const start = touchStartRef.current;
+        if (start) {
+          const zoomFactor = newDistance / start.distance;
+          const nextZoom = Math.min(8.0, Math.max(0.5, start.userZoom * zoomFactor));
+
+          const dx = newMidpoint.x - start.midpoint.x;
+          const dy = newMidpoint.y - start.midpoint.y;
+
+          setUserZoom(nextZoom);
+          setPanOffset({
+            x: start.panOffset.x + dx,
+            y: start.panOffset.y + dy
+          });
+          triggerRedraw();
+        }
+        return;
+      }
+
+      if (drag.mode === 'pan') {
+        const dx = e.clientX - drag.startX;
+        const dy = e.clientY - drag.startY;
+        setPanOffset({
+          x: drag.startPanOffset.x + dx,
+          y: drag.startPanOffset.y + dy
+        });
+        triggerRedraw();
+        return;
+      }
+
+      // Delegate to standard draw/drag/resize/select mousemove handler
+      handleMouseMove(e);
+    } else {
+      // Hover behavior updates
+      const coords = getCanvasCoords(e);
+      throttleCursorMove(coords.x, coords.y);
+
+      if (activeTool === 'eraser') {
+        eraserHoverRef.current = coords;
+        triggerRedraw();
+      }
+
+      if (activeTool === 'select' || activeTool === 'pan') {
+        const hovered = getHoveredElement(coords.x, coords.y);
+        if (hovered && hovered.properties?.tooltip?.enabled) {
+          setHoveredElementId(hovered.id);
+        } else {
+          setHoveredElementId(null);
+        }
+      }
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    containerRef.current?.releasePointerCapture(e.pointerId);
+    delete activePointersRef.current[e.pointerId];
+
+    const drag = dragStateRef.current;
+    if (drag) {
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+        dragStateRef.current = null;
+        triggerRedraw();
+        return;
+      }
+
+      // Delegate to standard resolve mouseup handler
+      handleMouseUp();
+    }
+  };
+
+  const handlePointerLeave = (e) => {
+    containerRef.current?.releasePointerCapture(e.pointerId);
+    delete activePointersRef.current[e.pointerId];
+
+    const drag = dragStateRef.current;
+    if (drag) {
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+        dragStateRef.current = null;
+        triggerRedraw();
+        return;
+      }
+    }
+
+    setHoveredElementId(null);
+    eraserHoverRef.current = null;
+    handleMouseUp();
+  };
+
+  const handleWheel = (e) => {
+    const zoomFactor = 1.08;
+    let nextZoom = userZoom;
+    if (e.deltaY < 0) {
+      nextZoom = Math.min(8.0, userZoom * zoomFactor);
+    } else {
+      nextZoom = Math.max(0.5, userZoom / zoomFactor);
+    }
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Translate mouse coordinates to virtual coords before zoom
+      const { scale, offsetX, offsetY } = getViewportTransform();
+      const virtualX = (mouseX - offsetX) / scale;
+      const virtualY = (mouseY - offsetY) / scale;
+
+      setUserZoom(nextZoom);
+
+      // Adjust panOffset so that cursor points to same virtual coords after zoom
+      const baseScale = Math.min(canvasSize.width / virtualDimensions.width, canvasSize.height / virtualDimensions.height) || 1;
+      const newScale = baseScale * nextZoom;
+
+      const newBaseOffsetX = (canvasSize.width - virtualDimensions.width * newScale) / 2;
+      const newBaseOffsetY = (canvasSize.height - virtualDimensions.height * newScale) / 2;
+
+      setPanOffset({
+        x: mouseX - virtualX * newScale - newBaseOffsetX,
+        y: mouseY - virtualY * newScale - newBaseOffsetY
+      });
+    }
+
+    triggerRedraw();
+  };
+
   const handleMouseDown = (e) => {
     setHoveredElementId(null);
     const socket = socketRef.current;
@@ -1847,10 +2096,11 @@ export default function Canvas({
           ? 'cursor-none'
           : 'cursor-default'
       }`}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
+      onWheel={handleWheel}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
 
@@ -1983,6 +2233,44 @@ export default function Canvas({
             </div>
           );
         })}
+
+      {/* Floating Zoom & Pan Reset Controls */}
+      <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 shadow-lg select-none">
+        <button
+          type="button"
+          onClick={() => {
+            setUserZoom((prev) => Math.max(0.5, prev - 0.1));
+            triggerRedraw();
+          }}
+          className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center justify-center font-bold text-lg select-none cursor-pointer active:scale-95"
+          title="Zoom Out"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setUserZoom(1);
+            setPanOffset({ x: 0, y: 0 });
+            triggerRedraw();
+          }}
+          className="px-2.5 py-1.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-slate-200 transition flex items-center justify-center text-xs font-semibold select-none cursor-pointer active:scale-95"
+          title="Reset Zoom & Pan to Fit Screen"
+        >
+          {Math.round(userZoom * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setUserZoom((prev) => Math.min(8.0, prev + 0.1));
+            triggerRedraw();
+          }}
+          className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center justify-center font-bold text-lg select-none cursor-pointer active:scale-95"
+          title="Zoom In"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

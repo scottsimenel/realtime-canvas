@@ -94,6 +94,27 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+// Serve React frontend static files in production if the build directory exists
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    // Avoid intercepting API, uploads, health check, or socket.io routes
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/uploads') ||
+      req.path.startsWith('/health') ||
+      req.path.startsWith('/socket.io')
+    ) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+  console.log(`Serving static client files from: ${clientDistPath}`);
+} else {
+  console.log(`Client dist directory not found at: ${clientDistPath}. Running in API-only server mode.`);
+}
+
 
 // Setup HTTP server and Socket.io
 const httpServer = createServer(app);
