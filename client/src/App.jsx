@@ -500,7 +500,6 @@ export default function App() {
       roomSettings: {
         backgroundImageUrl: null,
         showBackground: true,
-        backgroundMode: 'fill',
         showGrid: true,
         gridType: 'square',
         gridSize: 40,
@@ -524,7 +523,6 @@ export default function App() {
     roomSettings: {
       backgroundImageUrl: null,
       showBackground: true,
-      backgroundMode: 'fill',
       showGrid: true,
       gridType: 'square',
       gridSize: 40,
@@ -2124,9 +2122,6 @@ export default function App() {
                                     return found ? found.name : 'Custom Background';
                                   })()}
                                 </div>
-                                <div className="text-[8px] text-slate-500 capitalize">
-                                  {roomSettings.backgroundMode} mode
-                                </div>
                               </div>
                               <button
                                 type="button"
@@ -2150,26 +2145,7 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* Scaling mode */}
-                        <div className="space-y-1">
-                          <span className="text-[10px] text-slate-500">Scaling Mode</span>
-                          <div className="flex rounded-lg bg-slate-950/60 p-0.5 border border-slate-800/80">
-                            {['fill', 'fit', 'stretch'].map((mode) => (
-                              <button
-                                key={mode}
-                                type="button"
-                                onClick={() => handleUpdateRoomSettings({ backgroundMode: mode })}
-                                className={`flex-1 py-1 text-[9px] font-bold rounded-md capitalize transition cursor-pointer ${
-                                  roomSettings.backgroundMode === mode
-                                    ? 'bg-slate-800 text-sky-400 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                              >
-                                {mode}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+
 
                         {/* Background Dimensions */}
                         <div className="space-y-1.5 pt-2 border-t border-slate-800/40">

@@ -53,7 +53,6 @@ export class CanvasRegistry {
       roomSettings: {
         backgroundImageUrl: null,
         showBackground: true,
-        backgroundMode: 'fill', // 'fill', 'fit', 'stretch'
         showGrid: true,
         gridType: 'square', // 'square', 'hexagon'
         gridSize: 40, // spacing/radius range 15 to 150
@@ -115,7 +114,6 @@ export class CanvasRegistry {
       roomSettings: {
         backgroundImageUrl: null,
         showBackground: true,
-        backgroundMode: 'fill',
         showGrid: true,
         gridType: 'square',
         gridSize: 40,
@@ -205,7 +203,6 @@ export class CanvasRegistry {
     const settings = tab.roomSettings;
     if (updates.backgroundImageUrl !== undefined) settings.backgroundImageUrl = updates.backgroundImageUrl;
     if (updates.showBackground !== undefined) settings.showBackground = updates.showBackground;
-    if (updates.backgroundMode !== undefined) settings.backgroundMode = updates.backgroundMode;
     if (updates.showGrid !== undefined) settings.showGrid = updates.showGrid;
     if (updates.gridType !== undefined) settings.gridType = updates.gridType;
     if (updates.gridSize !== undefined) settings.gridSize = updates.gridSize;
