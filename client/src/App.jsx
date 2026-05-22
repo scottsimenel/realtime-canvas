@@ -105,6 +105,18 @@ export default function App() {
   const [draggedElementId, setDraggedElementId] = useState(null);
   const [dragOverElementId, setDragOverElementId] = useState(null);
 
+  // Collaborative Room Settings (Feature 4 Background and Grid)
+  const [roomSettings, setRoomSettings] = useState({
+    backgroundImageUrl: null,
+    showBackground: true,
+    backgroundMode: 'fill',
+    showGrid: true,
+    gridType: 'square',
+    gridSize: 40,
+  });
+  const [backgroundUrlInput, setBackgroundUrlInput] = useState('');
+  const [isSettingsSectionCollapsed, setIsSettingsSectionCollapsed] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
   }, [hiddenAssetUrls]);
@@ -209,6 +221,10 @@ export default function App() {
               setLocks(lockMap);
               setUsers(res.users || []);
               setAssets(res.assets || []);
+              if (res.roomSettings) {
+                setRoomSettings(res.roomSettings);
+                setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
+              }
               setCurrentUser({
                 id: s.id,
                 name: nameRef.current,
@@ -325,6 +341,11 @@ export default function App() {
         });
         return sorted;
       });
+    });
+
+    s.on('room-settings-updated', (updatedSettings) => {
+      setRoomSettings(updatedSettings);
+      setBackgroundUrlInput(updatedSettings.backgroundImageUrl || '');
     });
 
     return () => {
@@ -467,6 +488,10 @@ export default function App() {
               setLocks(lockMap);
               setUsers(res.users || []);
               setAssets(res.assets || []);
+              if (res.roomSettings) {
+                setRoomSettings(res.roomSettings);
+                setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
+              }
               setCurrentUser({
                 id: socket.id,
                 name: nameInput,
@@ -758,6 +783,22 @@ export default function App() {
       });
     }
   }, [elements, locks, currentUser, setSelectedElementIds]);
+
+  const handleUpdateRoomSettings = useCallback((updates) => {
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
+      // Optimistically update local state first
+      setRoomSettings((prev) => ({ ...prev, ...updates }));
+      socket.emit('room-settings-update', { updates }, (res) => {
+        if (res && res.success && res.roomSettings) {
+          setRoomSettings(res.roomSettings);
+          if (updates.backgroundImageUrl !== undefined) {
+            setBackgroundUrlInput(res.roomSettings.backgroundImageUrl || '');
+          }
+        }
+      });
+    }
+  }, []);
 
   // Lobby (Join Screen)
   if (!joined) {
@@ -1162,6 +1203,193 @@ export default function App() {
                 </p>
               )}
             </div>
+
+            {/* Canvas Settings Panel */}
+            <div className="mt-5 pt-4 border-t border-slate-800/80">
+              <div className="flex items-center justify-between mb-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsSectionCollapsed(!isSettingsSectionCollapsed)}
+                  className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-200 transition focus:outline-none cursor-pointer"
+                >
+                  <span>{isSettingsSectionCollapsed ? '▶' : '▼'} Canvas Settings</span>
+                </button>
+              </div>
+
+              {!isSettingsSectionCollapsed && (
+                <div className="space-y-4">
+                  {/* Background image section */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Background Image</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateRoomSettings({ showBackground: !roomSettings.showBackground })}
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
+                          roomSettings.showBackground ? 'bg-sky-500' : 'bg-slate-800'
+                        }`}
+                        title="Toggle Background Image"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                            roomSettings.showBackground ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {roomSettings.showBackground && (
+                      <div className="space-y-2.5 animate-in fade-in duration-200">
+                        {/* URL Input */}
+                        <div className="space-y-1">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={backgroundUrlInput}
+                              onChange={(e) => setBackgroundUrlInput(e.target.value)}
+                              placeholder="Paste background URL..."
+                              className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-950/60 border border-slate-800 rounded-lg text-[11px] text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: backgroundUrlInput })}
+                              className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Scaling mode */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500">Scaling Mode</span>
+                          <div className="flex rounded-lg bg-slate-950/60 p-0.5 border border-slate-800/80">
+                            {['fill', 'fit', 'stretch'].map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => handleUpdateRoomSettings({ backgroundMode: mode })}
+                                className={`flex-1 py-1 text-[9px] font-bold rounded-md capitalize transition cursor-pointer ${
+                                  roomSettings.backgroundMode === mode
+                                    ? 'bg-slate-800 text-sky-400 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                {mode}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Presets */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-slate-500">Presets</span>
+                            {(roomSettings.backgroundImageUrl || backgroundUrlInput) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleUpdateRoomSettings({ backgroundImageUrl: null });
+                                  setBackgroundUrlInput('');
+                                }}
+                                className="text-[9px] font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {SAMPLE_IMAGES.map((img, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url })}
+                                className={`group relative h-8 rounded-lg overflow-hidden border transition cursor-pointer ${
+                                  roomSettings.backgroundImageUrl === img.url
+                                    ? 'border-sky-500'
+                                    : 'border-slate-800 hover:border-slate-700'
+                                }`}
+                                title={img.name}
+                              >
+                                <img
+                                  src={img.url}
+                                  alt={img.name}
+                                  className="w-full h-full object-cover opacity-50 group-hover:opacity-85 transition"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-slate-800/60" />
+
+                  {/* Grid section */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grid Overlay</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateRoomSettings({ showGrid: !roomSettings.showGrid })}
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
+                          roomSettings.showGrid ? 'bg-sky-500' : 'bg-slate-800'
+                        }`}
+                        title="Toggle Grid Overlay"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                            roomSettings.showGrid ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {roomSettings.showGrid && (
+                      <div className="space-y-2.5 animate-in fade-in duration-200">
+                        {/* Grid Type */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500">Pattern Variant</span>
+                          <div className="flex rounded-lg bg-slate-950/60 p-0.5 border border-slate-800/80">
+                            {['square', 'hexagon'].map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => handleUpdateRoomSettings({ gridType: type })}
+                                className={`flex-1 py-1 text-[9px] font-bold rounded-md capitalize transition cursor-pointer ${
+                                  roomSettings.gridType === type
+                                    ? 'bg-slate-800 text-sky-400 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-300'
+                                }`}
+                              >
+                                {type}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Grid Size */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] text-slate-500">
+                            <span>Grid Spacing</span>
+                            <span className="font-mono text-slate-300">{roomSettings.gridSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="15"
+                            max="150"
+                            value={roomSettings.gridSize}
+                            onChange={(e) => handleUpdateRoomSettings({ gridSize: parseInt(e.target.value, 10) })}
+                            className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
         </aside>
 
         {/* Center Canvas Area */}
@@ -1288,6 +1516,7 @@ export default function App() {
             activeTool={activeTool}
             penColor={penColor}
             penSize={penSize}
+            roomSettings={roomSettings}
           />
         </main>
 

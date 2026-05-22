@@ -47,6 +47,18 @@ export class CanvasRegistry {
      * @type {Map<string, Object>}
      */
     this.assets = new Map();
+
+    /**
+     * Room-wide configuration settings.
+     */
+    this.roomSettings = {
+      backgroundImageUrl: null,
+      showBackground: true,
+      backgroundMode: 'fill', // 'fill', 'fit', 'stretch'
+      showGrid: true,
+      gridType: 'square', // 'square', 'hexagon'
+      gridSize: 40 // spacing/radius range 15 to 150
+    };
   }
 
   /**
@@ -55,7 +67,7 @@ export class CanvasRegistry {
    * @param {string} userId - The socket ID of the user.
    * @param {string} name - The display name of the user.
    * @param {string} color - The color assigned to the user's cursor.
-   * @returns {{ users: User[], elements: CanvasElement[], locks: [string, string][], assets: Object[] }} The current state of the room.
+   * @returns {{ users: User[], elements: CanvasElement[], locks: [string, string][], assets: Object[], roomSettings: Object }} The current state of the room.
    */
   joinRoom(userId, name, color) {
     const user = {
@@ -71,8 +83,25 @@ export class CanvasRegistry {
       users: Array.from(this.users.values()),
       elements: Array.from(this.elements.values()),
       locks: Array.from(this.locks.entries()),
-      assets: Array.from(this.assets.values())
+      assets: Array.from(this.assets.values()),
+      roomSettings: this.roomSettings
     };
+  }
+
+  /**
+   * Updates room-wide settings.
+   * 
+   * @param {Object} updates - Settings updates.
+   * @returns {Object} The updated settings.
+   */
+  updateRoomSettings(updates) {
+    if (updates.backgroundImageUrl !== undefined) this.roomSettings.backgroundImageUrl = updates.backgroundImageUrl;
+    if (updates.showBackground !== undefined) this.roomSettings.showBackground = updates.showBackground;
+    if (updates.backgroundMode !== undefined) this.roomSettings.backgroundMode = updates.backgroundMode;
+    if (updates.showGrid !== undefined) this.roomSettings.showGrid = updates.showGrid;
+    if (updates.gridType !== undefined) this.roomSettings.gridType = updates.gridType;
+    if (updates.gridSize !== undefined) this.roomSettings.gridSize = updates.gridSize;
+    return this.roomSettings;
   }
 
   /**

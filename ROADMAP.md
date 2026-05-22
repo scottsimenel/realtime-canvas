@@ -19,10 +19,10 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
   - Apply unified selection outline, bounding box, and group resizing/rotation.
   - Acquire batch locks and handle partial concurrency locks gracefully.
   - Global Transform Inspector control panel with batch resizing, absolute rotation, and delete button.
-- [ ] **Feature 3: Custom Image Asset Upload**
+- [x] **Feature 3: Custom Image Asset Upload**
   - Drag-and-drop or file selector to upload custom files from local computers.
   - Server-side static uploads storage or Base64 streaming fallback.
-- [ ] **Feature 4: Swappable Grid-Overlaid Background Canvas**
+- [x] **Feature 4: Swappable Grid-Overlaid Background Canvas**
   - Set a room-wide background image URL.
   - Toggle background image visibility.
   - Draw background under the grid lines (ensuring grid remains visible and clear).

@@ -13,6 +13,7 @@ export default function Canvas({
   activeTool,
   penColor,
   penSize,
+  roomSettings,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -456,23 +457,119 @@ export default function Canvas({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Destructure roomSettings
+    const {
+      backgroundImageUrl = null,
+      showBackground = true,
+      backgroundMode = 'fill',
+      showGrid = true,
+      gridType = 'square',
+      gridSize = 40,
+    } = roomSettings || {};
+
     // Clear canvas
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
-    // Draw grid background
-    const gridSpacing = 40;
-    ctx.strokeStyle = '#1e293b'; // slate-800
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = 0; x < canvasSize.width; x += gridSpacing) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvasSize.height);
+    // Track whether a background image is actually drawn to adjust grid color
+    let isBackgroundDrawn = false;
+
+    // Draw background image
+    if (showBackground && backgroundImageUrl) {
+      const bgImg = getOrLoadImage(backgroundImageUrl);
+      if (bgImg && bgImg.width > 0) {
+        isBackgroundDrawn = true;
+        ctx.save();
+        
+        const canvasAspect = canvasSize.width / canvasSize.height;
+        const imageAspect = bgImg.width / bgImg.height;
+        let drawW, drawH, drawX, drawY;
+
+        if (backgroundMode === 'stretch') {
+          drawW = canvasSize.width;
+          drawH = canvasSize.height;
+          drawX = 0;
+          drawY = 0;
+        } else if (backgroundMode === 'fit') {
+          // Aspect-fit (Contain)
+          if (imageAspect > canvasAspect) {
+            drawW = canvasSize.width;
+            drawH = canvasSize.width / imageAspect;
+            drawX = 0;
+            drawY = (canvasSize.height - drawH) / 2;
+          } else {
+            drawH = canvasSize.height;
+            drawW = canvasSize.height * imageAspect;
+            drawX = (canvasSize.width - drawW) / 2;
+            drawY = 0;
+          }
+        } else {
+          // Aspect-fill (Cover) - default
+          if (imageAspect > canvasAspect) {
+            drawH = canvasSize.height;
+            drawW = canvasSize.height * imageAspect;
+            drawX = (canvasSize.width - drawW) / 2;
+            drawY = 0;
+          } else {
+            drawW = canvasSize.width;
+            drawH = canvasSize.width / imageAspect;
+            drawX = 0;
+            drawY = (canvasSize.height - drawH) / 2;
+          }
+        }
+
+        ctx.drawImage(bgImg, drawX, drawY, drawW, drawH);
+        ctx.restore();
+      }
     }
-    for (let y = 0; y < canvasSize.height; y += gridSpacing) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvasSize.width, y);
+
+    // Draw grid background if enabled
+    if (showGrid) {
+      ctx.save();
+      ctx.strokeStyle = isBackgroundDrawn ? '#47556960' : '#1e293b';
+      ctx.lineWidth = 1;
+
+      if (gridType === 'hexagon') {
+        const R = gridSize;
+        const hSpacing = 1.5 * R;
+        const vSpacing = Math.sqrt(3) * R;
+
+        const cols = Math.ceil(canvasSize.width / hSpacing) + 2;
+        const rows = Math.ceil(canvasSize.height / vSpacing) + 2;
+
+        ctx.beginPath();
+        for (let col = -1; col < cols; col++) {
+          const cx = col * hSpacing;
+          const isOdd = Math.abs(col) % 2 === 1;
+          const yOffset = isOdd ? vSpacing / 2 : 0;
+          
+          for (let row = -1; row < rows; row++) {
+            const cy = row * vSpacing + yOffset;
+            
+            // Draw flat-topped hexagon
+            ctx.moveTo(cx + R, cy);
+            for (let i = 1; i <= 6; i++) {
+              const angle = (i * Math.PI) / 3;
+              ctx.lineTo(cx + R * Math.cos(angle), cy + R * Math.sin(angle));
+            }
+          }
+        }
+        ctx.stroke();
+      } else {
+        // Standard square grid
+        const gridSpacing = gridSize;
+        ctx.beginPath();
+        for (let x = 0; x < canvasSize.width; x += gridSpacing) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvasSize.height);
+        }
+        for (let y = 0; y < canvasSize.height; y += gridSpacing) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasSize.width, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.stroke();
 
     // Draw element shapes
     elements.forEach((element) => {
@@ -784,7 +881,7 @@ export default function Canvas({
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, penSize]);
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, getGroupBoundingBox, activeTool, penSize, roomSettings]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {

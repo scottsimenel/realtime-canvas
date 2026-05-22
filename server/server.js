@@ -139,7 +139,8 @@ io.on('connection', (socket) => {
         users: state.users,
         elements: state.elements,
         locks: state.locks,
-        assets: state.assets || []
+        assets: state.assets || [],
+        roomSettings: state.roomSettings
       });
     }
 
@@ -395,6 +396,22 @@ io.on('connection', (socket) => {
 
     if (typeof callback === 'function') {
       callback({ success: true, orderedIds: finalOrderedIds });
+    }
+  });
+
+  /**
+   * Handle room settings update request (background and grid).
+   */
+  socket.on('room-settings-update', (data, callback) => {
+    const { updates } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+    const updatedSettings = registry.updateRoomSettings(updates || {});
+
+    // Broadcast updated settings to everyone else in the room
+    socket.to(room).emit('room-settings-updated', updatedSettings);
+
+    if (typeof callback === 'function') {
+      callback({ success: true, roomSettings: updatedSettings });
     }
   });
 
