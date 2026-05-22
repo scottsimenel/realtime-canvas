@@ -73,6 +73,56 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedElementIds, setSelectedElementIds] = useState([]);
 
+  // Local states for Transform Inspector inputs to enable smooth multi-selection editing
+  const [inputWidth, setInputWidth] = useState('');
+  const [inputHeight, setInputHeight] = useState('');
+  const [inputRotation, setInputRotation] = useState('');
+
+  const [isWidthFocused, setIsWidthFocused] = useState(false);
+  const [isHeightFocused, setIsHeightFocused] = useState(false);
+  const [isRotationFocused, setIsRotationFocused] = useState(false);
+
+  // Sync state during rendering to avoid useEffect cascading renders
+  const [prevSelectedElementIds, setPrevSelectedElementIds] = useState([]);
+  const [prevElements, setPrevElements] = useState([]);
+
+  if (prevSelectedElementIds !== selectedElementIds || prevElements !== elements) {
+    setPrevSelectedElementIds(selectedElementIds);
+    setPrevElements(elements);
+
+    if (selectedElementIds.length === 0) {
+      setInputWidth('');
+      setInputHeight('');
+      setInputRotation('');
+    } else {
+      const selectedElements = elements.filter((el) => selectedElementIds.includes(el.id));
+      if (selectedElements.length > 0) {
+        if (!isWidthFocused) {
+          const firstWidth = selectedElements[0].width;
+          const allSameWidth = selectedElements.every((el) => el.width === firstWidth);
+          setInputWidth(allSameWidth ? String(firstWidth) : '');
+        }
+        if (!isHeightFocused) {
+          const firstHeight = selectedElements[0].height;
+          const allSameHeight = selectedElements.every((el) => el.height === firstHeight);
+          setInputHeight(allSameHeight ? String(firstHeight) : '');
+        }
+        if (!isRotationFocused) {
+          const firstRot = selectedElements[0].properties?.rotation || 0;
+          const deg = Math.round((firstRot * 180) / Math.PI) % 360;
+          const normalizedDeg = deg < 0 ? deg + 360 : deg;
+          const allSameRot = selectedElements.every((el) => {
+            const r = el.properties?.rotation || 0;
+            const d = Math.round((r * 180) / Math.PI) % 360;
+            const nd = d < 0 ? d + 360 : d;
+            return nd === normalizedDeg;
+          });
+          setInputRotation(allSameRot ? String(normalizedDeg) : '');
+        }
+      }
+    }
+  }
+
   // Update refs when inputs or connection state changes
   useEffect(() => {
     nameRef.current = nameInput;
@@ -735,15 +785,25 @@ export default function App() {
                     type="number"
                     min="10"
                     max="2000"
-                    value={
-                      selectedElementIds.length === 1
-                        ? elements.find((e) => e.id === selectedElementIds[0])?.width || ''
-                        : ''
-                    }
-                    placeholder={selectedElementIds.length > 1 ? 'Mixed' : 'Width'}
-                    onFocus={handleStartInspectorTransform}
-                    onBlur={handleEndInspectorTransform}
+                    value={inputWidth}
+                    placeholder={selectedElementIds.length > 1 && inputWidth === '' ? 'Mixed' : 'Width'}
+                    onFocus={() => {
+                      setIsWidthFocused(true);
+                      handleStartInspectorTransform();
+                    }}
+                    onBlur={() => {
+                      setIsWidthFocused(false);
+                      handleEndInspectorTransform();
+                      // Sync immediately on blur
+                      const selectedElements = elements.filter((el) => selectedElementIds.includes(el.id));
+                      if (selectedElements.length > 0) {
+                        const firstWidth = selectedElements[0].width;
+                        const allSameWidth = selectedElements.every((el) => el.width === firstWidth);
+                        setInputWidth(allSameWidth ? String(firstWidth) : '');
+                      }
+                    }}
                     onChange={(e) => {
+                      setInputWidth(e.target.value);
                       const val = parseInt(e.target.value, 10);
                       if (!isNaN(val)) {
                         handleInspectorChange({ width: val });
@@ -760,15 +820,25 @@ export default function App() {
                     type="number"
                     min="10"
                     max="2000"
-                    value={
-                      selectedElementIds.length === 1
-                        ? elements.find((e) => e.id === selectedElementIds[0])?.height || ''
-                        : ''
-                    }
-                    placeholder={selectedElementIds.length > 1 ? 'Mixed' : 'Height'}
-                    onFocus={handleStartInspectorTransform}
-                    onBlur={handleEndInspectorTransform}
+                    value={inputHeight}
+                    placeholder={selectedElementIds.length > 1 && inputHeight === '' ? 'Mixed' : 'Height'}
+                    onFocus={() => {
+                      setIsHeightFocused(true);
+                      handleStartInspectorTransform();
+                    }}
+                    onBlur={() => {
+                      setIsHeightFocused(false);
+                      handleEndInspectorTransform();
+                      // Sync immediately on blur
+                      const selectedElements = elements.filter((el) => selectedElementIds.includes(el.id));
+                      if (selectedElements.length > 0) {
+                        const firstHeight = selectedElements[0].height;
+                        const allSameHeight = selectedElements.every((el) => el.height === firstHeight);
+                        setInputHeight(allSameHeight ? String(firstHeight) : '');
+                      }
+                    }}
                     onChange={(e) => {
+                      setInputHeight(e.target.value);
                       const val = parseInt(e.target.value, 10);
                       if (!isNaN(val)) {
                         handleInspectorChange({ height: val });
@@ -787,7 +857,10 @@ export default function App() {
                   </label>
                   <span className="text-[10px] font-mono text-slate-400">
                     {(() => {
-                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
+                      if (inputRotation !== '') {
+                        return `${inputRotation}°`;
+                      }
+                      const firstEl = elements.find((el) => el.id === selectedElementIds[0]);
                       const rotRad = firstEl?.properties?.rotation || 0;
                       const deg = Math.round((rotRad * 180) / Math.PI) % 360;
                       return `${deg < 0 ? deg + 360 : deg}°`;
@@ -800,7 +873,11 @@ export default function App() {
                     min="0"
                     max="360"
                     value={(() => {
-                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
+                      if (inputRotation !== '') {
+                        const deg = parseInt(inputRotation, 10);
+                        if (!isNaN(deg)) return deg;
+                      }
+                      const firstEl = elements.find((el) => el.id === selectedElementIds[0]);
                       const rotRad = firstEl?.properties?.rotation || 0;
                       const deg = Math.round((rotRad * 180) / Math.PI) % 360;
                       return deg < 0 ? deg + 360 : deg;
@@ -811,6 +888,7 @@ export default function App() {
                     onTouchEnd={handleEndInspectorTransform}
                     onChange={(e) => {
                       const deg = parseInt(e.target.value, 10);
+                      setInputRotation(String(deg));
                       const rad = (deg * Math.PI) / 180;
                       handleInspectorChange((el) => ({
                         properties: {
@@ -825,15 +903,32 @@ export default function App() {
                     type="number"
                     min="0"
                     max="360"
-                    value={(() => {
-                      const firstEl = elements.find((e) => e.id === selectedElementIds[0]);
-                      const rotRad = firstEl?.properties?.rotation || 0;
-                      const deg = Math.round((rotRad * 180) / Math.PI) % 360;
-                      return deg < 0 ? deg + 360 : deg;
-                    })()}
-                    onFocus={handleStartInspectorTransform}
-                    onBlur={handleEndInspectorTransform}
+                    value={inputRotation}
+                    placeholder={selectedElementIds.length > 1 && inputRotation === '' ? 'Mixed' : '0'}
+                    onFocus={() => {
+                      setIsRotationFocused(true);
+                      handleStartInspectorTransform();
+                    }}
+                    onBlur={() => {
+                      setIsRotationFocused(false);
+                      handleEndInspectorTransform();
+                      // Sync immediately on blur
+                      const selectedElements = elements.filter((el) => selectedElementIds.includes(el.id));
+                      if (selectedElements.length > 0) {
+                        const firstRot = selectedElements[0].properties?.rotation || 0;
+                        const deg = Math.round((firstRot * 180) / Math.PI) % 360;
+                        const normalizedDeg = deg < 0 ? deg + 360 : deg;
+                        const allSameRot = selectedElements.every((el) => {
+                          const r = el.properties?.rotation || 0;
+                          const d = Math.round((r * 180) / Math.PI) % 360;
+                          const nd = d < 0 ? d + 360 : d;
+                          return nd === normalizedDeg;
+                        });
+                        setInputRotation(allSameRot ? String(normalizedDeg) : '');
+                      }
+                    }}
                     onChange={(e) => {
+                      setInputRotation(e.target.value);
                       const val = parseInt(e.target.value, 10);
                       if (!isNaN(val)) {
                         const deg = val % 360;
@@ -850,6 +945,7 @@ export default function App() {
                   />
                 </div>
               </div>
+
 
               {/* Delete Button */}
               <button
