@@ -41,6 +41,12 @@ export class CanvasRegistry {
      * @type {Map<string, string>}
      */
     this.locks = new Map();
+
+    /**
+     * Map of custom uploaded assets, keyed by asset ID.
+     * @type {Map<string, Object>}
+     */
+    this.assets = new Map();
   }
 
   /**
@@ -49,7 +55,7 @@ export class CanvasRegistry {
    * @param {string} userId - The socket ID of the user.
    * @param {string} name - The display name of the user.
    * @param {string} color - The color assigned to the user's cursor.
-   * @returns {{ users: User[], elements: CanvasElement[], locks: [string, string][] }} The current state of the room.
+   * @returns {{ users: User[], elements: CanvasElement[], locks: [string, string][], assets: Object[] }} The current state of the room.
    */
   joinRoom(userId, name, color) {
     const user = {
@@ -64,8 +70,25 @@ export class CanvasRegistry {
     return {
       users: Array.from(this.users.values()),
       elements: Array.from(this.elements.values()),
-      locks: Array.from(this.locks.entries())
+      locks: Array.from(this.locks.entries()),
+      assets: Array.from(this.assets.values())
     };
+  }
+
+  /**
+   * Creates a new custom asset.
+   * 
+   * @param {Object} asset - The asset details.
+   * @returns {Object} The saved asset.
+   */
+  createAsset(asset) {
+    const newAsset = {
+      id: asset.id,
+      name: asset.name,
+      url: asset.url
+    };
+    this.assets.set(asset.id, newAsset);
+    return newAsset;
   }
 
   /**

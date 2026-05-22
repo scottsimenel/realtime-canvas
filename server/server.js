@@ -134,7 +134,8 @@ io.on('connection', (socket) => {
         success: true,
         users: state.users,
         elements: state.elements,
-        locks: state.locks
+        locks: state.locks,
+        assets: state.assets || []
       });
     }
 
@@ -308,6 +309,31 @@ io.on('connection', (socket) => {
 
     if (typeof callback === 'function') {
       callback({ success: true, element: createdElement });
+    }
+  });
+
+  /**
+   * Handle registration of a new custom image asset.
+   * Saves it to the registry and broadcasts it to all room members.
+   */
+  socket.on('asset-create', (data, callback) => {
+    const { asset } = data || {};
+    if (!asset || !asset.id || !asset.url) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Invalid asset schema' });
+      return;
+    }
+
+    const createdAsset = registry.createAsset(asset);
+    const room = socket.room || DEFAULT_ROOM;
+
+    // Broadcast newly created asset to other clients in the room
+    socket.to(room).emit('asset-created', {
+      asset: createdAsset,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, asset: createdAsset });
     }
   });
 

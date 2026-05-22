@@ -91,6 +91,40 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
+  // Custom Image Assets (Feature 3.5)
+  const [assets, setAssets] = useState([]);
+  const [isImageSectionCollapsed, setIsImageSectionCollapsed] = useState(false);
+  const [hiddenAssetUrls, setHiddenAssetUrls] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('canvas_hidden_assets') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [showHiddenMode, setShowHiddenMode] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
+  }, [hiddenAssetUrls]);
+
+  const allImageAssets = [
+    ...SAMPLE_IMAGES.map((img, index) => ({ id: `preset_${index}`, name: img.name, url: img.url, isPreset: true })),
+    ...assets.map(asset => ({ id: asset.id, name: asset.name, url: asset.url, isPreset: false }))
+  ];
+
+  const visibleAssets = allImageAssets.filter(asset => !hiddenAssetUrls.includes(asset.url));
+  const hiddenAssets = allImageAssets.filter(asset => hiddenAssetUrls.includes(asset.url));
+
+  const toggleHideAsset = useCallback((url) => {
+    setHiddenAssetUrls(prev => {
+      if (prev.includes(url)) {
+        return prev.filter(u => u !== url);
+      } else {
+        return [...prev, url];
+      }
+    });
+  }, []);
+
   // Sync state during rendering to avoid useEffect cascading renders
   const [prevSelectedElementIds, setPrevSelectedElementIds] = useState([]);
   const [prevElements, setPrevElements] = useState([]);
@@ -169,6 +203,7 @@ export default function App() {
               });
               setLocks(lockMap);
               setUsers(res.users || []);
+              setAssets(res.assets || []);
               setCurrentUser({
                 id: s.id,
                 name: nameRef.current,
@@ -265,6 +300,10 @@ export default function App() {
       setSelectedElementIds((prev) => prev.filter((id) => id !== elementId));
     });
 
+    s.on('asset-created', ({ asset }) => {
+      setAssets((prev) => [...prev.filter((a) => a.id !== asset.id), asset]);
+    });
+
     return () => {
       s.disconnect();
     };
@@ -293,6 +332,7 @@ export default function App() {
               });
               setLocks(lockMap);
               setUsers(res.users || []);
+              setAssets(res.assets || []);
               setCurrentUser({
                 id: socket.id,
                 name: nameInput,
@@ -405,6 +445,20 @@ export default function App() {
 
         const data = await response.json();
         if (data.success) {
+          const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          const assetName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+          const newAsset = { id: assetId, name: assetName, url: data.url };
+          
+          const socket = socketRef.current;
+          if (socket && socket.connected) {
+            socket.emit('asset-create', { asset: newAsset }, (res) => {
+              if (res && res.success) {
+                setAssets((prev) => [...prev.filter((a) => a.id !== res.asset.id), res.asset]);
+              }
+            });
+          } else {
+            setAssets((prev) => [...prev, newAsset]);
+          }
           handleSpawnImage(data.url);
         } else {
           setUploadError(data.error || 'Failed to upload image.');
@@ -743,32 +797,145 @@ export default function App() {
           <hr className="border-slate-800/80" />
 
           <div>
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">
-              Spawn Image Assets
-            </h2>
-            <p className="text-[10px] text-slate-500 mb-3">
-              Click a thumbnail to spawn high-resolution textures onto the canvas.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {SAMPLE_IMAGES.map((img) => (
-                <button
-                  key={img.name}
-                  onClick={() => handleSpawnImage(img.url)}
-                  className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition active:scale-95 cursor-pointer"
-                >
-                  <img
-                    src={img.url}
-                    alt={img.name}
-                    className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end p-2">
-                    <span className="text-[9px] font-bold text-slate-300 group-hover:text-white transition truncate">
-                      {img.name}
-                    </span>
-                  </div>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <button
+                type="button"
+                onClick={() => setIsImageSectionCollapsed(!isImageSectionCollapsed)}
+                className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-200 transition focus:outline-none cursor-pointer"
+              >
+                <span>{isImageSectionCollapsed ? '▶' : '▼'} Spawn Image Assets</span>
+                {!isImageSectionCollapsed && allImageAssets.length > 0 && (
+                  <span className="text-[10px] bg-slate-800 text-slate-400 font-bold px-1.5 py-0.5 rounded">
+                    {visibleAssets.length}
+                  </span>
+                )}
+              </button>
             </div>
+
+            {!isImageSectionCollapsed && (
+              <div className="space-y-3">
+                <p className="text-[10px] text-slate-500">
+                  {showHiddenMode 
+                    ? 'Click eye to restore image to active panel.' 
+                    : 'Click to spawn. Hover to hide.'}
+                </p>
+
+                <div className="max-h-72 overflow-y-auto pr-1.5 space-y-3 custom-scrollbar">
+                  {showHiddenMode ? (
+                    hiddenAssets.length === 0 ? (
+                      <p className="text-[10px] text-slate-600 text-center py-4">No hidden images.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {hiddenAssets.map((img) => (
+                          <div
+                            key={img.id}
+                            className="group relative h-20 rounded-xl overflow-hidden border border-rose-950 bg-rose-950/20"
+                          >
+                            <img
+                              src={img.url}
+                              alt={img.name}
+                              className="w-full h-full object-cover opacity-30 grayscale"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex items-end p-2">
+                              <span className="text-[9px] font-bold text-rose-300 truncate pr-6">
+                                {img.name}
+                              </span>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => toggleHideAsset(img.url)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-400 hover:scale-105 active:scale-95 transition cursor-pointer"
+                              title="Restore Image"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    visibleAssets.length === 0 ? (
+                      <p className="text-[10px] text-slate-500 text-center py-4 bg-slate-950/20 border border-dashed border-slate-800 rounded-xl">
+                        No visible image assets. Upload one below or restore hidden ones.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {visibleAssets.map((img) => (
+                          <div
+                            key={img.id}
+                            className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleSpawnImage(img.url)}
+                              className="w-full h-full text-left p-0 bg-transparent border-0 cursor-pointer"
+                            >
+                              <img
+                                src={img.url}
+                                alt={img.name}
+                                className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end p-2 pointer-events-none">
+                                <span className="text-[9px] font-bold text-slate-300 group-hover:text-white transition truncate pr-6">
+                                  {img.name}
+                                </span>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleHideAsset(img.url)}
+                              className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-700 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-400 active:scale-95 transition cursor-pointer z-10"
+                              title="Hide Image"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.893 7.893L21 21m-4.228-4.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                              </svg>
+                            </button>
+
+                            {!img.isPreset && (
+                              <span className="absolute bottom-1.5 right-1.5 text-[7px] font-bold bg-sky-500/80 text-white px-1 rounded-sm select-none pointer-events-none">
+                                User
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </div>
+
+                {hiddenAssetUrls.length > 0 && (
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                    <button
+                      type="button"
+                      onClick={() => setShowHiddenMode(!showHiddenMode)}
+                      className={`text-[9px] font-bold px-2 py-1 rounded-lg transition border cursor-pointer ${
+                        showHiddenMode 
+                          ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20' 
+                          : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300'
+                      }`}
+                    >
+                      {showHiddenMode ? '← Active Panel' : `Manage Hidden (${hiddenAssets.length})`}
+                    </button>
+                    {showHiddenMode && (
+                      <button
+                        type="button"
+                        onClick={() => setHiddenAssetUrls([])}
+                        className="text-[9px] font-bold text-slate-500 hover:text-slate-300 transition cursor-pointer"
+                      >
+                        Restore All
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
             {/* Custom File Upload Panel */}
             <div className="mt-5 pt-4 border-t border-slate-800/80">
@@ -833,7 +1000,6 @@ export default function App() {
                 </p>
               )}
             </div>
-          </div>
         </aside>
 
         {/* Center Canvas Area */}
