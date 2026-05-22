@@ -111,3 +111,9 @@ The client will spin up at **`http://localhost:5173`** (or another port if 5173 
 4. Join the same Room ID using a different name and color.
 5. Move your mouse in one window to see the colored cursor trail follow in real-time in the other.
 6. Spawn objects using the left toolbar. Drag elements to watch lock indicators and coordinates synchronize instantly.
+
+---
+
+## 🗺️ Feature Roadmap & Planning
+
+For details on planned features, implementation designs, and upcoming socket event schemas, see the project [ROADMAP.md](file:///C:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md).
