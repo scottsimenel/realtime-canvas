@@ -71,6 +71,7 @@ export default function App() {
   const [elements, setElements] = useState([]);
   const [locks, setLocks] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedElementId, setSelectedElementId] = useState(null);
 
   // Update refs when inputs or connection state changes
   useEffect(() => {
@@ -167,6 +168,11 @@ export default function App() {
 
     s.on('element-created', ({ element }) => {
       setElements((prev) => [...prev.filter((el) => el.id !== element.id), element]);
+    });
+
+    s.on('element-deleted', ({ elementId }) => {
+      setElements((prev) => prev.filter((el) => el.id !== elementId));
+      setSelectedElementId((prev) => (prev === elementId ? null : prev));
     });
 
     return () => {
@@ -516,6 +522,8 @@ export default function App() {
             setLocks={setLocks}
             users={users}
             currentUser={currentUser}
+            selectedElementId={selectedElementId}
+            setSelectedElementId={setSelectedElementId}
           />
         </main>
 
@@ -592,12 +600,21 @@ export default function App() {
                   const lockHolderId = locks[el.id];
                   const isLocked = !!lockHolderId;
                   const lockHolder = isLocked ? users.find((u) => u.id === lockHolderId) : null;
+                  const isLockedByOther = isLocked && lockHolderId !== currentUser?.id;
+                  const isSelected = el.id === selectedElementId;
                   const shapeName = el.type.charAt(0).toUpperCase() + el.type.slice(1);
 
                   return (
                     <div
                       key={el.id}
-                      className="p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/50 flex flex-col gap-1.5"
+                      onClick={() => {
+                        setSelectedElementId(el.id);
+                      }}
+                      className={`p-2.5 rounded-xl flex flex-col gap-1.5 transition cursor-pointer select-none ${
+                        isSelected
+                          ? 'bg-sky-500/10 border border-sky-500/80 shadow-md shadow-sky-500/5'
+                          : 'bg-slate-900/40 border border-slate-800/50 hover:border-slate-800'
+                      }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -638,6 +655,27 @@ export default function App() {
                         <div className="flex items-center justify-between border border-slate-800/80 bg-slate-950/20 rounded-lg px-2 py-1 text-[9px] text-slate-500">
                           <span>🔓 Unlocked & Editable</span>
                         </div>
+                      )}
+
+                      {/* Delete Element Button */}
+                      {isSelected && !isLockedByOther && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const socket = socketRef.current;
+                            if (socket && socket.connected) {
+                              socket.emit('element-delete', { elementId: el.id }, (response) => {
+                                if (response && response.success) {
+                                  setElements((prev) => prev.filter((item) => item.id !== el.id));
+                                  setSelectedElementId(null);
+                                }
+                              });
+                            }
+                          }}
+                          className="mt-1 w-full py-1.5 px-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-[10px] text-rose-400 font-bold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          🗑️ Delete Element
+                        </button>
                       )}
                     </div>
                   );

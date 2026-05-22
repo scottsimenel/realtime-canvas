@@ -203,6 +203,31 @@ io.on('connection', (socket) => {
   });
 
   /**
+   * Handle deletion of an element.
+   */
+  socket.on('element-delete', (data, callback) => {
+    const { elementId } = data || {};
+    if (!elementId) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Element ID is required' });
+      return;
+    }
+
+    const success = registry.deleteElement(elementId, socket.id);
+    const room = socket.room || DEFAULT_ROOM;
+
+    if (success) {
+      console.log(`Element deleted: ${elementId} by ${socket.id}`);
+      // Notify all other clients in the room
+      socket.to(room).emit('element-deleted', { elementId, userId: socket.id });
+      if (typeof callback === 'function') callback({ success: true });
+    } else {
+      if (typeof callback === 'function') {
+        callback({ success: false, error: 'Delete denied: Element locked by another user or not found' });
+      }
+    }
+  });
+
+  /**
    * Handle user disconnection.
    * Clean up registry entries (user cursor and held locks) and notify other clients.
    */

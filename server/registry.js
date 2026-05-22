@@ -179,6 +179,30 @@ export class CanvasRegistry {
   }
 
   /**
+   * Deletes a canvas element.
+   * Checks locks to ensure only the lock owner (or if unlocked) can delete.
+   * 
+   * @param {string} elementId - The ID of the element to delete.
+   * @param {string} userId - The socket ID of the user requesting deletion.
+   * @returns {boolean} True if deletion was successful; false if denied or not found.
+   */
+  deleteElement(elementId, userId) {
+    if (!this.elements.has(elementId)) {
+      return false;
+    }
+
+    const lockHolder = this.locks.get(elementId);
+    if (lockHolder && lockHolder !== userId) {
+      return false; // Denied: Locked by someone else
+    }
+
+    // Perform deletion
+    this.elements.delete(elementId);
+    this.locks.delete(elementId); // Release any lock
+    return true;
+  }
+
+  /**
    * Cleans up state when a user disconnects:
    * Removes them from the users list and releases any locks they held.
    * 
