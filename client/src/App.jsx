@@ -826,31 +826,48 @@ export default function App() {
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
 
-      const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      const element = {
-        id,
-        type: 'image',
-        x: Math.floor(Math.random() * 200) + 120,
-        y: Math.floor(Math.random() * 200) + 120,
-        width: 160,
-        height: 110,
-        properties: {
-          url,
-        },
+      const img = new Image();
+      img.src = url;
+
+      const spawnWithDimensions = (w, h) => {
+        const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const element = {
+          id,
+          type: 'image',
+          x: Math.floor(Math.random() * 200) + 120,
+          y: Math.floor(Math.random() * 200) + 120,
+          width: w,
+          height: h,
+          properties: {
+            url,
+          },
+        };
+
+        // Optimistically update locally
+        setElements((prev) => [...prev, element]);
+
+        socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
+          if (!response || !response.success) {
+            // Rollback
+            setElements((prev) => prev.filter((el) => el.id !== id));
+            console.error('Failed to create image element:', response?.error);
+          }
+        });
       };
 
-      // Optimistically update locally
-      setElements((prev) => [...prev, element]);
+      img.onload = () => {
+        const w = img.naturalWidth || 160;
+        const h = img.naturalHeight || 110;
+        spawnWithDimensions(w, h);
+      };
 
-      socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
-        if (!response || !response.success) {
-          // Rollback
-          setElements((prev) => prev.filter((el) => el.id !== id));
-          console.error('Failed to create image element:', response?.error);
-        }
-      });
+      img.onerror = () => {
+        console.error('Failed to load image to determine native dimensions:', url);
+        // Fallback to default dimensions if loading fails
+        spawnWithDimensions(160, 110);
+      };
     },
-    []
+    [setElements]
   );
 
   const handleImageUpload = useCallback(
