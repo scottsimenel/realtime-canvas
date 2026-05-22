@@ -16,6 +16,7 @@ export default function Canvas({
   eraserSize = 20,
   roomSettings,
   tabId = 'tab-default',
+  onVirtualDimensionsChange,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -30,33 +31,83 @@ export default function Canvas({
 
   // Load background image to set virtual dimensions state
   useEffect(() => {
-    const { backgroundImageUrl, showBackground } = roomSettings || {};
+    const {
+      backgroundImageUrl,
+      showBackground,
+      customBackgroundWidth,
+      customBackgroundHeight,
+    } = roomSettings || {};
+
+    const fallbackWidth = 1920;
+    const fallbackHeight = 1080;
+
+    const getFittedDimensions = (imgW, imgH) => {
+      const maxW = 1920;
+      const maxH = 1080;
+      const imgRatio = imgW / imgH;
+      const boxRatio = maxW / maxH;
+      if (imgRatio > boxRatio) {
+        return { width: maxW, height: Math.round(maxW / imgRatio) };
+      } else {
+        return { width: Math.round(maxH * imgRatio), height: maxH };
+      }
+    };
+
+    const getOverriddenDimensions = (imgRatio, defaultW, defaultH) => {
+      const w = parseInt(customBackgroundWidth, 10);
+      const h = parseInt(customBackgroundHeight, 10);
+      const wValid = !isNaN(w) && w > 0;
+      const hValid = !isNaN(h) && h > 0;
+
+      if (wValid && hValid) {
+        return { width: w, height: h };
+      } else if (wValid) {
+        return { width: w, height: Math.round(w / imgRatio) };
+      } else if (hValid) {
+        return { width: Math.round(h * imgRatio), height: h };
+      } else {
+        return { width: defaultW, height: defaultH };
+      }
+    };
+
     if (showBackground && backgroundImageUrl) {
       const img = new Image();
       img.src = backgroundImageUrl;
       img.onload = () => {
+        const fitted = getFittedDimensions(img.width, img.height);
+        const imgRatio = img.width / img.height;
+        const final = getOverriddenDimensions(imgRatio, fitted.width, fitted.height);
         setVirtualDimensions((prev) => {
-          if (prev.width === img.width && prev.height === img.height) return prev;
-          return { width: img.width, height: img.height };
+          if (prev.width === final.width && prev.height === final.height) return prev;
+          return final;
         });
       };
       img.onerror = () => {
         setTimeout(() => {
+          const final = getOverriddenDimensions(fallbackWidth / fallbackHeight, fallbackWidth, fallbackHeight);
           setVirtualDimensions((prev) => {
-            if (prev.width === 1920 && prev.height === 1080) return prev;
-            return { width: 1920, height: 1080 };
+            if (prev.width === final.width && prev.height === final.height) return prev;
+            return final;
           });
         }, 0);
       };
     } else {
       setTimeout(() => {
+        const final = getOverriddenDimensions(fallbackWidth / fallbackHeight, fallbackWidth, fallbackHeight);
         setVirtualDimensions((prev) => {
-          if (prev.width === 1920 && prev.height === 1080) return prev;
-          return { width: 1920, height: 1080 };
+          if (prev.width === final.width && prev.height === final.height) return prev;
+          return final;
         });
       }, 0);
     }
   }, [roomSettings]);
+
+  // Sync virtualDimensions with parent callback if provided
+  useEffect(() => {
+    if (onVirtualDimensionsChange) {
+      onVirtualDimensionsChange(virtualDimensions);
+    }
+  }, [virtualDimensions, onVirtualDimensionsChange]);
 
   // Trigger state update to force re-render/redraw on asynchronous assets (like images) loading
   const triggerRedraw = useCallback(() => {

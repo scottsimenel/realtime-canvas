@@ -56,7 +56,9 @@ export class CanvasRegistry {
         backgroundMode: 'fill', // 'fill', 'fit', 'stretch'
         showGrid: true,
         gridType: 'square', // 'square', 'hexagon'
-        gridSize: 40 // spacing/radius range 15 to 150
+        gridSize: 40, // spacing/radius range 15 to 150
+        customBackgroundWidth: null,
+        customBackgroundHeight: null
       }
     });
   }
@@ -116,7 +118,9 @@ export class CanvasRegistry {
         backgroundMode: 'fill',
         showGrid: true,
         gridType: 'square',
-        gridSize: 40
+        gridSize: 40,
+        customBackgroundWidth: null,
+        customBackgroundHeight: null
       }
     };
     this.tabs.set(tabId, newTab);
@@ -205,6 +209,8 @@ export class CanvasRegistry {
     if (updates.showGrid !== undefined) settings.showGrid = updates.showGrid;
     if (updates.gridType !== undefined) settings.gridType = updates.gridType;
     if (updates.gridSize !== undefined) settings.gridSize = updates.gridSize;
+    if (updates.customBackgroundWidth !== undefined) settings.customBackgroundWidth = updates.customBackgroundWidth;
+    if (updates.customBackgroundHeight !== undefined) settings.customBackgroundHeight = updates.customBackgroundHeight;
     return settings;
   }
 

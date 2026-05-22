@@ -168,6 +168,8 @@ export default function App() {
         showGrid: true,
         gridType: 'square',
         gridSize: 40,
+        customBackgroundWidth: null,
+        customBackgroundHeight: null,
       },
     },
   ]);
@@ -190,6 +192,8 @@ export default function App() {
       showGrid: true,
       gridType: 'square',
       gridSize: 40,
+      customBackgroundWidth: null,
+      customBackgroundHeight: null,
     },
   };
   const elements = activeTab.elements;
@@ -225,6 +229,7 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedElementIds, setSelectedElementIds] = useState([]);
+  const [activeVirtualDimensions, setActiveVirtualDimensions] = useState({ width: 1920, height: 1080 });
 
   // Local states for Transform Inspector inputs to enable smooth multi-selection editing
   const [inputWidth, setInputWidth] = useState('');
@@ -1829,6 +1834,55 @@ export default function App() {
                             ))}
                           </div>
                         </div>
+
+                        {/* Background Dimensions */}
+                        <div className="space-y-1.5 pt-2 border-t border-slate-800/40">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Custom Artboard Size</span>
+                          <div className="flex gap-2">
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[9px] text-slate-500 block">Width (px)</label>
+                              <input
+                                type="number"
+                                placeholder={activeVirtualDimensions.width}
+                                value={roomSettings.customBackgroundWidth || ''}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  handleUpdateRoomSettings({
+                                    customBackgroundWidth: isNaN(val) || val <= 0 ? null : val
+                                  });
+                                }}
+                                className="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[9px] text-slate-500 block">Height (px)</label>
+                              <input
+                                type="number"
+                                placeholder={activeVirtualDimensions.height}
+                                value={roomSettings.customBackgroundHeight || ''}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10);
+                                  handleUpdateRoomSettings({
+                                    customBackgroundHeight: isNaN(val) || val <= 0 ? null : val
+                                  });
+                                }}
+                                className="w-full bg-slate-950/60 border border-slate-800 rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-sky-500"
+                              />
+                            </div>
+                          </div>
+                          {(roomSettings.customBackgroundWidth || roomSettings.customBackgroundHeight) && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateRoomSettings({
+                                customBackgroundWidth: null,
+                                customBackgroundHeight: null
+                              })}
+                              className="text-[9px] font-bold text-sky-400 hover:text-sky-300 transition cursor-pointer"
+                            >
+                              Reset to Auto-Fit
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2105,6 +2159,7 @@ export default function App() {
               eraserSize={eraserSize}
               roomSettings={roomSettings}
               tabId={activeTabId}
+              onVirtualDimensionsChange={setActiveVirtualDimensions}
             />
           </div>
 
