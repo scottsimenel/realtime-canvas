@@ -145,6 +145,155 @@ export default function Canvas({
     return false;
   }, [getLocalCoords]);
 
+  // Split a path element into multiple sub-paths where the eraser intersects
+  const splitPathElement = useCallback((ex, ey, eraserRad, pathEl) => {
+    const points = pathEl.properties?.points || [];
+    if (points.length < 2) return [];
+
+    const local = getLocalCoords(ex, ey, pathEl);
+    const w = pathEl.width;
+    const h = pathEl.height;
+    const strokeWidth = pathEl.properties?.strokeWidth || 4;
+    const hitTolerance = eraserRad; // Erase vertices strictly inside the eraser
+
+    // 1. Calculate local coordinates for all points
+    const localPts = points.map((p) => ({
+      x: -w / 2 + p.x * w,
+      y: -h / 2 + p.y * h,
+    }));
+
+    // 2. Identify which points are erased (inside eraser circle)
+    const isPtErased = localPts.map(
+      (lp) => Math.hypot(lp.x - local.x, lp.y - local.y) <= hitTolerance
+    );
+
+    // Helper to get distance from a point to a segment
+    const getDistanceToSegment = (px, py, ax, ay, bx, by) => {
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+      let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+    };
+
+    // 3. Identify which segments are erased (intersect the eraser + stroke thickness)
+    const isSegErased = [];
+    for (let i = 0; i < localPts.length - 1; i++) {
+      const dist = getDistanceToSegment(
+        local.x,
+        local.y,
+        localPts[i].x,
+        localPts[i].y,
+        localPts[i + 1].x,
+        localPts[i + 1].y
+      );
+      isSegErased.push(dist <= eraserRad + strokeWidth / 2);
+    }
+
+    // 4. Split into chunks of points
+    const chunks = [];
+    let currentChunk = [];
+
+    for (let i = 0; i < points.length; i++) {
+      if (isPtErased[i]) {
+        // Current point is erased. End current chunk
+        if (currentChunk.length >= 2) {
+          chunks.push(currentChunk);
+        }
+        currentChunk = [];
+      } else {
+        // Point is not erased
+        if (currentChunk.length === 0) {
+          currentChunk.push(points[i]);
+        } else {
+          // Check if segment from previous point to this point was erased
+          if (isSegErased[i - 1]) {
+            // Segment is erased! Split here.
+            if (currentChunk.length >= 2) {
+              chunks.push(currentChunk);
+            }
+            currentChunk = [points[i]];
+          } else {
+            currentChunk.push(points[i]);
+          }
+        }
+      }
+    }
+    if (currentChunk.length >= 2) {
+      chunks.push(currentChunk);
+    }
+
+    if (chunks.length === 0) {
+      return [];
+    }
+
+    // 5. Convert chunks back into new path elements
+    const parentCx = pathEl.x + w / 2;
+    const parentCy = pathEl.y + h / 2;
+    const rot = pathEl.properties?.rotation || 0;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+
+    return chunks.map((chunk, idx) => {
+      // Chunk points are original normalized points. Get local coords relative to parent:
+      const chunkLocalPts = chunk.map((pt) => ({
+        x: -w / 2 + pt.x * w,
+        y: -h / 2 + pt.y * h,
+      }));
+
+      // Find local bounding box of this chunk
+      let minLx = Infinity;
+      let maxLx = -Infinity;
+      let minLy = Infinity;
+      let maxLy = -Infinity;
+      chunkLocalPts.forEach((lp) => {
+        if (lp.x < minLx) minLx = lp.x;
+        if (lp.x > maxLx) maxLx = lp.x;
+        if (lp.y < minLy) minLy = lp.y;
+        if (lp.y > maxLy) maxLy = lp.y;
+      });
+
+      const chunkW = Math.max(maxLx - minLx, 4);
+      const chunkH = Math.max(maxLy - minLy, 4);
+
+      // Normalize points for the new element
+      const newNormalizedPoints = chunkLocalPts.map((lp) => ({
+        x: (lp.x - minLx) / chunkW,
+        y: (lp.y - minLy) / chunkH,
+      }));
+
+      // Center of new element in parent local space
+      const newCxLocal = minLx + chunkW / 2;
+      const newCyLocal = minLy + chunkH / 2;
+
+      // Center in global space
+      const newCxGlobal = parentCx + newCxLocal * cos - newCyLocal * sin;
+      const newCyGlobal = parentCy + newCxLocal * sin + newCyLocal * cos;
+
+      const newX = newCxGlobal - chunkW / 2;
+      const newY = newCyGlobal - chunkH / 2;
+
+      const newId = `el_path_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 9)}`;
+
+      return {
+        id: newId,
+        type: 'path',
+        x: Math.round(newX),
+        y: Math.round(newY),
+        width: Math.round(chunkW),
+        height: Math.round(chunkH),
+        properties: {
+          points: newNormalizedPoints,
+          stroke: pathEl.properties.stroke,
+          strokeWidth: pathEl.properties.strokeWidth,
+          rotation: rot,
+        },
+      };
+    });
+  }, [getLocalCoords]);
+
   // Check if coordinates hit an element, checking top-most first
   const getElementAtCoords = useCallback((x, y) => {
     for (let i = elements.length - 1; i >= 0; i--) {
@@ -729,17 +878,35 @@ export default function Canvas({
       );
 
       if (elementsToErase.length > 0) {
-        const unlockableIds = elementsToErase
-          .filter((el) => {
-            const lockHolderId = locks[el.id];
-            return !lockHolderId || lockHolderId === currentUser?.id;
-          })
-          .map((el) => el.id);
+        const unlockableElements = elementsToErase.filter((el) => {
+          const lockHolderId = locks[el.id];
+          return !lockHolderId || lockHolderId === currentUser?.id;
+        });
 
-        if (unlockableIds.length > 0) {
-          setElements((prev) => prev.filter((el) => !unlockableIds.includes(el.id)));
-          setSelectedElementIds((prev) => prev.filter((id) => !unlockableIds.includes(id)));
-          socket.emit('element-delete', { elementIds: unlockableIds });
+        if (unlockableElements.length > 0) {
+          const toDeleteIds = [];
+          const toCreateElements = [];
+
+          unlockableElements.forEach((el) => {
+            const subPaths = splitPathElement(coords.x, coords.y, eraserRad, el);
+            toDeleteIds.push(el.id);
+            toCreateElements.push(...subPaths);
+          });
+
+          if (toDeleteIds.length > 0) {
+            setElements((prev) => [
+              ...prev.filter((el) => !toDeleteIds.includes(el.id)),
+              ...toCreateElements,
+            ]);
+            setSelectedElementIds((prev) =>
+              prev.filter((id) => !toDeleteIds.includes(id))
+            );
+
+            socket.emit('element-delete', { elementIds: toDeleteIds });
+            toCreateElements.forEach((newEl) => {
+              socket.emit('element-create', { element: newEl });
+            });
+          }
         }
       }
       triggerRedraw();
@@ -945,23 +1112,42 @@ export default function Canvas({
         );
 
         if (elementsToErase.length > 0) {
-          const unlockableIds = elementsToErase
-            .filter((el) => {
-              const lockHolderId = locks[el.id];
-              return !lockHolderId || lockHolderId === currentUser?.id;
-            })
-            .map((el) => el.id);
+          const unlockableElements = elementsToErase.filter((el) => {
+            const lockHolderId = locks[el.id];
+            return !lockHolderId || lockHolderId === currentUser?.id;
+          });
 
-          if (unlockableIds.length > 0) {
-            setElements((prev) => prev.filter((el) => !unlockableIds.includes(el.id)));
-            setSelectedElementIds((prev) => prev.filter((id) => !unlockableIds.includes(id)));
-            if (socket && socket.connected) {
-              socket.emit('element-delete', { elementIds: unlockableIds });
+          if (unlockableElements.length > 0) {
+            const toDeleteIds = [];
+            const toCreateElements = [];
+
+            unlockableElements.forEach((el) => {
+              const subPaths = splitPathElement(coords.x, coords.y, eraserRad, el);
+              toDeleteIds.push(el.id);
+              toCreateElements.push(...subPaths);
+            });
+
+            if (toDeleteIds.length > 0) {
+              setElements((prev) => [
+                ...prev.filter((el) => !toDeleteIds.includes(el.id)),
+                ...toCreateElements,
+              ]);
+              setSelectedElementIds((prev) =>
+                prev.filter((id) => !toDeleteIds.includes(id))
+              );
+
+              if (socket && socket.connected) {
+                socket.emit('element-delete', { elementIds: toDeleteIds });
+                toCreateElements.forEach((newEl) => {
+                  socket.emit('element-create', { element: newEl });
+                });
+              }
             }
           }
         }
         return;
       }
+
 
       if (drag.mode === 'select') {
         drag.currentX = coords.x;
