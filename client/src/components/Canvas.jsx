@@ -15,6 +15,7 @@ export default function Canvas({
   penSize,
   eraserSize = 20,
   roomSettings,
+  tabId = 'tab-default',
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -300,6 +301,7 @@ export default function Canvas({
   const getElementAtCoords = useCallback((x, y) => {
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
+      if (el.properties?.locked) continue;
       const local = getLocalCoords(x, y, el);
       const hw = el.width / 2;
       const hh = el.height / 2;
@@ -728,11 +730,13 @@ export default function Canvas({
       const cy = element.y + h / 2;
       const rad = element.properties?.rotation || 0;
 
+      const outlineColor = element.properties?.locked ? '#f59e0b' : '#38bdf8';
+
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(rad);
 
-      ctx.strokeStyle = '#38bdf8'; // sky-400
+      ctx.strokeStyle = outlineColor;
       ctx.lineWidth = 1;
 
       // Draw individual handles only if exactly 1 element is selected
@@ -741,7 +745,7 @@ export default function Canvas({
         ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
 
         // Rotation handle line
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = outlineColor;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(0, -h / 2 - 4);
@@ -750,7 +754,7 @@ export default function Canvas({
 
         // Rotation handle circle
         ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = outlineColor;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(0, -h / 2 - 24, 5, 0, 2 * Math.PI);
@@ -760,7 +764,7 @@ export default function Canvas({
         // Corner handles
         const handleSize = 7;
         ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#38bdf8';
+        ctx.strokeStyle = outlineColor;
         ctx.lineWidth = 1.5;
 
         // Top-Left
@@ -929,7 +933,7 @@ export default function Canvas({
 
           if (unlockedIds.length === 0) return;
 
-          socket.emit('element-delete', { elementIds: unlockedIds }, (response) => {
+          socket.emit('element-delete', { elementIds: unlockedIds, tabId }, (response) => {
             if (response && response.success) {
               setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
               setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
@@ -941,7 +945,7 @@ export default function Canvas({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds]);
+  }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
 
   const handleMouseDown = (e) => {
     const socket = socketRef.current;
@@ -1000,9 +1004,9 @@ export default function Canvas({
               prev.filter((id) => !toDeleteIds.includes(id))
             );
 
-            socket.emit('element-delete', { elementIds: toDeleteIds });
+            socket.emit('element-delete', { elementIds: toDeleteIds, tabId });
             toCreateElements.forEach((newEl) => {
-              socket.emit('element-create', { element: newEl });
+              socket.emit('element-create', { element: newEl, tabId });
             });
           }
         }
@@ -1028,7 +1032,7 @@ export default function Canvas({
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
-          socket.emit('element-lock', { elementIds: targetIds }, (response) => {
+          socket.emit('element-lock', { elementIds: targetIds, tabId }, (response) => {
             if (response && response.success && response.lockedIds) {
               if (dragStateRef.current) {
                 dragStateRef.current.lockedIds = response.lockedIds;
@@ -1074,7 +1078,7 @@ export default function Canvas({
             };
 
             // Request socket lock
-            socket.emit('element-lock', { elementId: activeElement.id }, (response) => {
+            socket.emit('element-lock', { elementId: activeElement.id, tabId }, (response) => {
               if (response && response.success) {
                 if (dragStateRef.current && dragStateRef.current.elementId === activeElement.id) {
                   dragStateRef.current.hasLock = true;
@@ -1124,7 +1128,7 @@ export default function Canvas({
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
-          socket.emit('element-lock', { elementIds: targetIds }, (response) => {
+          socket.emit('element-lock', { elementIds: targetIds, tabId }, (response) => {
             if (response && response.success && response.lockedIds) {
               if (dragStateRef.current) {
                 dragStateRef.current.lockedIds = response.lockedIds;
@@ -1153,7 +1157,7 @@ export default function Canvas({
         hasLock: false,
       };
 
-      socket.emit('element-lock', { elementId: element.id }, (response) => {
+      socket.emit('element-lock', { elementId: element.id, tabId }, (response) => {
         if (response && response.success) {
           if (dragStateRef.current && dragStateRef.current.elementId === element.id) {
             dragStateRef.current.hasLock = true;
@@ -1235,9 +1239,9 @@ export default function Canvas({
               );
 
               if (socket && socket.connected) {
-                socket.emit('element-delete', { elementIds: toDeleteIds });
+                socket.emit('element-delete', { elementIds: toDeleteIds, tabId });
                 toCreateElements.forEach((newEl) => {
-                  socket.emit('element-create', { element: newEl });
+                  socket.emit('element-create', { element: newEl, tabId });
                 });
               }
             }
@@ -1465,12 +1469,13 @@ export default function Canvas({
               return drag.lockedIds.includes(item.elementId) || !locks[item.elementId] || locks[item.elementId] === currentUser?.id;
             });
             if (unlockedBatch.length > 0) {
-              socket.emit('element-update', { batch: unlockedBatch });
+              socket.emit('element-update', { batch: unlockedBatch, tabId });
             }
           } else if (drag.hasLock) {
             socket.emit('element-update', {
               elementId: drag.elementId,
               updates: updatesBatch[0].updates,
+              tabId,
             });
           }
         }
@@ -1529,7 +1534,7 @@ export default function Canvas({
           // Emit to server
           const socket = socketRef.current;
           if (socket && socket.connected) {
-            socket.emit('element-create', { element });
+            socket.emit('element-create', { element, tabId });
           }
         }
         tempDrawingPathRef.current = null;
@@ -1556,6 +1561,7 @@ export default function Canvas({
         if (width > 3 || height > 3) {
           const intersectingIds = [];
           elements.forEach((el) => {
+            if (el.properties?.locked) return;
             if (checkElementIntersectsBox(el, minX, maxX, minY, maxY)) {
               intersectingIds.push(el.id);
             }
@@ -1587,7 +1593,7 @@ export default function Canvas({
         if (activeIds.length > 0) {
           const socket = socketRef.current;
           if (socket && socket.connected) {
-            socket.emit('element-unlock', { elementIds: activeIds });
+            socket.emit('element-unlock', { elementIds: activeIds, tabId });
           }
           setLocks((prev) => {
             const next = { ...prev };
@@ -1600,7 +1606,7 @@ export default function Canvas({
       } else if (drag.hasLock) {
         const socket = socketRef.current;
         if (socket && socket.connected) {
-          socket.emit('element-unlock', { elementId: drag.elementId });
+          socket.emit('element-unlock', { elementId: drag.elementId, tabId });
         }
         setLocks((prev) => {
           const next = { ...prev };
@@ -1647,7 +1653,7 @@ export default function Canvas({
 
       {/* Render active cursors with names */}
       {users
-        .filter((u) => u.id !== currentUser?.id)
+        .filter((u) => u.id !== currentUser?.id && (u.activeTabId || 'tab-default') === tabId)
         .map((user) => {
           if (user.x === undefined || user.y === undefined) return null;
 

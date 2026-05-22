@@ -45,6 +45,93 @@ const SAMPLE_IMAGES = [
   },
 ];
 
+function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete, onRename, isDeleteDisabled }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(tab.name);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSubmit = () => {
+    setIsEditing(false);
+    if (editName.trim() && editName !== tab.name) {
+      onRename(tab.id, editName.trim());
+    } else {
+      setEditName(tab.name);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditName(tab.name);
+    }
+  };
+
+  return (
+    <div
+      onClick={() => !isEditing && onSwitch(tab.id)}
+      onDoubleClick={() => setIsEditing(true)}
+      className={`group flex items-center gap-3 px-4 py-2 rounded-xl transition duration-200 border cursor-pointer select-none relative shrink-0 ${
+        isActive
+          ? 'bg-sky-500/10 border-sky-500/30 text-sky-400 font-bold shadow-md'
+          : 'bg-slate-950/20 border-slate-900 text-slate-400 hover:bg-slate-900/40 hover:text-slate-300'
+      }`}
+    >
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onBlur={handleSubmit}
+          onKeyDown={handleKeyDown}
+          className="bg-slate-950/80 border border-sky-500 rounded px-1.5 py-0.5 text-xs text-sky-300 focus:outline-none w-24 font-semibold"
+        />
+      ) : (
+        <span className="text-xs truncate max-w-[100px] font-semibold">{tab.name}</span>
+      )}
+
+      {/* Users Avatars indicator */}
+      {tabUsers.length > 0 && (
+        <div className="flex items-center -space-x-1.5 ml-1">
+          {tabUsers.map((u) => (
+            <div
+              key={u.id}
+              style={{ backgroundColor: u.color }}
+              className="w-4 h-4 rounded-full border border-slate-900 flex items-center justify-center text-[8px] font-black text-white shadow-sm"
+              title={u.name}
+            >
+              {u.name.substring(0, 1).toUpperCase()}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Delete button (shows on hover or active, hidden if disabled) */}
+      {!isDeleteDisabled && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(tab.id);
+          }}
+          className="w-3.5 h-3.5 rounded-md flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 transition opacity-0 group-hover:opacity-100 cursor-pointer"
+          title="Delete Canvas"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // Connection states
   const [connected, setConnected] = useState(false);
@@ -68,8 +155,74 @@ export default function App() {
 
   // Shared board state
   const [users, setUsers] = useState([]);
-  const [elements, setElements] = useState([]);
-  const [locks, setLocks] = useState({});
+  const [tabs, setTabs] = useState([
+    {
+      id: 'tab-default',
+      name: 'Canvas 1',
+      elements: [],
+      locks: {},
+      roomSettings: {
+        backgroundImageUrl: null,
+        showBackground: true,
+        backgroundMode: 'fill',
+        showGrid: true,
+        gridType: 'square',
+        gridSize: 40,
+      },
+    },
+  ]);
+  const [activeTabId, setActiveTabId] = useState('tab-default');
+  const activeTabIdRef = useRef('tab-default');
+
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || {
+    id: 'tab-default',
+    name: 'Canvas 1',
+    elements: [],
+    locks: {},
+    roomSettings: {
+      backgroundImageUrl: null,
+      showBackground: true,
+      backgroundMode: 'fill',
+      showGrid: true,
+      gridType: 'square',
+      gridSize: 40,
+    },
+  };
+  const elements = activeTab.elements;
+  const locks = activeTab.locks;
+  const roomSettings = activeTab.roomSettings;
+
+  const setElements = useCallback((updater) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabIdRef.current
+          ? {
+              ...t,
+              elements:
+                typeof updater === 'function' ? updater(t.elements) : updater,
+            }
+          : t
+      )
+    );
+  }, []);
+
+  const setLocks = useCallback((updater) => {
+    setTabs((prev) =>
+      prev.map((t) =>
+        t.id === activeTabIdRef.current
+          ? {
+              ...t,
+              locks: typeof updater === 'function' ? updater(t.locks) : updater,
+            }
+          : t
+      )
+    );
+  }, []);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedElementIds, setSelectedElementIds] = useState([]);
 
@@ -106,16 +259,10 @@ export default function App() {
   const [draggedElementId, setDraggedElementId] = useState(null);
   const [dragOverElementId, setDragOverElementId] = useState(null);
 
-  // Collaborative Room Settings (Feature 4 Background and Grid)
-  const [roomSettings, setRoomSettings] = useState({
-    backgroundImageUrl: null,
-    showBackground: true,
-    backgroundMode: 'fill',
-    showGrid: true,
-    gridType: 'square',
-    gridSize: 40,
-  });
+  // Collaborative Room Settings computed dynamically from active tab
   const [isSettingsSectionCollapsed, setIsSettingsSectionCollapsed] = useState(false);
+  const [isBgModalOpen, setIsBgModalOpen] = useState(false);
+  const [selectedBgPreviewAsset, setSelectedBgPreviewAsset] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
@@ -213,17 +360,30 @@ export default function App() {
           },
           (res) => {
             if (res && res.success) {
-              setElements(res.elements || []);
-              const lockMap = {};
-              (res.locks || []).forEach(([eId, uId]) => {
-                lockMap[eId] = uId;
+              const formattedTabs = (res.tabs || []).map((tab) => {
+                const lockMap = {};
+                (tab.locks || []).forEach(([eId, uId]) => {
+                  lockMap[eId] = uId;
+                });
+                return {
+                  ...tab,
+                  locks: lockMap,
+                };
               });
-              setLocks(lockMap);
+              setTabs(formattedTabs);
               setUsers(res.users || []);
               setAssets(res.assets || []);
-              if (res.roomSettings) {
-                setRoomSettings(res.roomSettings);
+
+              let targetTabId = activeTabIdRef.current;
+              if (!formattedTabs.some((t) => t.id === targetTabId)) {
+                targetTabId = res.activeTabId || 'tab-default';
               }
+              setActiveTabId(targetTabId);
+
+              if (targetTabId !== 'tab-default') {
+                s.emit('tab-switch', { tabId: targetTabId });
+              }
+
               setCurrentUser({
                 id: s.id,
                 name: nameRef.current,
@@ -245,15 +405,19 @@ export default function App() {
 
     s.on('user-left', ({ userId }) => {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-      setLocks((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((key) => {
-          if (next[key] === userId) {
-            delete next[key];
-          }
-        });
-        return next;
-      });
+      setTabs((prev) =>
+        prev.map((tab) => {
+          const nextLocks = { ...tab.locks };
+          let changed = false;
+          Object.keys(nextLocks).forEach((key) => {
+            if (nextLocks[key] === userId) {
+              delete nextLocks[key];
+              changed = true;
+            }
+          });
+          return changed ? { ...tab, locks: nextLocks } : tab;
+        })
+      );
     });
 
     s.on('cursor-update', ({ userId, x, y }) => {
@@ -262,61 +426,107 @@ export default function App() {
       );
     });
 
-    s.on('element-locked', ({ elementId, userId }) => {
-      setLocks((prev) => ({ ...prev, [elementId]: userId }));
+    s.on('element-locked', ({ elementId, userId, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === targetTabId
+            ? { ...t, locks: { ...t.locks, [elementId]: userId } }
+            : t
+        )
+      );
     });
 
-    s.on('element-unlocked', ({ elementId }) => {
-      setLocks((prev) => {
-        const next = { ...prev };
-        delete next[elementId];
-        return next;
-      });
-    });
-
-    s.on('element-updated', ({ elementId, updates }) => {
-      setElements((prev) =>
-        prev.map((el) => {
-          if (el.id === elementId) {
-            return {
-              ...el,
-              ...updates,
-              properties: {
-                ...(el.properties || {}),
-                ...(updates.properties || {}),
-              },
-            };
-          }
-          return el;
+    s.on('element-unlocked', ({ elementId, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          const nextLocks = { ...t.locks };
+          delete nextLocks[elementId];
+          return { ...t, locks: nextLocks };
         })
       );
     });
 
-    s.on('element-updated-batch', ({ batch }) => {
-      setElements((prev) =>
-        prev.map((el) => {
-          const match = batch.find((item) => item.elementId === el.id);
-          if (match) {
-            return {
-              ...el,
-              ...match.updates,
-              properties: {
-                ...(el.properties || {}),
-                ...(match.updates.properties || {}),
-              },
-            };
-          }
-          return el;
+    s.on('element-updated', ({ elementId, updates, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          return {
+            ...t,
+            elements: t.elements.map((el) => {
+              if (el.id === elementId) {
+                return {
+                  ...el,
+                  ...updates,
+                  properties: {
+                    ...(el.properties || {}),
+                    ...(updates.properties || {}),
+                  },
+                };
+              }
+              return el;
+            }),
+          };
         })
       );
     });
 
-    s.on('element-created', ({ element }) => {
-      setElements((prev) => [...prev.filter((el) => el.id !== element.id), element]);
+    s.on('element-updated-batch', ({ batch, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          return {
+            ...t,
+            elements: t.elements.map((el) => {
+              const match = batch.find((item) => item.elementId === el.id);
+              if (match) {
+                return {
+                  ...el,
+                  ...match.updates,
+                  properties: {
+                    ...(el.properties || {}),
+                    ...(match.updates.properties || {}),
+                  },
+                };
+              }
+              return el;
+            }),
+          };
+        })
+      );
     });
 
-    s.on('element-deleted', ({ elementId }) => {
-      setElements((prev) => prev.filter((el) => el.id !== elementId));
+    s.on('element-created', ({ element, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          return {
+            ...t,
+            elements: [...t.elements.filter((el) => el.id !== element.id), element],
+          };
+        })
+      );
+    });
+
+    s.on('element-deleted', ({ elementId, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          const nextLocks = { ...t.locks };
+          delete nextLocks[elementId];
+          return {
+            ...t,
+            elements: t.elements.filter((el) => el.id !== elementId),
+            locks: nextLocks,
+          };
+        })
+      );
       setSelectedElementIds((prev) => prev.filter((id) => id !== elementId));
     });
 
@@ -324,26 +534,83 @@ export default function App() {
       setAssets((prev) => [...prev.filter((a) => a.id !== asset.id), asset]);
     });
 
-    s.on('elements-reordered', ({ orderedIds }) => {
-      setElements((prev) => {
-        const elementMap = new Map(prev.map((el) => [el.id, el]));
-        const sorted = [];
-        orderedIds.forEach((id) => {
-          if (elementMap.has(id)) {
-            sorted.push(elementMap.get(id));
-          }
+    s.on('elements-reordered', ({ orderedIds, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) => {
+          if (t.id !== targetTabId) return t;
+          const elementMap = new Map(t.elements.map((el) => [el.id, el]));
+          const sorted = [];
+          orderedIds.forEach((id) => {
+            if (elementMap.has(id)) {
+              sorted.push(elementMap.get(id));
+            }
+          });
+          t.elements.forEach((el) => {
+            if (!orderedIds.includes(el.id)) {
+              sorted.push(el);
+            }
+          });
+          return {
+            ...t,
+            elements: sorted,
+          };
+        })
+      );
+    });
+
+    s.on('room-settings-updated', ({ roomSettings: updatedSettings, tabId }) => {
+      const targetTabId = tabId || 'tab-default';
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === targetTabId
+            ? { ...t, roomSettings: updatedSettings }
+            : t
+        )
+      );
+    });
+
+    s.on('tab-created', ({ tab }) => {
+      setTabs((prev) => {
+        if (prev.some((t) => t.id === tab.id)) return prev;
+        const lockMap = {};
+        (tab.locks || []).forEach(([eId, uId]) => {
+          lockMap[eId] = uId;
         });
-        prev.forEach((el) => {
-          if (!orderedIds.includes(el.id)) {
-            sorted.push(el);
-          }
-        });
-        return sorted;
+        return [
+          ...prev,
+          {
+            ...tab,
+            locks: lockMap,
+          },
+        ];
       });
     });
 
-    s.on('room-settings-updated', (updatedSettings) => {
-      setRoomSettings(updatedSettings);
+    s.on('tab-deleted', ({ tabId, fallbackTabId, users: updatedUsers }) => {
+      setTabs((prev) => prev.filter((t) => t.id !== tabId));
+      if (updatedUsers) {
+        setUsers(updatedUsers);
+      }
+      setActiveTabId((currentActiveTabId) => {
+        if (currentActiveTabId === tabId) {
+          setSelectedElementIds([]);
+          return fallbackTabId;
+        }
+        return currentActiveTabId;
+      });
+    });
+
+    s.on('tab-renamed', ({ tabId, name }) => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === tabId ? { ...t, name } : t))
+      );
+    });
+
+    s.on('tab-switched', ({ userId, tabId }) => {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, activeTabId: tabId } : u))
+      );
     });
 
     return () => {
@@ -371,7 +638,7 @@ export default function App() {
 
       const socket = socketRef.current;
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
       return next;
     });
@@ -409,7 +676,7 @@ export default function App() {
 
       const socket = socketRef.current;
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
       return next;
     });
@@ -456,7 +723,7 @@ export default function App() {
 
       const socket = socketRef.current;
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id) });
+        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
       return next;
     });
@@ -478,17 +745,30 @@ export default function App() {
           },
           (res) => {
             if (res && res.success) {
-              setElements(res.elements || []);
-              const lockMap = {};
-              (res.locks || []).forEach(([eId, uId]) => {
-                lockMap[eId] = uId;
+              const formattedTabs = (res.tabs || []).map((tab) => {
+                const lockMap = {};
+                (tab.locks || []).forEach(([eId, uId]) => {
+                  lockMap[eId] = uId;
+                });
+                return {
+                  ...tab,
+                  locks: lockMap,
+                };
               });
-              setLocks(lockMap);
+              setTabs(formattedTabs);
               setUsers(res.users || []);
               setAssets(res.assets || []);
-              if (res.roomSettings) {
-                setRoomSettings(res.roomSettings);
+
+              let targetTabId = activeTabIdRef.current;
+              if (!formattedTabs.some((t) => t.id === targetTabId)) {
+                targetTabId = res.activeTabId || 'tab-default';
               }
+              setActiveTabId(targetTabId);
+
+              if (targetTabId !== 'tab-default') {
+                socket.emit('tab-switch', { tabId: targetTabId });
+              }
+
               setCurrentUser({
                 id: socket.id,
                 name: nameInput,
@@ -530,7 +810,7 @@ export default function App() {
       // Optimistically update locally
       setElements((prev) => [...prev, element]);
 
-      socket.emit('element-create', { element }, (response) => {
+      socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
         if (!response || !response.success) {
           // Rollback
           setElements((prev) => prev.filter((el) => el.id !== id));
@@ -562,7 +842,7 @@ export default function App() {
       // Optimistically update locally
       setElements((prev) => [...prev, element]);
 
-      socket.emit('element-create', { element }, (response) => {
+      socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
         if (!response || !response.success) {
           // Rollback
           setElements((prev) => prev.filter((el) => el.id !== id));
@@ -666,7 +946,7 @@ export default function App() {
 
     if (unlockedIds.length === 0) return;
 
-    socket.emit('element-lock', { elementIds: unlockedIds }, (res) => {
+    socket.emit('element-lock', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
         inspectorLockRef.current = true;
         setLocks((prev) => {
@@ -685,7 +965,7 @@ export default function App() {
     const socket = socketRef.current;
     if (socket && socket.connected) {
       const activeIds = selectedElementIds.filter((id) => locks[id] === currentUser?.id);
-      socket.emit('element-unlock', { elementIds: activeIds });
+      socket.emit('element-unlock', { elementIds: activeIds, tabId: activeTabIdRef.current });
       setLocks((prev) => {
         const next = { ...prev };
         activeIds.forEach((id) => {
@@ -732,10 +1012,54 @@ export default function App() {
         })
       );
 
-      socket.emit('element-update', { batch });
+      socket.emit('element-update', { batch, tabId: activeTabIdRef.current });
     },
     [selectedElementIds, elements, locks, currentUser]
   );
+
+  const handleToggleSelectionLock = useCallback((elementId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const el = elements.find((item) => item.id === elementId);
+    if (!el) return;
+
+    const currentlyLocked = !!el.properties?.locked;
+    const nextLocked = !currentlyLocked;
+
+    // Optimistically update locally
+    setElements((prev) =>
+      prev.map((item) => {
+        if (item.id === elementId) {
+          return {
+            ...item,
+            properties: {
+              ...(item.properties || {}),
+              locked: nextLocked,
+            },
+          };
+        }
+        return item;
+      })
+    );
+
+    // If we are locking the element, remove it from selectedElementIds to drop handles on the canvas
+    if (nextLocked) {
+      setSelectedElementIds((prev) => prev.filter((id) => id !== elementId));
+    }
+
+    // Emit standard element-update Socket.IO event to sync changes room-wide
+    const updates = {
+      properties: {
+        ...(el.properties || {}),
+        locked: nextLocked,
+      },
+    };
+    socket.emit('element-update', {
+      batch: [{ elementId, updates }],
+      tabId: activeTabIdRef.current,
+    });
+  }, [elements, socketRef, setElements, setSelectedElementIds]);
 
   const handleDeleteSelected = useCallback(() => {
     const socket = socketRef.current;
@@ -748,7 +1072,7 @@ export default function App() {
 
     if (unlockedIds.length === 0) return;
 
-    socket.emit('element-delete', { elementIds: unlockedIds }, (res) => {
+    socket.emit('element-delete', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
         setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
         setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
@@ -772,7 +1096,7 @@ export default function App() {
 
       if (unlockableDrawingIds.length === 0) return;
 
-      socket.emit('element-delete', { elementIds: unlockableDrawingIds }, (res) => {
+      socket.emit('element-delete', { elementIds: unlockableDrawingIds, tabId: activeTabIdRef.current }, (res) => {
         if (res && res.success) {
           setElements((prev) => prev.filter((el) => !unlockableDrawingIds.includes(el.id)));
           setSelectedElementIds((prev) => prev.filter((id) => !unlockableDrawingIds.includes(id)));
@@ -785,14 +1109,122 @@ export default function App() {
     const socket = socketRef.current;
     if (socket && socket.connected) {
       // Optimistically update local state first
-      setRoomSettings((prev) => ({ ...prev, ...updates }));
-      socket.emit('room-settings-update', { updates }, (res) => {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabIdRef.current
+            ? { ...t, roomSettings: { ...t.roomSettings, ...updates } }
+            : t
+        )
+      );
+      socket.emit('room-settings-update', { updates, tabId: activeTabIdRef.current }, (res) => {
         if (res && res.success && res.roomSettings) {
-          setRoomSettings(res.roomSettings);
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === activeTabIdRef.current
+                ? { ...t, roomSettings: res.roomSettings }
+                : t
+            )
+          );
         }
       });
     }
   }, []);
+
+  const handleSwitchTab = useCallback((tabId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    socket.emit('tab-switch', { tabId }, (res) => {
+      if (res && res.success) {
+        setSelectedElementIds([]);
+        setActiveTabId(tabId);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === socket.id ? { ...u, activeTabId: tabId } : u))
+        );
+      }
+    });
+  }, []);
+
+  // Collaborative canvas tab operational callbacks
+  const handleCreateTab = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const newTabId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const newName = `Canvas ${tabs.length + 1}`;
+
+    socket.emit('tab-create', { tabId: newTabId, name: newName }, (res) => {
+      if (res && res.success && res.tab) {
+        const lockMap = {};
+        (res.tab.locks || []).forEach(([eId, uId]) => {
+          lockMap[eId] = uId;
+        });
+        const formattedTab = {
+          ...res.tab,
+          locks: lockMap,
+        };
+        setTabs((prev) => [...prev, formattedTab]);
+        handleSwitchTab(newTabId);
+      }
+    });
+  }, [tabs.length, handleSwitchTab]);
+
+  const handleDeleteTab = useCallback((tabId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    if (tabs.length <= 1) return;
+
+    socket.emit('tab-delete', { tabId }, (res) => {
+      if (res && res.success) {
+        setTabs((prev) => prev.filter((t) => t.id !== tabId));
+        if (res.users) {
+          setUsers(res.users);
+        }
+        if (res.fallbackTabId) {
+          setActiveTabId((currentActiveTabId) => {
+            if (currentActiveTabId === tabId) {
+              setSelectedElementIds([]);
+              return res.fallbackTabId;
+            }
+            return currentActiveTabId;
+          });
+        }
+      }
+    });
+  }, [tabs.length]);
+
+  const handleRenameTab = useCallback((tabId, name) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    socket.emit('tab-rename', { tabId, name: trimmedName }, (res) => {
+      if (res && res.success) {
+        setTabs((prev) =>
+          prev.map((t) => (t.id === tabId ? { ...t, name: trimmedName } : t))
+        );
+      }
+    });
+  }, []);
+
+  const handleOpenBgModal = useCallback(() => {
+    const activeUrl = roomSettings.backgroundImageUrl;
+    if (activeUrl) {
+      const foundPreset = SAMPLE_IMAGES.find((img) => img.url === activeUrl);
+      if (foundPreset) {
+        setSelectedBgPreviewAsset({ id: 'active', name: foundPreset.name, url: activeUrl, isPreset: true });
+      } else {
+        const foundUser = assets.find((a) => a.url === activeUrl);
+        setSelectedBgPreviewAsset(foundUser ? { ...foundUser, isPreset: false } : { id: 'active', name: 'Active Background', url: activeUrl, isPreset: false });
+      }
+    } else {
+      setSelectedBgPreviewAsset(null);
+    }
+    setIsBgModalOpen(true);
+  }, [roomSettings.backgroundImageUrl, assets]);
 
   // Lobby (Join Screen)
   if (!joined) {
@@ -1252,7 +1684,7 @@ export default function App() {
                         {/* Select Background Image */}
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Select Image Asset</span>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Background Image Asset</span>
                             {roomSettings.backgroundImageUrl && (
                               <button
                                 type="button"
@@ -1263,34 +1695,45 @@ export default function App() {
                               </button>
                             )}
                           </div>
-                          {allImageAssets.length === 0 ? (
-                            <p className="text-[10px] text-slate-600 italic">No image assets available. Upload above first.</p>
-                          ) : (
-                            <div className="grid grid-cols-4 gap-1.5 max-h-28 overflow-y-auto p-1 bg-slate-950/60 rounded-lg border border-slate-900 custom-scrollbar">
-                              {allImageAssets.map((img) => (
-                                <button
-                                  key={img.id}
-                                  type="button"
-                                  onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
-                                  className={`group relative h-8 rounded-lg overflow-hidden border transition cursor-pointer ${
-                                    roomSettings.backgroundImageUrl === img.url
-                                      ? 'border-sky-500 ring-1 ring-sky-500/30'
-                                      : 'border-slate-800 hover:border-slate-700'
-                                  }`}
-                                  title={`Set "${img.name}" as background`}
-                                >
-                                  <img
-                                    src={img.url}
-                                    alt={img.name}
-                                    className={`w-full h-full object-cover transition duration-200 ${
-                                      roomSettings.backgroundImageUrl === img.url
-                                        ? 'opacity-90'
-                                        : 'opacity-50 group-hover:opacity-85'
-                                    }`}
-                                  />
-                                </button>
-                              ))}
+                          {roomSettings.backgroundImageUrl ? (
+                            <div className="relative rounded-lg overflow-hidden border border-slate-800 bg-slate-950/60 p-2 flex items-center gap-2">
+                              <div className="w-12 h-9 rounded bg-slate-900 overflow-hidden border border-slate-800 flex-shrink-0">
+                                <img
+                                  src={roomSettings.backgroundImageUrl}
+                                  alt="Active Background"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[9px] font-bold text-slate-300 truncate">
+                                  {(() => {
+                                    const found = allImageAssets.find(img => img.url === roomSettings.backgroundImageUrl);
+                                    return found ? found.name : 'Custom Background';
+                                  })()}
+                                </div>
+                                <div className="text-[8px] text-slate-500 capitalize">
+                                  {roomSettings.backgroundMode} mode
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleOpenBgModal}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 text-[8px] font-bold rounded transition cursor-pointer flex-shrink-0"
+                              >
+                                Change
+                              </button>
                             </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleOpenBgModal}
+                              className="w-full py-3 border border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/30 hover:bg-slate-950/50 rounded-lg flex flex-col items-center justify-center gap-1 transition duration-200 group cursor-pointer"
+                            >
+                              <svg className="w-4 h-4 text-slate-500 group-hover:text-slate-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-[9px] font-medium text-slate-400 group-hover:text-slate-300 transition">Browse Backgrounds...</span>
+                            </button>
                           )}
                         </div>
 
@@ -1387,152 +1830,188 @@ export default function App() {
         </aside>
 
         {/* Center Canvas Area */}
-        <main className="flex-1 p-5 flex flex-col overflow-hidden relative">
-          {/* Floating Toolbar */}
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
-            <div className="backdrop-blur-md bg-slate-900/75 border border-slate-800 rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveTool('select')}
-                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                  activeTool === 'select'
-                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                }`}
-                title="Select Tool"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.303.197-1.593 1.593M21.75 12h-2.25m-.197 5.303-1.593-1.593M3.071 6.25 4.664 4.664M12 19.75v2.25M6.25 3.071 4.664 4.664M4.5 12H2.25" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTool('pen')}
-                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                  activeTool === 'pen'
-                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                }`}
-                title="Pen Tool"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTool('eraser')}
-                className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-                  activeTool === 'eraser'
-                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                }`}
-                title="Eraser Tool"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-              <div className="w-px h-6 bg-slate-800 self-center mx-1" />
-              <button
-                type="button"
-                onClick={handleClearDrawings}
-                className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
-                title="Clear All Drawings"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+        <main className="flex-1 p-5 flex flex-col overflow-hidden relative gap-4">
+          {/* Collaborative Canvas Tabs Bar */}
+          <div className="flex items-center justify-between backdrop-blur-md bg-slate-900/30 border border-slate-800/80 rounded-xl p-1.5 shadow-lg z-20 overflow-hidden">
+            <div className="flex items-center gap-2 overflow-x-auto flex-1 mr-4 py-0.5 scrollbar-none">
+              {tabs.map((tab) => {
+                const isActive = tab.id === activeTabId;
+                const tabUsers = users.filter((u) => (u.activeTabId || 'tab-default') === tab.id);
+
+                return (
+                  <TabButton
+                    key={tab.id}
+                    tab={tab}
+                    isActive={isActive}
+                    tabUsers={tabUsers}
+                    onSwitch={handleSwitchTab}
+                    onDelete={handleDeleteTab}
+                    onRename={handleRenameTab}
+                    isDeleteDisabled={tabs.length <= 1}
+                  />
+                );
+              })}
             </div>
-
-            {/* Slide-out sub-toolbar when Pen Tool is active */}
-            {activeTool === 'pen' && (
-              <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
-                {/* Pen Color presets */}
-                <div className="flex items-center gap-1.5">
-                  {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ffffff'].map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setPenColor(color)}
-                      style={{ backgroundColor: color }}
-                      className={`w-5 h-5 rounded-full transition-all border border-black/10 cursor-pointer ${
-                        penColor === color
-                          ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900 scale-110'
-                          : 'hover:scale-105'
-                      }`}
-                    />
-                  ))}
-                  {/* Custom color picker */}
-                  <div className="relative w-5 h-5 rounded-full overflow-hidden border border-slate-700 cursor-pointer flex items-center justify-center">
-                    <input
-                      type="color"
-                      value={penColor}
-                      onChange={(e) => setPenColor(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                    />
-                    <span className="text-[10px] text-slate-400 font-bold select-none">+</span>
-                  </div>
-                </div>
-
-                <div className="w-px h-4 bg-slate-800" />
-
-                {/* Pen size selector */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-slate-400 select-none">Size</span>
-                  <input
-                    type="range"
-                    min="2"
-                    max="24"
-                    value={penSize}
-                    onChange={(e) => setPenSize(parseInt(e.target.value, 10))}
-                    className="w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                  />
-                  <span className="text-[10px] font-mono text-slate-400 select-none w-5 text-right">
-                    {penSize}px
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Slide-out sub-toolbar when Eraser Tool is active */}
-            {activeTool === 'eraser' && (
-              <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-slate-400 select-none">Eraser Size</span>
-                  <input
-                    type="range"
-                    min="5"
-                    max="100"
-                    value={eraserSize}
-                    onChange={(e) => setEraserSize(parseInt(e.target.value, 10))}
-                    className="w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
-                  />
-                  <span className="text-[10px] font-mono text-slate-400 select-none w-8 text-right">
-                    {eraserSize}px
-                  </span>
-                </div>
-              </div>
-            )}
+            
+            <button
+              onClick={handleCreateTab}
+              className="p-2 bg-slate-800/80 hover:bg-slate-700 text-sky-400 hover:text-sky-300 rounded-lg transition active:scale-95 flex items-center justify-center cursor-pointer shadow-md border border-slate-700/50 flex-shrink-0"
+              title="Create New Canvas"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
           </div>
 
-          <Canvas
-            socketRef={socketRef}
-            elements={elements}
-            setElements={setElements}
-            locks={locks}
-            setLocks={setLocks}
-            users={users}
-            currentUser={currentUser}
-            selectedElementIds={selectedElementIds}
-            setSelectedElementIds={setSelectedElementIds}
-            activeTool={activeTool}
-            penColor={penColor}
-            penSize={penSize}
-            eraserSize={eraserSize}
-            roomSettings={roomSettings}
-          />
+          <div className="flex-1 min-h-0 relative">
+            {/* Floating Toolbar */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+              <div className="backdrop-blur-md bg-slate-900/75 border border-slate-800 rounded-2xl p-1.5 shadow-2xl flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('select')}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    activeTool === 'select'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Select Tool"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.303.197-1.593 1.593M21.75 12h-2.25m-.197 5.303-1.593-1.593M3.071 6.25 4.664 4.664M12 19.75v2.25M6.25 3.071 4.664 4.664M4.5 12H2.25" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('pen')}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    activeTool === 'pen'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Pen Tool"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('eraser')}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    activeTool === 'eraser'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Eraser Tool"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <div className="w-px h-6 bg-slate-800 self-center mx-1" />
+                <button
+                  type="button"
+                  onClick={handleClearDrawings}
+                  className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
+                  title="Clear All Drawings"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Slide-out sub-toolbar when Pen Tool is active */}
+              {activeTool === 'pen' && (
+                <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+                  {/* Pen Color presets */}
+                  <div className="flex items-center gap-1.5">
+                    {['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ffffff'].map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setPenColor(color)}
+                        style={{ backgroundColor: color }}
+                        className={`w-5 h-5 rounded-full transition-all border border-black/10 cursor-pointer ${
+                          penColor === color
+                            ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900 scale-110'
+                            : 'hover:scale-105'
+                        }`}
+                      />
+                    ))}
+                    {/* Custom color picker */}
+                    <div className="relative w-5 h-5 rounded-full overflow-hidden border border-slate-700 cursor-pointer flex items-center justify-center">
+                      <input
+                        type="color"
+                        value={penColor}
+                        onChange={(e) => setPenColor(e.target.value)}
+                        className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                      />
+                      <span className="text-[10px] text-slate-400 font-bold select-none">+</span>
+                    </div>
+                  </div>
+
+                  <div className="w-px h-4 bg-slate-800" />
+
+                  {/* Pen size selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-400 select-none">Size</span>
+                    <input
+                      type="range"
+                      min="2"
+                      max="24"
+                      value={penSize}
+                      onChange={(e) => setPenSize(parseInt(e.target.value, 10))}
+                      className="w-20 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <span className="text-[10px] font-mono text-slate-400 select-none w-5 text-right">
+                      {penSize}px
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Slide-out sub-toolbar when Eraser Tool is active */}
+              {activeTool === 'eraser' && (
+                <div className="backdrop-blur-md bg-slate-900/70 border border-slate-800 rounded-2xl px-4 py-2 shadow-2xl flex items-center gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-slate-400 select-none">Eraser Size</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="100"
+                      value={eraserSize}
+                      onChange={(e) => setEraserSize(parseInt(e.target.value, 10))}
+                      className="w-24 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                    <span className="text-[10px] font-mono text-slate-400 select-none w-8 text-right">
+                      {eraserSize}px
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Canvas
+              socketRef={socketRef}
+              elements={elements}
+              setElements={setElements}
+              locks={locks}
+              setLocks={setLocks}
+              users={users}
+              currentUser={currentUser}
+              selectedElementIds={selectedElementIds}
+              setSelectedElementIds={setSelectedElementIds}
+              activeTool={activeTool}
+              penColor={penColor}
+              penSize={penSize}
+              eraserSize={eraserSize}
+              roomSettings={roomSettings}
+              tabId={activeTabId}
+            />
+          </div>
         </main>
 
         {/* Right Info Panel */}
@@ -1569,6 +2048,18 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
+                      {/* Active Tab Badge */}
+                      <span className="text-[8px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium truncate max-w-[80px]" title={`On ${(() => {
+                        const userTabId = user.activeTabId || 'tab-default';
+                        const tab = tabs.find((t) => t.id === userTabId);
+                        return tab ? tab.name : 'Canvas';
+                      })()}`}>
+                        {(() => {
+                          const userTabId = user.activeTabId || 'tab-default';
+                          const tab = tabs.find((t) => t.id === userTabId);
+                          return tab ? tab.name : 'Canvas';
+                        })()}
+                      </span>
                       <span
                         className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
                           isUserActive
@@ -1918,6 +2409,25 @@ export default function App() {
                           >
                             ▼
                           </button>
+                          <button
+                            type="button"
+                            disabled={isLockedByOther}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSelectionLock(el.id);
+                            }}
+                            className={`w-5 h-5 rounded flex items-center justify-center text-[10px] border transition active:scale-95 cursor-pointer ${
+                              isLockedByOther
+                                ? 'border-slate-800/40 text-slate-700 cursor-not-allowed bg-slate-950/10'
+                                : el.properties?.locked
+                                ? 'border-amber-500/35 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 shadow-sm shadow-amber-500/5'
+                                : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
+                            }`}
+                            title={isLockedByOther ? "Cannot lock/unlock: currently being edited" : el.properties?.locked ? "Click to unlock selection on canvas" : "Click to lock selection on canvas (Sidebar only)"}
+                            draggable="false"
+                          >
+                            {el.properties?.locked ? '🔒' : '🔓'}
+                          </button>
                           <span className="text-[10px] text-slate-500 font-mono ml-1">
                             X:{el.x} Y:{el.y}
                           </span>
@@ -1934,13 +2444,19 @@ export default function App() {
                           className="flex items-center justify-between border rounded-lg px-2 py-1 text-[9px]"
                         >
                           <span className="text-slate-400 flex items-center gap-1">
-                            🔒 Locked by{' '}
+                            🔒 Editing: Locked by{' '}
                             <span
                               style={{ color: lockHolder?.color }}
                               className="font-extrabold"
                             >
                               {lockHolder?.name || 'Unknown'}
                             </span>
+                          </span>
+                        </div>
+                      ) : el.properties?.locked ? (
+                        <div className="flex items-center justify-between border border-amber-500/25 bg-amber-500/5 rounded-lg px-2 py-1 text-[9px] text-amber-400">
+                          <span className="flex items-center gap-1">
+                            🔒 Canvas Selection Locked (Sidebar Select Only)
                           </span>
                         </div>
                       ) : (
@@ -1979,6 +2495,245 @@ export default function App() {
           </div>
         </aside>
       </div>
+
+      {/* Background Selection Modal Overlay */}
+      {isBgModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsBgModalOpen(false)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 w-full max-w-5xl h-[80vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Left section: Scrollable asset browser (2/3 width) */}
+            <div className="flex-1 flex flex-col min-w-0 border-r border-slate-800">
+              {/* Modal Header */}
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+                    🖼️ Canvas Backgrounds
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Select a custom uploaded asset or preset scene to apply to the collaborative room.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBgModalOpen(false)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 flex items-center justify-center transition cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Asset grid sections */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                {/* 1. Custom Uploaded Assets */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                      📤 Your Uploaded Assets
+                    </h3>
+                    <span className="text-[10px] bg-sky-500/10 text-sky-400 font-bold px-2 py-0.5 rounded-full border border-sky-500/20">
+                      {assets.length} Uploads
+                    </span>
+                  </div>
+
+                  {assets.length === 0 ? (
+                    <div className="py-8 text-center bg-slate-950/20 rounded-xl border border-dashed border-slate-800 p-6">
+                      <p className="text-xs text-slate-500 italic">No custom uploaded images yet.</p>
+                      <p className="text-[10px] text-slate-600 mt-1">Upload images using the "Spawn Image Assets" section in the left panel.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {assets.map((asset) => {
+                        const isSelected = selectedBgPreviewAsset?.url === asset.url;
+                        const isActive = roomSettings.backgroundImageUrl === asset.url;
+                        return (
+                          <div
+                            key={asset.id}
+                            onClick={() => setSelectedBgPreviewAsset({ ...asset, isPreset: false })}
+                            className={`group rounded-xl overflow-hidden bg-slate-950/40 border transition duration-200 cursor-pointer flex flex-col ${
+                              isSelected
+                                ? 'border-sky-500 ring-2 ring-sky-500/20'
+                                : 'border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="aspect-video w-full bg-slate-950 relative overflow-hidden flex items-center justify-center border-b border-slate-800/80">
+                              <img
+                                src={asset.url}
+                                alt={asset.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                              />
+                              {isActive && (
+                                <div className="absolute top-2 right-2 bg-emerald-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg border border-emerald-400 font-bold text-xs" title="Active background">
+                                  ✓
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-3 flex-1 flex flex-col justify-center min-w-0">
+                              <div className="text-xs font-bold text-slate-200 truncate">{asset.name}</div>
+                              <div className="text-[9px] text-slate-500 mt-0.5 truncate">{asset.url}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Preset Backgrounds (Less Prominent) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                      🎨 Preset Backgrounds
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {SAMPLE_IMAGES.map((img, index) => {
+                      const isSelected = selectedBgPreviewAsset?.url === img.url;
+                      const isActive = roomSettings.backgroundImageUrl === img.url;
+                      return (
+                        <div
+                          key={`preset_${index}`}
+                          onClick={() => setSelectedBgPreviewAsset({ id: `preset_${index}`, name: img.name, url: img.url, isPreset: true })}
+                          className={`group rounded-lg overflow-hidden bg-slate-950/20 border transition duration-200 cursor-pointer flex flex-col ${
+                            isSelected
+                              ? 'border-sky-500/80 ring-1 ring-sky-500/20'
+                              : 'border-slate-800/80 hover:border-slate-700/80'
+                          }`}
+                        >
+                          <div className="h-16 w-full bg-slate-950 relative overflow-hidden flex items-center justify-center border-b border-slate-900">
+                            <img
+                              src={img.url}
+                              alt={img.name}
+                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                            {isActive && (
+                              <div className="absolute top-1.5 right-1.5 bg-emerald-500 text-white w-4 h-4 rounded-full flex items-center justify-center shadow border border-emerald-400 font-bold text-[9px]">
+                                ✓
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-2 flex-1 flex flex-col justify-center min-w-0">
+                            <div className="text-[10px] font-bold text-slate-400 group-hover:text-slate-300 truncate">{img.name}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right section: Detail Preview Panel (1/3 width) */}
+            <div className="w-full md:w-80 bg-slate-900/60 p-6 flex flex-col justify-between">
+              {selectedBgPreviewAsset ? (
+                <div className="flex-1 flex flex-col justify-between min-h-0">
+                  <div className="space-y-5">
+                    <span className="text-[9px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                      Preview Details
+                    </span>
+
+                    {/* High-fidelity preview image */}
+                    <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner relative flex items-center justify-center">
+                      <img
+                        src={selectedBgPreviewAsset.url}
+                        alt={selectedBgPreviewAsset.name}
+                        className="w-full h-full object-contain"
+                      />
+                      {roomSettings.backgroundImageUrl === selectedBgPreviewAsset.url && (
+                        <div className="absolute inset-0 bg-emerald-500/10 backdrop-blur-[1px] flex items-center justify-center">
+                          <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg border border-emerald-400 flex items-center gap-1">
+                            ✓ Currently Active
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Asset Name</label>
+                      <h4 className="text-base font-bold text-slate-200 truncate">{selectedBgPreviewAsset.name}</h4>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Origin</label>
+                      <div>
+                        {selectedBgPreviewAsset.isPreset ? (
+                          <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                            Preset Background
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded-full">
+                            User Uploaded
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Source URL</label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          readOnly
+                          value={selectedBgPreviewAsset.url}
+                          className="flex-1 bg-slate-950 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-400 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedBgPreviewAsset.url);
+                          }}
+                          className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                          title="Copy URL"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 mt-6">
+                    {roomSettings.backgroundImageUrl === selectedBgPreviewAsset.url ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleUpdateRoomSettings({ backgroundImageUrl: null });
+                          setSelectedBgPreviewAsset(null);
+                        }}
+                        className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-xs text-rose-400 font-bold rounded-xl transition cursor-pointer active:scale-95"
+                      >
+                        Clear Background
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleUpdateRoomSettings({ backgroundImageUrl: selectedBgPreviewAsset.url, showBackground: true });
+                        }}
+                        className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold rounded-xl transition shadow-lg shadow-sky-500/15 cursor-pointer active:scale-95"
+                      >
+                        Set as Canvas Background
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-800 rounded-2xl bg-slate-950/20">
+                  <span className="text-3xl mb-2">👈</span>
+                  <h4 className="text-xs font-bold text-slate-400">No Asset Selected</h4>
+                  <p className="text-[10px] text-slate-500 max-w-[180px] mt-1 leading-relaxed">
+                    Click any thumbnail on the left to preview details and set it as the canvas background.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

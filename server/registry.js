@@ -5,6 +5,7 @@
  * @property {string} color - The user's assigned cursor/active color.
  * @property {number} x - The user's current cursor X coordinate.
  * @property {number} y - The user's current cursor Y coordinate.
+ * @property {string} activeTabId - The ID of the tab the user is currently viewing.
  */
 
 /**
@@ -20,7 +21,7 @@
 
 /**
  * In-memory transactional registry for the real-time collaborative canvas.
- * Manages users, canvas elements, and element locks to ensure consistent state.
+ * Manages users, canvas tabs, elements, locks, and settings to ensure consistent state.
  */
 export class CanvasRegistry {
   constructor() {
@@ -31,34 +32,33 @@ export class CanvasRegistry {
     this.users = new Map();
 
     /**
-     * Map of canvas elements, keyed by element ID.
-     * @type {Map<string, CanvasElement>}
-     */
-    this.elements = new Map();
-
-    /**
-     * Map of element locks, mapping element ID to the holding user's socket ID.
-     * @type {Map<string, string>}
-     */
-    this.locks = new Map();
-
-    /**
      * Map of custom uploaded assets, keyed by asset ID.
      * @type {Map<string, Object>}
      */
     this.assets = new Map();
 
     /**
-     * Room-wide configuration settings.
+     * Map of active canvas tabs, keyed by tab ID.
+     * Each tab contains elements, locks, and roomSettings specific to that tab.
+     * @type {Map<string, Object>}
      */
-    this.roomSettings = {
-      backgroundImageUrl: null,
-      showBackground: true,
-      backgroundMode: 'fill', // 'fill', 'fit', 'stretch'
-      showGrid: true,
-      gridType: 'square', // 'square', 'hexagon'
-      gridSize: 40 // spacing/radius range 15 to 150
-    };
+    this.tabs = new Map();
+
+    // Initialize with a default canvas tab
+    this.tabs.set('tab-default', {
+      id: 'tab-default',
+      name: 'Canvas 1',
+      elements: new Map(),
+      locks: new Map(),
+      roomSettings: {
+        backgroundImageUrl: null,
+        showBackground: true,
+        backgroundMode: 'fill', // 'fill', 'fit', 'stretch'
+        showGrid: true,
+        gridType: 'square', // 'square', 'hexagon'
+        gridSize: 40 // spacing/radius range 15 to 150
+      }
+    });
   }
 
   /**
@@ -67,7 +67,7 @@ export class CanvasRegistry {
    * @param {string} userId - The socket ID of the user.
    * @param {string} name - The display name of the user.
    * @param {string} color - The color assigned to the user's cursor.
-   * @returns {{ users: User[], elements: CanvasElement[], locks: [string, string][], assets: Object[], roomSettings: Object }} The current state of the room.
+   * @returns {{ users: User[], assets: Object[], tabs: Object[], activeTabId: string }} The current state of the room.
    */
   joinRoom(userId, name, color) {
     const user = {
@@ -75,37 +75,141 @@ export class CanvasRegistry {
       name: name || `User_${userId.substring(0, 4)}`,
       color: color || '#000000',
       x: 0,
-      y: 0
+      y: 0,
+      activeTabId: 'tab-default'
     };
     this.users.set(userId, user);
 
+    // Map the tabs map to a serialized list for transfer
+    const tabsList = Array.from(this.tabs.values()).map(tab => ({
+      id: tab.id,
+      name: tab.name,
+      elements: Array.from(tab.elements.values()),
+      locks: Array.from(tab.locks.entries()),
+      roomSettings: tab.roomSettings
+    }));
+
     return {
       users: Array.from(this.users.values()),
-      elements: Array.from(this.elements.values()),
-      locks: Array.from(this.locks.entries()),
       assets: Array.from(this.assets.values()),
-      roomSettings: this.roomSettings
+      tabs: tabsList,
+      activeTabId: 'tab-default'
     };
   }
 
   /**
-   * Updates room-wide settings.
+   * Creates a new tab.
    * 
-   * @param {Object} updates - Settings updates.
-   * @returns {Object} The updated settings.
+   * @param {string} tabId - Unique ID of the tab.
+   * @param {string} name - Display name of the tab.
+   * @returns {Object} The created tab object formatted for transfer.
    */
-  updateRoomSettings(updates) {
-    if (updates.backgroundImageUrl !== undefined) this.roomSettings.backgroundImageUrl = updates.backgroundImageUrl;
-    if (updates.showBackground !== undefined) this.roomSettings.showBackground = updates.showBackground;
-    if (updates.backgroundMode !== undefined) this.roomSettings.backgroundMode = updates.backgroundMode;
-    if (updates.showGrid !== undefined) this.roomSettings.showGrid = updates.showGrid;
-    if (updates.gridType !== undefined) this.roomSettings.gridType = updates.gridType;
-    if (updates.gridSize !== undefined) this.roomSettings.gridSize = updates.gridSize;
-    return this.roomSettings;
+  createTab(tabId, name) {
+    const newTab = {
+      id: tabId,
+      name: name || `Canvas`,
+      elements: new Map(),
+      locks: new Map(),
+      roomSettings: {
+        backgroundImageUrl: null,
+        showBackground: true,
+        backgroundMode: 'fill',
+        showGrid: true,
+        gridType: 'square',
+        gridSize: 40
+      }
+    };
+    this.tabs.set(tabId, newTab);
+    return {
+      id: newTab.id,
+      name: newTab.name,
+      elements: [],
+      locks: [],
+      roomSettings: newTab.roomSettings
+    };
   }
 
   /**
-   * Creates a new custom asset.
+   * Deletes a tab.
+   * 
+   * @param {string} tabId - Unique ID of the tab to delete.
+   * @returns {{ success: boolean, fallbackTabId?: string, users?: User[] }} Status of deletion and updated user assignments.
+   */
+  deleteTab(tabId) {
+    if (this.tabs.size <= 1 || !this.tabs.has(tabId)) {
+      return { success: false };
+    }
+
+    this.tabs.delete(tabId);
+
+    // Find a fallback tab (first remaining tab)
+    const fallbackTabId = this.tabs.keys().next().value;
+
+    // Update active tab for any users that were on the deleted tab
+    for (const [userId, user] of this.users.entries()) {
+      if (user.activeTabId === tabId) {
+        user.activeTabId = fallbackTabId;
+      }
+    }
+
+    return {
+      success: true,
+      fallbackTabId,
+      users: Array.from(this.users.values())
+    };
+  }
+
+  /**
+   * Renames a tab.
+   * 
+   * @param {string} tabId - Unique ID of the tab.
+   * @param {string} name - The new name.
+   * @returns {boolean} True if successful.
+   */
+  renameTab(tabId, name) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return false;
+    tab.name = name;
+    return true;
+  }
+
+  /**
+   * Switches a user's active tab.
+   * 
+   * @param {string} userId - User's socket ID.
+   * @param {string} tabId - Target tab ID.
+   * @returns {User|null} The updated user.
+   */
+  switchUserTab(userId, tabId) {
+    const user = this.users.get(userId);
+    if (!user || !this.tabs.has(tabId)) return null;
+    user.activeTabId = tabId;
+    return user;
+  }
+
+  /**
+   * Updates tab-specific settings.
+   * 
+   * @param {string} tabId - Tab ID.
+   * @param {Object} updates - Settings updates.
+   * @returns {Object|null} The updated settings, or null if tab not found.
+   */
+  updateRoomSettings(tabId, updates) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return null;
+
+    const settings = tab.roomSettings;
+    if (updates.backgroundImageUrl !== undefined) settings.backgroundImageUrl = updates.backgroundImageUrl;
+    if (updates.showBackground !== undefined) settings.showBackground = updates.showBackground;
+    if (updates.backgroundMode !== undefined) settings.backgroundMode = updates.backgroundMode;
+    if (updates.showGrid !== undefined) settings.showGrid = updates.showGrid;
+    if (updates.gridType !== undefined) settings.gridType = updates.gridType;
+    if (updates.gridSize !== undefined) settings.gridSize = updates.gridSize;
+    return settings;
+  }
+
+  /**
+   * Creates a new custom asset (shared across tabs).
    * 
    * @param {Object} asset - The asset details.
    * @returns {Object} The saved asset.
@@ -138,22 +242,25 @@ export class CanvasRegistry {
   }
 
   /**
-   * Attempts to acquire a lock on a canvas element for a specific user.
-   * Prevent collisions by allowing only one user to edit/move an element at a time.
+   * Attempts to acquire a lock on a canvas element for a specific user in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string} elementId - The ID of the canvas element.
    * @param {string} userId - The socket ID of the user trying to acquire the lock.
-   * @returns {boolean} True if lock was successfully acquired or is already held by the user; false otherwise.
+   * @returns {boolean} True if lock was acquired; false otherwise.
    */
-  lockElement(elementId, userId) {
+  lockElement(tabId, elementId, userId) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return false;
+
     // If element doesn't exist, we can't lock it
-    if (!this.elements.has(elementId)) {
+    if (!tab.elements.has(elementId)) {
       return false;
     }
 
-    const currentLockHolder = this.locks.get(elementId);
+    const currentLockHolder = tab.locks.get(elementId);
     if (!currentLockHolder) {
-      this.locks.set(elementId, userId);
+      tab.locks.set(elementId, userId);
       return true;
     }
 
@@ -161,38 +268,44 @@ export class CanvasRegistry {
   }
 
   /**
-   * Releases a lock on a canvas element.
+   * Releases a lock on a canvas element in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string} elementId - The ID of the canvas element.
    * @param {string} userId - The socket ID of the user trying to release the lock.
-   * @returns {boolean} True if lock was released; false if user doesn't hold the lock or lock didn't exist.
+   * @returns {boolean} True if lock was released; false otherwise.
    */
-  unlockElement(elementId, userId) {
-    const currentLockHolder = this.locks.get(elementId);
+  unlockElement(tabId, elementId, userId) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return false;
+
+    const currentLockHolder = tab.locks.get(elementId);
     if (currentLockHolder === userId) {
-      this.locks.delete(elementId);
+      tab.locks.delete(elementId);
       return true;
     }
     return false;
   }
 
   /**
-   * Updates a canvas element with new properties.
-   * Checks locks to ensure only the lock owner (or if unlocked) can update the element.
+   * Updates a canvas element with new properties inside a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string} elementId - The ID of the element to update.
    * @param {Partial<CanvasElement>} updates - The properties to update.
    * @param {string} userId - The socket ID of the user requesting the update.
-   * @returns {CanvasElement|null} The updated element, or null if update is denied or element not found.
+   * @returns {CanvasElement|null} The updated element, or null if update is denied.
    */
-  updateElement(elementId, updates, userId) {
-    const element = this.elements.get(elementId);
+  updateElement(tabId, elementId, updates, userId) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return null;
+
+    const element = tab.elements.get(elementId);
     if (!element) return null;
 
-    const lockHolder = this.locks.get(elementId);
-    // Deny update if locked by someone else
+    const lockHolder = tab.locks.get(elementId);
     if (lockHolder && lockHolder !== userId) {
-      return null;
+      return null; // Locked by someone else
     }
 
     // Apply updates
@@ -211,12 +324,16 @@ export class CanvasRegistry {
   }
 
   /**
-   * Creates a new canvas element.
+   * Creates a new canvas element in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {CanvasElement} element - The full element details.
-   * @returns {CanvasElement} The saved canvas element.
+   * @returns {CanvasElement|null} The saved canvas element.
    */
-  createElement(element) {
+  createElement(tabId, element) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return null;
+
     const newElement = {
       id: element.id,
       type: element.type,
@@ -226,45 +343,48 @@ export class CanvasRegistry {
       height: element.height ?? 100,
       properties: element.properties || {}
     };
-    this.elements.set(element.id, newElement);
+    tab.elements.set(element.id, newElement);
     return newElement;
   }
 
   /**
-   * Deletes a canvas element.
-   * Checks locks to ensure only the lock owner (or if unlocked) can delete.
+   * Deletes a canvas element inside a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string} elementId - The ID of the element to delete.
-   * @param {string} userId - The socket ID of the user requesting deletion.
-   * @returns {boolean} True if deletion was successful; false if denied or not found.
+   * @param {string} userId - User socket ID.
+   * @returns {boolean} True if deleted successfully.
    */
-  deleteElement(elementId, userId) {
-    if (!this.elements.has(elementId)) {
+  deleteElement(tabId, elementId, userId) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return false;
+
+    if (!tab.elements.has(elementId)) {
       return false;
     }
 
-    const lockHolder = this.locks.get(elementId);
+    const lockHolder = tab.locks.get(elementId);
     if (lockHolder && lockHolder !== userId) {
       return false; // Denied: Locked by someone else
     }
 
-    // Perform deletion
-    this.elements.delete(elementId);
-    this.locks.delete(elementId); // Release any lock
+    tab.elements.delete(elementId);
+    tab.locks.delete(elementId); // Release any lock
     return true;
   }
 
   /**
-   * Attempts to lock a list of elements for a user.
+   * Attempts to lock a list of elements for a user in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string[]} elementIds - List of element IDs.
    * @param {string} userId - Socket ID.
    * @returns {string[]} List of successfully locked element IDs.
    */
-  lockElements(elementIds, userId) {
+  lockElements(tabId, elementIds, userId) {
     const locked = [];
     for (const id of elementIds) {
-      if (this.lockElement(id, userId)) {
+      if (this.lockElement(tabId, id, userId)) {
         locked.push(id);
       }
     }
@@ -272,16 +392,17 @@ export class CanvasRegistry {
   }
 
   /**
-   * Unlocks a list of elements.
+   * Unlocks a list of elements in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string[]} elementIds - List of element IDs.
    * @param {string} userId - Socket ID.
    * @returns {string[]} List of successfully unlocked element IDs.
    */
-  unlockElements(elementIds, userId) {
+  unlockElements(tabId, elementIds, userId) {
     const unlocked = [];
     for (const id of elementIds) {
-      if (this.unlockElement(id, userId)) {
+      if (this.unlockElement(tabId, id, userId)) {
         unlocked.push(id);
       }
     }
@@ -289,16 +410,17 @@ export class CanvasRegistry {
   }
 
   /**
-   * Deletes a list of elements.
+   * Deletes a list of elements in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string[]} elementIds - List of element IDs.
    * @param {string} userId - Socket ID.
    * @returns {string[]} List of successfully deleted element IDs.
    */
-  deleteElements(elementIds, userId) {
+  deleteElements(tabId, elementIds, userId) {
     const deleted = [];
     for (const id of elementIds) {
-      if (this.deleteElement(id, userId)) {
+      if (this.deleteElement(tabId, id, userId)) {
         deleted.push(id);
       }
     }
@@ -306,16 +428,17 @@ export class CanvasRegistry {
   }
 
   /**
-   * Updates multiple elements in a batch.
+   * Updates multiple elements in a batch in a tab.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {Array<{ elementId: string, updates: Partial<CanvasElement> }>} batchUpdates - Array of updates.
    * @param {string} userId - Socket ID.
    * @returns {CanvasElement[]} List of successfully updated elements.
    */
-  updateElements(batchUpdates, userId) {
+  updateElements(tabId, batchUpdates, userId) {
     const updated = [];
     for (const item of batchUpdates) {
-      const el = this.updateElement(item.elementId, item.updates, userId);
+      const el = this.updateElement(tabId, item.elementId, item.updates, userId);
       if (el) {
         updated.push(el);
       }
@@ -325,19 +448,21 @@ export class CanvasRegistry {
 
   /**
    * Cleans up state when a user disconnects:
-   * Removes them from the users list and releases any locks they held.
+   * Removes them from the users list and releases any locks they held across ALL tabs.
    * 
    * @param {string} userId - The socket ID of the disconnecting user.
-   * @returns {{ releasedLocks: string[] }} List of element IDs that were unlocked.
+   * @returns {{ releasedLocks: Array<{ tabId: string, elementId: string }> }} List of element locks that were unlocked.
    */
   disconnectUser(userId) {
     this.users.delete(userId);
 
     const releasedLocks = [];
-    for (const [elementId, holderId] of this.locks.entries()) {
-      if (holderId === userId) {
-        this.locks.delete(elementId);
-        releasedLocks.push(elementId);
+    for (const [tabId, tab] of this.tabs.entries()) {
+      for (const [elementId, holderId] of tab.locks.entries()) {
+        if (holderId === userId) {
+          tab.locks.delete(elementId);
+          releasedLocks.push({ tabId, elementId });
+        }
       }
     }
 
@@ -347,25 +472,28 @@ export class CanvasRegistry {
   /**
    * Reorders the canvas elements based on a list of ordered element IDs.
    * 
+   * @param {string} tabId - Tab ID.
    * @param {string[]} orderedIds - The new order of element IDs.
    * @returns {string[]} The resulting ordered element IDs.
    */
-  reorderElements(orderedIds) {
+  reorderElements(tabId, orderedIds) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return [];
+
     const newElements = new Map();
     orderedIds.forEach((id) => {
-      if (this.elements.has(id)) {
-        newElements.set(id, this.elements.get(id));
+      if (tab.elements.has(id)) {
+        newElements.set(id, tab.elements.get(id));
       }
     });
 
-    // Add any remaining elements that weren't in orderedIds to prevent data loss
-    for (const [id, el] of this.elements.entries()) {
+    for (const [id, el] of tab.elements.entries()) {
       if (!newElements.has(id)) {
         newElements.set(id, el);
       }
     }
 
-    this.elements = newElements;
-    return Array.from(this.elements.keys());
+    tab.elements = newElements;
+    return Array.from(tab.elements.keys());
   }
 }
