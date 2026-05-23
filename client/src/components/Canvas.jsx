@@ -17,6 +17,7 @@ export default function Canvas({
   roomSettings,
   tabId = 'tab-default',
   onVirtualDimensionsChange,
+  showCursorNames = true,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -2239,13 +2240,15 @@ export default function Canvas({
                   strokeLinejoin="round"
                 />
               </svg>
-              <div
-                style={{ backgroundColor: user.color || '#f43f5e' }}
-                className="ml-4 mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-white whitespace-nowrap shadow-md border border-white/20 flex items-center gap-1"
-              >
-                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                <span>{user.name}</span>
-              </div>
+              {showCursorNames && (
+                <div
+                  style={{ backgroundColor: user.color || '#f43f5e' }}
+                  className="ml-4 mt-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-white whitespace-nowrap shadow-md border border-white/20 flex items-center gap-1"
+                >
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                  <span>{user.name}</span>
+                </div>
+              )}
             </div>
           );
         })}

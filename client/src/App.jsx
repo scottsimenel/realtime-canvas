@@ -702,8 +702,25 @@ export default function App() {
   const [activeRolls, setActiveRolls] = useState([]);
   const [rollHistory, setRollHistory] = useState([]);
   const [isDiceSectionCollapsed, setIsDiceSectionCollapsed] = useState(false);
+  const [isUsersSectionCollapsed, setIsUsersSectionCollapsed] = useState(false);
   const [rollTick, setRollTick] = useState(0);
   const [hoveredRoll, setHoveredRoll] = useState(null);
+  const [showCursorNames, setShowCursorNames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('canvas_show_cursor_names');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvas_show_cursor_names', JSON.stringify(showCursorNames));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [showCursorNames]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -2427,6 +2444,29 @@ export default function App() {
                       </div>
                     )}
                   </div>
+
+                  <hr className="border-slate-800/60" />
+
+                  {/* Cursor Usernames Toggle */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cursor Usernames</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCursorNames(!showCursorNames)}
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
+                          showCursorNames ? 'bg-sky-500' : 'bg-slate-800'
+                        }`}
+                        title="Toggle Cursor Usernames"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                            showCursorNames ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2666,6 +2706,7 @@ export default function App() {
               roomSettings={roomSettings}
               tabId={activeTabId}
               onVirtualDimensionsChange={setActiveVirtualDimensions}
+              showCursorNames={showCursorNames}
             />
           </div>
 
@@ -2806,75 +2847,86 @@ export default function App() {
             : 'w-0 p-0 border-l-0 opacity-0 pointer-events-none fixed lg:relative right-0 top-0 h-full lg:h-auto z-40 lg:z-10 shadow-none'
         }`}>
           {/* Active Users */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Active Users
+          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsUsersSectionCollapsed(!isUsersSectionCollapsed)}
+              className="w-full flex items-center justify-between pb-1 text-left cursor-pointer focus:outline-none"
+            >
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>👥 Active Users</span>
               </h2>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold px-1.5 py-0.5 rounded">
                   {users.length}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setShowRightSidebar(false)}
-                  className="lg:hidden text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/50 transition cursor-pointer active:scale-95 flex items-center justify-center"
-                  title="Close Panel"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {users.map((user) => {
-                const isMe = user.id === currentUser?.id;
-                const isUserActive = user.x !== 0 || user.y !== 0;
-
-                return (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/50 hover:border-slate-800 transition"
+                <span className="text-slate-500 text-[10px] mr-1">
+                  {isUsersSectionCollapsed ? '➕' : '➖'}
+                </span>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setShowRightSidebar(false)}
+                    className="lg:hidden text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-800/40 border border-slate-700/50 transition cursor-pointer active:scale-95 flex items-center justify-center"
+                    title="Close Panel"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full border border-white/10"
-                        style={{ backgroundColor: user.color }}
-                      />
-                      <span className="text-xs font-bold text-slate-300 truncate max-w-[120px]">
-                        {user.name}
-                        {isMe && <span className="text-[9px] font-normal text-slate-500 ml-1">(you)</span>}
-                      </span>
-                    </div>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </button>
+            {!isUsersSectionCollapsed && (
+              <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                {users.map((user) => {
+                  const isMe = user.id === currentUser?.id;
+                  const isUserActive = user.x !== 0 || user.y !== 0;
 
-                    <div className="flex items-center gap-1.5">
-                      {/* Active Tab Badge */}
-                      <span className="text-[8px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium truncate max-w-[80px]" title={`On ${(() => {
-                        const userTabId = user.activeTabId || 'tab-default';
-                        const tab = tabs.find((t) => t.id === userTabId);
-                        return tab ? tab.name : 'Canvas';
-                      })()}`}>
-                        {(() => {
+                  return (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/50 hover:border-slate-800 transition"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-white/10"
+                          style={{ backgroundColor: user.color }}
+                        />
+                        <span className="text-xs font-bold text-slate-300 truncate max-w-[120px]">
+                          {user.name}
+                          {isMe && <span className="text-[9px] font-normal text-slate-500 ml-1">(you)</span>}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Active Tab Badge */}
+                        <span className="text-[8px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium truncate max-w-[80px]" title={`On ${(() => {
                           const userTabId = user.activeTabId || 'tab-default';
                           const tab = tabs.find((t) => t.id === userTabId);
                           return tab ? tab.name : 'Canvas';
-                        })()}
-                      </span>
-                      <span
-                        className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                          isUserActive
-                            ? 'bg-emerald-500/10 text-emerald-400'
-                            : 'bg-slate-800 text-slate-500'
-                        }`}
-                      >
-                        {isUserActive ? 'Active' : 'Idle'}
-                      </span>
+                        })()}`}>
+                          {(() => {
+                            const userTabId = user.activeTabId || 'tab-default';
+                            const tab = tabs.find((t) => t.id === userTabId);
+                            return tab ? tab.name : 'Canvas';
+                          })()}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                            isUserActive
+                              ? 'bg-emerald-500/10 text-emerald-400'
+                              : 'bg-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {isUserActive ? 'Active' : 'Idle'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <hr className="border-slate-800/80" />
