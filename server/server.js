@@ -540,6 +540,111 @@ io.on('connection', (socket) => {
   });
 
   /**
+   * Handle collaborative dice rolling.
+   * Generates random values and advantage/disadvantage results, then broadcasts.
+   */
+  socket.on('dice-roll', (data) => {
+    const { count, type, mode } = data || {};
+    const room = socket.room || DEFAULT_ROOM;
+
+    // Validate inputs
+    const safeCount = Math.max(1, Math.min(20, parseInt(count, 10) || 1));
+    const safeType = [4, 6, 8, 10, 12, 20, 100].includes(parseInt(type, 10)) ? parseInt(type, 10) : 6;
+    const safeMode = ['normal', 'advantage', 'disadvantage'].includes(mode) ? mode : 'normal';
+
+    const user = registry.users.get(socket.id);
+    if (!user) return;
+
+    const rollDie = (sides) => Math.floor(Math.random() * sides) + 1;
+    const rollId = `roll_${Date.now()}_${Math.round(Math.random() * 1e9)}`;
+    const timestamp = new Date().toISOString();
+
+    let rollResult = {};
+
+    if (safeType === 20) {
+      // Advantage/disadvantage evaluated per-die for d20
+      const rolls = [];
+      for (let i = 0; i < safeCount; i++) {
+        const r1 = rollDie(20);
+        const r2 = rollDie(20);
+        let kept, discarded;
+
+        if (safeMode === 'advantage') {
+          kept = Math.max(r1, r2);
+          discarded = Math.min(r1, r2);
+        } else if (safeMode === 'disadvantage') {
+          kept = Math.min(r1, r2);
+          discarded = Math.max(r1, r2);
+        } else {
+          kept = r1;
+          discarded = null;
+        }
+
+        rolls.push({
+          roll1: r1,
+          roll2: safeMode !== 'normal' ? r2 : null,
+          kept,
+          discarded
+        });
+      }
+      rollResult = { rolls };
+    } else {
+      // For non-d20, advantage/disadvantage rolls two full sets of N dice and keeps the higher/lower sum
+      if (safeMode === 'normal') {
+        const rolls = Array.from({ length: safeCount }, () => rollDie(safeType));
+        const sum = rolls.reduce((a, b) => a + b, 0);
+        rollResult = { rolls, sum };
+      } else {
+        const rollsA = Array.from({ length: safeCount }, () => rollDie(safeType));
+        const rollsB = Array.from({ length: safeCount }, () => rollDie(safeType));
+        const sumA = rollsA.reduce((a, b) => a + b, 0);
+        const sumB = rollsB.reduce((a, b) => a + b, 0);
+
+        let kept, discarded, keptRolls, discardedRolls, keptSum, discardedSum;
+        if (safeMode === 'advantage') {
+          if (sumA >= sumB) {
+            kept = 'A'; keptRolls = rollsA; keptSum = sumA;
+            discarded = 'B'; discardedRolls = rollsB; discardedSum = sumB;
+          } else {
+            kept = 'B'; keptRolls = rollsB; keptSum = sumB;
+            discarded = 'A'; discardedRolls = rollsA; discardedSum = sumA;
+          }
+        } else {
+          if (sumA <= sumB) {
+            kept = 'A'; keptRolls = rollsA; keptSum = sumA;
+            discarded = 'B'; discardedRolls = rollsB; discardedSum = sumB;
+          } else {
+            kept = 'B'; keptRolls = rollsB; keptSum = sumB;
+            discarded = 'A'; discardedRolls = rollsA; discardedSum = sumA;
+          }
+        }
+
+        rollResult = {
+          rolls: keptRolls,
+          sum: keptSum,
+          discardedRolls,
+          discardedSum,
+          kept
+        };
+      }
+    }
+
+    const payload = {
+      rollId,
+      timestamp,
+      userId: socket.id,
+      userName: user.name,
+      userColor: user.color,
+      count: safeCount,
+      type: safeType,
+      mode: safeMode,
+      result: rollResult
+    };
+
+    io.to(room).emit('dice-rolled', payload);
+  });
+
+  /**
    * Handle user disconnection.
    * Clean up registry entries (user cursor and held locks) and notify other clients.
    */

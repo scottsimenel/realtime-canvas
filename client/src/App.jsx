@@ -614,6 +614,22 @@ export default function App() {
   const [isBgModalOpen, setIsBgModalOpen] = useState(false);
   const [selectedBgPreviewAsset, setSelectedBgPreviewAsset] = useState(null);
 
+  // Dice Roller States
+  const [diceCount, setDiceCount] = useState(1);
+  const [diceType, setDiceType] = useState(20);
+  const [rollMode, setRollMode] = useState('normal');
+  const [activeRolls, setActiveRolls] = useState([]);
+  const [rollHistory, setRollHistory] = useState([]);
+  const [isDiceSectionCollapsed, setIsDiceSectionCollapsed] = useState(false);
+  const [rollTick, setRollTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRollTick((prev) => (prev + 1) % 100);
+    }, 60);
+    return () => clearInterval(interval);
+  }, []);
+
   // Layout Panel Visibility States
   const [showHeader, setShowHeader] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -990,6 +1006,21 @@ export default function App() {
       setTabs((prev) =>
         prev.map((t) => (t.id === tabId ? { ...t, name } : t))
       );
+    });
+
+    s.on('dice-rolled', (roll) => {
+      setActiveRolls((prev) => [...prev, { ...roll, status: 'rolling' }]);
+
+      setTimeout(() => {
+        setActiveRolls((prev) =>
+          prev.map((r) => (r.rollId === roll.rollId ? { ...r, status: 'resolved' } : r))
+        );
+        setRollHistory((prev) => [roll, ...prev].slice(0, 15));
+      }, 1500);
+
+      setTimeout(() => {
+        setActiveRolls((prev) => prev.filter((r) => r.rollId !== roll.rollId));
+      }, 5000);
     });
 
     s.on('tab-switched', ({ userId, tabId }) => {
@@ -1520,6 +1551,17 @@ export default function App() {
       });
     }
   }, [elements, locks, currentUser, setSelectedElementIds]);
+
+  const handleRollDice = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    socket.emit('dice-roll', {
+      count: diceCount,
+      type: diceType,
+      mode: rollMode,
+    });
+  }, [diceCount, diceType, rollMode]);
 
   const handleUpdateRoomSettings = useCallback((updates) => {
     const socket = socketRef.current;
@@ -2755,6 +2797,209 @@ export default function App() {
 
           <hr className="border-slate-800/80" />
 
+          {/* Collapsible Dice Roller */}
+          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsDiceSectionCollapsed(!isDiceSectionCollapsed)}
+              className="w-full flex items-center justify-between pb-1 text-left cursor-pointer focus:outline-none"
+            >
+              <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🎲 Dice Roller</span>
+              </h2>
+              <span className="text-slate-500 text-[10px]">
+                {isDiceSectionCollapsed ? '➕' : '➖'}
+              </span>
+            </button>
+
+            {!isDiceSectionCollapsed && (
+              <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                {/* Dice count and Quick Select type */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      Dice Count: {diceCount}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={diceCount}
+                        onChange={(e) => setDiceCount(parseInt(e.target.value, 10))}
+                        className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="20"
+                        value={diceCount}
+                        onChange={(e) => {
+                          const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
+                          setDiceCount(val);
+                        }}
+                        className="w-12 px-1.5 py-1 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-center text-slate-200 focus:outline-none focus:border-indigo-500 transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                      Die Type: d{diceType}
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[4, 6, 8, 10, 12, 20, 100].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setDiceType(t)}
+                          className={`py-1 text-[10px] font-extrabold rounded-lg border transition cursor-pointer active:scale-95 ${
+                            diceType === t
+                              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                              : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          }`}
+                        >
+                          d{t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Roll Mode (Advantage/Disadvantage) */}
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Roll Mode
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-950/60 p-1 border border-slate-800/80 rounded-lg">
+                    {[
+                      { value: 'normal', label: 'Normal' },
+                      { value: 'advantage', label: 'Adv' },
+                      { value: 'disadvantage', label: 'Dis' }
+                    ].map((mode) => (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        onClick={() => setRollMode(mode.value)}
+                        className={`py-1 px-1 text-[10px] font-bold rounded-md transition cursor-pointer active:scale-95 ${
+                          rollMode === mode.value
+                            ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Roll Button */}
+                <button
+                  type="button"
+                  onClick={handleRollDice}
+                  className="w-full py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/40 hover:shadow-indigo-600/10 border border-indigo-500/30 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-97"
+                >
+                  <span>🎲</span> Roll {diceCount}d{diceType}
+                  {rollMode !== 'normal' && <span className="text-[10px] font-normal opacity-85">({rollMode})</span>}
+                </button>
+
+                {/* Roll History logs */}
+                <div className="border-t border-slate-800/80 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      History log
+                    </span>
+                    {rollHistory.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setRollHistory([])}
+                        className="text-[9px] text-slate-600 hover:text-slate-400 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {rollHistory.length === 0 ? (
+                    <p className="text-[10px] text-slate-600 text-center py-2 bg-slate-950/10 border border-dashed border-slate-800/60 rounded-xl">
+                      No rolls yet.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-0.5">
+                      {rollHistory.map((roll) => {
+                        const isD20 = roll.type === 20;
+                        const hasSum = !isD20;
+                        return (
+                          <div
+                            key={roll.rollId}
+                            className="text-[10px] p-2 rounded-lg bg-slate-950/40 border border-slate-800/60 flex flex-col gap-1"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1 font-bold">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full"
+                                  style={{ backgroundColor: roll.userColor }}
+                                />
+                                <span className="text-slate-300 truncate max-w-[90px]">{roll.userName}</span>
+                              </div>
+                              <span className="text-slate-500 text-[8px]">
+                                {new Date(roll.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-indigo-400 font-bold">
+                                {roll.count}d{roll.type}
+                                {roll.mode !== 'normal' && (
+                                  <span className="text-slate-500 font-normal ml-0.5">({roll.mode === 'advantage' ? 'Adv' : 'Dis'})</span>
+                                )}
+                              </span>
+                              <div className="flex items-center gap-1 font-mono">
+                                <span className="text-slate-400">
+                                  {isD20 ? (
+                                    roll.result.rolls.map((r, idx) => (
+                                      <span key={idx} className="mr-1 last:mr-0">
+                                        {roll.mode !== 'normal' ? (
+                                          <>
+                                            <span className="text-emerald-400 font-bold">{r.kept}</span>
+                                            <span className="text-slate-600 line-through text-[8px] ml-0.5">({r.discarded})</span>
+                                          </>
+                                        ) : (
+                                          <span className="text-slate-300">{r.kept}</span>
+                                        )}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <>
+                                      <span className="text-slate-300">
+                                        [{roll.result.rolls.join(', ')}]
+                                      </span>
+                                      {roll.mode !== 'normal' && (
+                                        <span className="text-slate-600 line-through text-[8px] ml-1" title={`Discarded: [${roll.result.discardedRolls.join(', ')}] (Sum: ${roll.result.discardedSum})`}>
+                                          (discarded)
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </span>
+                                {hasSum && (
+                                  <span className="text-indigo-400 font-bold ml-1 bg-indigo-500/10 px-1 py-0.5 rounded">
+                                    ={roll.result.sum}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <hr className="border-slate-800/80" />
+
           {/* Transform Inspector */}
           {selectedElementIds.length > 0 && (
             <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
@@ -3425,6 +3670,116 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Dice Roll Broadcast Overlay Notifications */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full">
+        {activeRolls.map((roll) => {
+          const isRolling = roll.status === 'rolling';
+          const isD20 = roll.type === 20;
+
+          return (
+            <div
+              key={roll.rollId}
+              className="pointer-events-auto bg-slate-900/95 border border-slate-800 backdrop-blur-md rounded-2xl p-4 shadow-2xl w-full flex flex-col gap-2 transition-all duration-300 transform scale-100 animate-in slide-in-from-right-4 fade-in"
+              style={{
+                borderLeftWidth: '4px',
+                borderLeftColor: roll.userColor
+              }}
+            >
+              {/* Card Header: User and formula */}
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: roll.userColor }}
+                  />
+                  <span className="text-xs font-black text-slate-100">{roll.userName}</span>
+                </div>
+                <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-extrabold px-2 py-0.5 rounded">
+                  {roll.count}d{roll.type}
+                  {roll.mode !== 'normal' && (
+                    <span className="ml-1 opacity-80 uppercase text-[8px] font-normal">
+                      {roll.mode === 'advantage' ? 'Adv' : 'Dis'}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Rolling Animation / Final Results */}
+              <div className="py-1.5 flex flex-col items-center justify-center min-h-[50px] relative">
+                {isRolling ? (
+                  // Rolling state: Show shaking placeholders with cycling values
+                  <div className="flex flex-wrap justify-center gap-2 animate-pulse">
+                    {Array.from({ length: roll.count }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="w-10 h-10 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-center text-xs font-black text-indigo-400 animate-spin"
+                        style={{
+                          animationDuration: `${0.4 + idx * 0.15}s`
+                        }}
+                      >
+                        {((rollTick + idx) % roll.type) + 1}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Resolved state: Show final values
+                  <div className="flex flex-col items-center gap-3 w-full">
+                    {/* Dice results display */}
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {isD20 ? (
+                        roll.result.rolls.map((r, idx) => (
+                          <div key={idx} className="flex items-center bg-slate-950/80 border border-slate-800/50 p-1.5 rounded-xl gap-1">
+                            {roll.mode !== 'normal' ? (
+                              <>
+                                <div className="w-8 h-8 rounded-lg bg-indigo-600 border border-indigo-400 text-white flex items-center justify-center font-black text-sm shadow-md animate-in zoom-in-50 duration-150">
+                                  {r.kept}
+                                </div>
+                                <div className="text-[10px] text-slate-500 line-through px-1 font-mono">
+                                  {r.discarded}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-sm animate-in zoom-in-50 duration-150">
+                                {r.kept}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        roll.result.rolls.map((val, idx) => (
+                          <div
+                            key={idx}
+                            className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-sm animate-in zoom-in-50 duration-150"
+                            style={{ animationDelay: `${idx * 0.05}s` }}
+                          >
+                            {val}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Advantage/Disadvantage discarded set preview for non-d20 */}
+                    {!isD20 && roll.mode !== 'normal' && (
+                      <div className="text-[9px] text-slate-500 flex gap-1 items-center font-mono">
+                        <span className="line-through">
+                          Discarded: [{roll.result.discardedRolls.join(', ')}] (Sum: {roll.result.discardedSum})
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Total sum for non-d20 */}
+                    {!isD20 && (
+                      <div className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-4 py-1.5 rounded-full border border-indigo-500/20 animate-in zoom-in duration-300">
+                        Total Sum: <span className="text-white text-sm ml-1">{roll.result.sum}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
