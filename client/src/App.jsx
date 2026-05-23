@@ -15,6 +15,87 @@ const getFullUrl = (url) => {
   return `${SOCKET_URL}${path}`;
 };
 
+const DieIcon = ({ type, value, size = 'w-12 h-12', className = '', isKept = true, isDiscarded = false, userColor = null }) => {
+  let fillClass = 'fill-slate-950/80';
+  let strokeClass = 'stroke-slate-700/80';
+  let textClass = 'fill-slate-200';
+
+  if (isDiscarded) {
+    fillClass = 'fill-slate-950/20';
+    strokeClass = 'stroke-slate-900';
+    textClass = 'fill-slate-600 line-through';
+  } else if (isKept) {
+    if (userColor) {
+      fillClass = 'fill-slate-950/70';
+      // Convert hex userColor to stroke
+      strokeClass = ''; 
+    } else {
+      fillClass = 'fill-slate-950/80';
+    }
+  }
+
+  let path = '';
+  let textY = '55';
+
+  switch (type) {
+    case 4: // Tetrahedron (Triangle)
+      path = 'M 50,10 L 92,86 L 8,86 Z';
+      textY = '64';
+      break;
+    case 6: // Cube (Square)
+      path = 'M 20,10 H 80 A 10,10 0 0 1 90,20 V 80 A 10,10 0 0 1 80,90 H 20 A 10,10 0 0 1 10,80 V 20 A 10,10 0 0 1 20,10 Z';
+      textY = '56';
+      break;
+    case 8: // Octahedron (Diamond)
+      path = 'M 50,8 L 92,50 L 50,92 L 8,50 Z';
+      textY = '56';
+      break;
+    case 10: // Decahedron (Kite)
+      path = 'M 50,8 L 88,38 L 50,92 L 12,38 Z';
+      textY = '54';
+      break;
+    case 12: // Dodecahedron (Pentagon)
+      path = 'M 50,8 L 92,38 L 76,88 L 24,88 L 8,38 Z';
+      textY = '57';
+      break;
+    case 20: // Icosahedron (Hexagon)
+      path = 'M 50,8 L 88,30 V 70 L 50,92 L 12,70 V 30 Z';
+      textY = '56';
+      break;
+    case 100: // Zocchihedron (Circle)
+    default:
+      path = 'M 50,50 m -42,0 a 42,42 0 1,0 84,0 a 42,42 0 1,0 -84,0';
+      textY = '56';
+      break;
+  }
+
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className={`${size} ${className}`}
+      style={{ overflow: 'visible' }}
+    >
+      <path
+        d={path}
+        className={`${fillClass} ${strokeClass} transition-all duration-300`}
+        style={strokeClass === '' ? { stroke: userColor || '#4f46e5' } : {}}
+        strokeWidth="6"
+        strokeLinejoin="round"
+      />
+      <text
+        x="50"
+        y={textY}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        className={`${textClass} font-mono font-black text-[35px] transition-all duration-300`}
+        style={isDiscarded ? { textDecoration: 'line-through' } : {}}
+      >
+        {value}
+      </text>
+    </svg>
+  );
+};
+
 const RANDOM_NAMES = [
   'Creative Fox',
   'Swift Eagle',
@@ -2959,36 +3040,47 @@ export default function App() {
                                   <span className="text-slate-500 font-normal ml-1">({roll.mode === 'advantage' ? 'Adv' : 'Dis'})</span>
                                 )}
                               </span>
-                              <div className="flex items-center gap-1 font-mono text-xs">
-                                <span className="text-slate-400 font-bold">
-                                  {isD20 ? (
-                                    roll.result.rolls.map((r, idx) => (
-                                      <span key={idx} className="mr-1 last:mr-0">
-                                        {roll.mode !== 'normal' ? (
-                                          <>
-                                            <span className="text-emerald-400 font-extrabold">{r.kept}</span>
-                                            <span className="text-slate-600 line-through text-[9px] ml-0.5">({r.discarded})</span>
-                                          </>
-                                        ) : (
-                                          <span className="text-slate-300">{r.kept}</span>
-                                        )}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <>
-                                      <span className="text-slate-300">
-                                        [{roll.result.rolls.join(', ')}]
-                                      </span>
+                              <div className="flex items-center gap-1.5">
+                                {isD20 ? (
+                                  roll.result.rolls.map((r, idx) => (
+                                    <span key={idx} className="flex items-center gap-1">
+                                      <DieIcon
+                                        type={20}
+                                        value={r.kept}
+                                        size="w-5 h-5"
+                                        isKept={true}
+                                      />
                                       {roll.mode !== 'normal' && (
-                                        <span className="text-slate-600 line-through text-[9px] ml-1" title={`Discarded: [${roll.result.discardedRolls.join(', ')}] (Sum: ${roll.result.discardedSum})`}>
-                                          (discarded)
-                                        </span>
+                                        <DieIcon
+                                          type={20}
+                                          value={r.discarded}
+                                          size="w-5 h-5"
+                                          isKept={false}
+                                          isDiscarded={true}
+                                        />
                                       )}
-                                    </>
-                                  )}
-                                </span>
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="flex items-center gap-1">
+                                    {roll.result.rolls.map((val, idx) => (
+                                      <DieIcon
+                                        key={idx}
+                                        type={roll.type}
+                                        value={val}
+                                        size="w-5 h-5"
+                                        isKept={true}
+                                      />
+                                    ))}
+                                    {roll.mode !== 'normal' && (
+                                      <span className="text-[9px] text-slate-500 font-mono line-through ml-1" title={`Discarded: [${roll.result.discardedRolls.join(', ')}] (Sum: ${roll.result.discardedSum})`}>
+                                        (discarded)
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
                                 {hasSum && (
-                                  <span className="text-indigo-400 font-black ml-1.5 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                  <span className="text-indigo-400 font-black ml-1 bg-indigo-500/10 px-1 py-0.5 rounded text-[10px]">
                                     ={roll.result.sum}
                                   </span>
                                 )}
@@ -3718,12 +3810,16 @@ export default function App() {
                     {Array.from({ length: roll.count }).map((_, idx) => (
                       <div
                         key={idx}
-                        className="w-12 h-12 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-center text-sm font-black text-indigo-400 animate-spin"
+                        className="animate-spin"
                         style={{
                           animationDuration: `${0.4 + idx * 0.15}s`
                         }}
                       >
-                        {((rollTick + idx) % roll.type) + 1}
+                        <DieIcon
+                          type={roll.type}
+                          value={((rollTick + idx) % roll.type) + 1}
+                          size="w-12 h-12"
+                        />
                       </div>
                     ))}
                   </div>
@@ -3737,17 +3833,29 @@ export default function App() {
                           <div key={idx} className="flex items-center bg-slate-950/80 border border-slate-800/50 p-2 rounded-xl gap-2 shadow-inner">
                             {roll.mode !== 'normal' ? (
                               <>
-                                <div className="w-10 h-10 rounded-lg bg-indigo-600 border border-indigo-400 text-white flex items-center justify-center font-black text-base shadow-md animate-in zoom-in-50 duration-150">
-                                  {r.kept}
-                                </div>
-                                <div className="text-xs text-slate-500 line-through px-1 font-mono">
-                                  {r.discarded}
-                                </div>
+                                <DieIcon
+                                  type={20}
+                                  value={r.kept}
+                                  size="w-10 h-10"
+                                  isKept={true}
+                                  userColor={roll.userColor}
+                                />
+                                <DieIcon
+                                  type={20}
+                                  value={r.discarded}
+                                  size="w-10 h-10"
+                                  isKept={false}
+                                  isDiscarded={true}
+                                />
                               </>
                             ) : (
-                              <div className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-base animate-in zoom-in-50 duration-150">
-                                {r.kept}
-                              </div>
+                              <DieIcon
+                                type={20}
+                                value={r.kept}
+                                size="w-10 h-10"
+                                isKept={true}
+                                userColor={roll.userColor}
+                              />
                             )}
                           </div>
                         ))
@@ -3755,10 +3863,16 @@ export default function App() {
                         roll.result.rolls.map((val, idx) => (
                           <div
                             key={idx}
-                            className="w-10 h-10 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-base animate-in zoom-in-50 duration-150 shadow-md"
+                            className="animate-in zoom-in-50 duration-150 shadow-md"
                             style={{ animationDelay: `${idx * 0.05}s` }}
                           >
-                            {val}
+                            <DieIcon
+                              type={roll.type}
+                              value={val}
+                              size="w-10 h-10"
+                              isKept={true}
+                              userColor={roll.userColor}
+                            />
                           </div>
                         ))
                       )}
@@ -3828,28 +3942,43 @@ export default function App() {
                   <div key={idx} className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-2 gap-1.5 shadow-inner">
                     {hoveredRoll.mode !== 'normal' ? (
                       <>
-                        <div className="w-11 h-11 rounded-lg bg-indigo-600 border border-indigo-400 text-white flex items-center justify-center font-black text-sm shadow-md">
-                          {r.kept}
-                        </div>
-                        <div className="text-[11px] text-slate-500 line-through px-1 font-mono">
-                          {r.discarded}
-                        </div>
+                        <DieIcon
+                          type={20}
+                          value={r.kept}
+                          size="w-11 h-11"
+                          isKept={true}
+                          userColor={hoveredRoll.userColor}
+                        />
+                        <DieIcon
+                          type={20}
+                          value={r.discarded}
+                          size="w-11 h-11"
+                          isKept={false}
+                          isDiscarded={true}
+                        />
                       </>
                     ) : (
-                      <div className="w-11 h-11 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-sm">
-                        {r.kept}
-                      </div>
+                      <DieIcon
+                        type={20}
+                        value={r.kept}
+                        size="w-11 h-11"
+                        isKept={true}
+                        userColor={hoveredRoll.userColor}
+                      />
                     )}
                   </div>
                 ))
               ) : (
                 hoveredRoll.result.rolls.map((val, idx) => (
-                  <div
+                  <DieIcon
                     key={idx}
-                    className="w-11 h-11 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 flex items-center justify-center font-black text-sm shadow-md"
-                  >
-                    {val}
-                  </div>
+                    type={hoveredRoll.type}
+                    value={val}
+                    size="w-11 h-11"
+                    isKept={true}
+                    userColor={hoveredRoll.userColor}
+                    className="shadow-md"
+                  />
                 ))
               )}
             </div>
