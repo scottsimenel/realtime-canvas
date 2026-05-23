@@ -58,11 +58,8 @@ app.post('/api/upload', upload.array('image', 50), (req, res) => {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'No files uploaded' });
     }
-    const protocol = req.protocol;
-    const host = req.get('host');
-    
     const filesData = req.files.map(file => ({
-      url: `${protocol}://${host}/uploads/${file.filename}`,
+      url: `/uploads/${file.filename}`,
       filename: file.filename,
       originalname: file.originalname
     }));

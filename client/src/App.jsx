@@ -6,6 +6,15 @@ const SOCKET_URL = window.location.hostname === 'localhost' || window.location.h
   ? 'http://localhost:5000'
   : window.location.origin;
 
+const getFullUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${SOCKET_URL}${path}`;
+};
+
 const RANDOM_NAMES = [
   'Creative Fox',
   'Swift Eagle',
@@ -1471,6 +1480,8 @@ export default function App() {
     if (!socket || !socket.connected) return;
 
     const unlockedIds = selectedElementIds.filter((id) => {
+      const el = elements.find((item) => item.id === id);
+      if (!el || el.properties?.locked) return false;
       const lockHolderId = locks[id];
       return !lockHolderId || lockHolderId === currentUser?.id;
     });
@@ -1483,7 +1494,7 @@ export default function App() {
         setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
       }
     });
-  }, [selectedElementIds, locks, currentUser]);
+  }, [selectedElementIds, elements, locks, currentUser]);
 
   const handleClearDrawings = useCallback(() => {
     const drawingElementIds = elements
@@ -1898,7 +1909,7 @@ export default function App() {
                             className="group relative h-20 rounded-xl overflow-hidden border border-rose-950 bg-rose-950/20"
                           >
                             <img
-                              src={img.url}
+                              src={getFullUrl(img.url)}
                               alt={img.name}
                               className="w-full h-full object-cover opacity-30 grayscale"
                             />
@@ -1941,7 +1952,7 @@ export default function App() {
                               className="w-full h-full text-left p-0 bg-transparent border-0 cursor-pointer"
                             >
                               <img
-                                src={img.url}
+                                src={getFullUrl(img.url)}
                                 alt={img.name}
                                 className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300"
                               />
@@ -2140,7 +2151,7 @@ export default function App() {
                             <div className="relative rounded-lg overflow-hidden border border-slate-800 bg-slate-950/60 p-2 flex items-center gap-2">
                               <div className="w-12 h-9 rounded bg-slate-900 overflow-hidden border border-slate-800 flex-shrink-0">
                                 <img
-                                  src={roomSettings.backgroundImageUrl}
+                                  src={getFullUrl(roomSettings.backgroundImageUrl)}
                                   alt="Active Background"
                                   className="w-full h-full object-cover"
                                 />
@@ -2399,12 +2410,27 @@ export default function App() {
                 <div className="w-px h-6 bg-slate-800 self-center mx-1" />
                 <button
                   type="button"
-                  onClick={handleClearDrawings}
-                  className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer"
-                  title="Clear All Drawings"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedElementIds.length === 0}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    selectedElementIds.length === 0
+                      ? 'text-slate-600 cursor-not-allowed opacity-35'
+                      : 'text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 active:scale-95'
+                  }`}
+                  title="Delete Selected Elements (Delete/Backspace)"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearDrawings}
+                  className="p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer active:scale-95"
+                  title="Clear All Drawings"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h16M7 16h10M9 12h6M11 8h2M12 4v4" />
                   </svg>
                 </button>
                 <div className="w-px h-6 bg-slate-800 self-center mx-1" />
@@ -3131,7 +3157,7 @@ export default function App() {
                       )}
 
                       {/* Delete Element Button */}
-                      {isSelected && !isLockedByOther && (
+                      {isSelected && !isLockedByOther && !el.properties?.locked && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -3227,7 +3253,7 @@ export default function App() {
                           >
                             <div className="aspect-video w-full bg-slate-950 relative overflow-hidden flex items-center justify-center border-b border-slate-800/80">
                               <img
-                                src={asset.url}
+                                src={getFullUrl(asset.url)}
                                 alt={asset.name}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                               />
@@ -3272,7 +3298,7 @@ export default function App() {
                         >
                           <div className="h-16 w-full bg-slate-950 relative overflow-hidden flex items-center justify-center border-b border-slate-900">
                             <img
-                              src={img.url}
+                              src={getFullUrl(img.url)}
                               alt={img.name}
                               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
@@ -3305,7 +3331,7 @@ export default function App() {
                     {/* High-fidelity preview image */}
                     <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner relative flex items-center justify-center">
                       <img
-                        src={selectedBgPreviewAsset.url}
+                        src={getFullUrl(selectedBgPreviewAsset.url)}
                         alt={selectedBgPreviewAsset.name}
                         className="w-full h-full object-contain"
                       />
@@ -3344,13 +3370,13 @@ export default function App() {
                         <input
                           type="text"
                           readOnly
-                          value={selectedBgPreviewAsset.url}
+                          value={getFullUrl(selectedBgPreviewAsset.url)}
                           className="flex-1 bg-slate-950 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[10px] text-slate-400 focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(selectedBgPreviewAsset.url);
+                            navigator.clipboard.writeText(getFullUrl(selectedBgPreviewAsset.url));
                           }}
                           className="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg text-[10px] font-bold transition active:scale-95 cursor-pointer"
                           title="Copy URL"

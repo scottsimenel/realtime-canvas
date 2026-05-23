@@ -121,9 +121,22 @@ export default function Canvas({
     setRedrawTrigger((prev) => prev + 1);
   }, []);
 
+  const getFullUrl = useCallback((url) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    const socketUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000'
+      : window.location.origin;
+    const path = url.startsWith('/') ? url : `/${url}`;
+    return `${socketUrl}${path}`;
+  }, []);
+
   // Get image from cache or load it
-  const getOrLoadImage = useCallback((url) => {
-    if (!url) return null;
+  const getOrLoadImage = useCallback((rawUrl) => {
+    if (!rawUrl) return null;
+    const url = getFullUrl(rawUrl);
     if (imageCache.current[url]) {
       return imageCache.current[url];
     }
@@ -1092,6 +1105,8 @@ export default function Canvas({
         const socket = socketRef.current;
         if (socket && socket.connected) {
           const unlockedIds = selectedElementIds.filter((id) => {
+            const el = elements.find((item) => item.id === id);
+            if (!el || el.properties?.locked) return false;
             const lockHolderId = locks[id];
             return !lockHolderId || lockHolderId === currentUser?.id;
           });
@@ -1110,7 +1125,7 @@ export default function Canvas({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
+  }, [selectedElementIds, elements, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
 
   // Spacebar panning key listeners
   useEffect(() => {
@@ -2101,6 +2116,7 @@ export default function Canvas({
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerLeave}
       onWheel={handleWheel}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
 
