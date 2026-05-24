@@ -696,9 +696,9 @@ export default function App() {
   const [selectedBgPreviewAsset, setSelectedBgPreviewAsset] = useState(null);
 
   // Dice Roller States
-  const [diceCount, setDiceCount] = useState(1);
-  const [diceType, setDiceType] = useState(20);
-  const [rollMode, setRollMode] = useState('normal');
+  const [mixedDice, setMixedDice] = useState({ d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d100: 0 });
+  const [d20Count, setD20Count] = useState(1);
+  const [d20Mode, setD20Mode] = useState('normal');
   const [activeRolls, setActiveRolls] = useState([]);
   const [rollHistory, setRollHistory] = useState([]);
   const [isDiceSectionCollapsed, setIsDiceSectionCollapsed] = useState(false);
@@ -1655,12 +1655,21 @@ export default function App() {
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
 
+    const diceGroups = Object.entries(mixedDice)
+      .map(([key, val]) => ({
+        type: parseInt(key.substring(1), 10),
+        count: val
+      }))
+      .filter((g) => g.count > 0);
+
     socket.emit('dice-roll', {
-      count: diceCount,
-      type: diceType,
-      mode: rollMode,
+      d20: {
+        count: d20Count,
+        mode: d20Mode
+      },
+      dice: diceGroups
     });
-  }, [diceCount, diceType, rollMode]);
+  }, [mixedDice, d20Count, d20Mode]);
 
   const handleUpdateRoomSettings = useCallback((updates) => {
     const socket = socketRef.current;
@@ -2948,94 +2957,142 @@ export default function App() {
 
             {!isDiceSectionCollapsed && (
               <div className="space-y-4 pt-1 animate-in fade-in duration-200">
-                {/* Dice count and Quick Select type */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                      Dice Count: {diceCount}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="1"
-                        max="20"
-                        value={diceCount}
-                        onChange={(e) => setDiceCount(parseInt(e.target.value, 10))}
-                        className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                      />
-                      <input
-                        type="number"
-                        min="1"
-                        max="20"
-                        value={diceCount}
-                        onChange={(e) => {
-                          const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
-                          setDiceCount(val);
-                        }}
-                        className="w-12 px-1.5 py-1 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-center text-slate-200 focus:outline-none focus:border-indigo-500 transition"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Die Type: d{diceType}
-                    </label>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[4, 6, 8, 10, 12, 20, 100].map((t) => (
+                {/* d20 Configuration */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider select-none">
+                    d20 test roll
+                  </label>
+                  <div className="grid grid-cols-4 gap-1 bg-slate-950/60 p-1 border border-slate-800/80 rounded-lg">
+                    {[
+                      { label: 'None', count: 0, mode: 'normal' },
+                      { label: 'Normal', count: 1, mode: 'normal' },
+                      { label: 'Adv', count: 1, mode: 'advantage' },
+                      { label: 'Dis', count: 1, mode: 'disadvantage' }
+                    ].map((opt) => {
+                      const isActive = d20Count === opt.count && (opt.count === 0 || d20Mode === opt.mode);
+                      return (
                         <button
-                          key={t}
+                          key={opt.label}
                           type="button"
-                          onClick={() => setDiceType(t)}
-                          className={`py-1 text-[10px] font-extrabold rounded-lg border transition cursor-pointer active:scale-95 ${
-                            diceType === t
-                              ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                              : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                          onClick={() => {
+                            setD20Count(opt.count);
+                            setD20Mode(opt.mode);
+                          }}
+                          className={`py-1 px-1 text-[10px] font-bold rounded-md transition cursor-pointer active:scale-95 text-center ${
+                            isActive
+                              ? 'bg-indigo-600 text-white shadow-sm font-extrabold'
+                              : 'text-slate-500 hover:text-slate-300'
                           }`}
                         >
-                          d{t}
+                          {opt.label}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Roll Mode (Advantage/Disadvantage) */}
-                <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Roll Mode
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5 bg-slate-950/60 p-1 border border-slate-800/80 rounded-lg">
-                    {[
-                      { value: 'normal', label: 'Normal' },
-                      { value: 'advantage', label: 'Adv' },
-                      { value: 'disadvantage', label: 'Dis' }
-                    ].map((mode) => (
+                {/* Mixed Dice Bag */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between select-none">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Dice Bag (Custom pool)
+                    </label>
+                    {(d20Count > 0 || Object.values(mixedDice).some(v => v > 0)) && (
                       <button
-                        key={mode.value}
                         type="button"
-                        onClick={() => setRollMode(mode.value)}
-                        className={`py-1 px-1 text-[10px] font-bold rounded-md transition cursor-pointer active:scale-95 ${
-                          rollMode === mode.value
-                            ? 'bg-indigo-500/20 text-indigo-400 shadow-sm'
-                            : 'text-slate-500 hover:text-slate-300'
-                        }`}
+                        onClick={() => {
+                          setMixedDice({ d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d100: 0 });
+                          setD20Count(0);
+                        }}
+                        className="text-[9px] text-rose-400 hover:text-rose-300 transition font-semibold cursor-pointer"
                       >
-                        {mode.label}
+                        Reset Bag
                       </button>
-                    ))}
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {['d4', 'd6', 'd8', 'd10', 'd12', 'd100'].map((type) => {
+                      const count = mixedDice[type] || 0;
+                      return (
+                        <div
+                          key={type}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition ${
+                            count > 0
+                              ? 'bg-indigo-600/10 border-indigo-500/30 text-indigo-200'
+                              : 'bg-slate-950/40 border-slate-900 text-slate-500'
+                          }`}
+                        >
+                          <span className={`text-xs font-black ${count > 0 ? 'text-indigo-400' : 'text-slate-400'}`}>
+                            {type}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMixedDice((prev) => ({
+                                  ...prev,
+                                  [type]: Math.max(0, count - 1)
+                                }));
+                              }}
+                              disabled={count === 0}
+                              className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-900 border border-slate-800/80 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 transition text-[10px] font-black text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                            >
+                              －
+                            </button>
+                            <span className="text-xs font-bold w-4 text-center select-none text-slate-200">
+                              {count}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMixedDice((prev) => ({
+                                  ...prev,
+                                  [type]: Math.min(30, count + 1)
+                                }));
+                              }}
+                              className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-900 border border-slate-800/80 hover:bg-slate-800 transition text-[10px] font-black text-slate-400 cursor-pointer"
+                            >
+                              ＋
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Roll Button */}
-                <button
-                  type="button"
-                  onClick={handleRollDice}
-                  className="w-full py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/40 hover:shadow-indigo-600/10 border border-indigo-500/30 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-97"
-                >
-                  <span>🎲</span> Roll {diceCount}d{diceType}
-                  {rollMode !== 'normal' && <span className="text-[10px] font-normal opacity-85">({rollMode})</span>}
-                </button>
+                {(() => {
+                  const getRollFormula = () => {
+                    const parts = [];
+                    if (d20Count > 0) {
+                      let modeSuffix = '';
+                      if (d20Mode === 'advantage') modeSuffix = ' (Adv)';
+                      else if (d20Mode === 'disadvantage') modeSuffix = ' (Dis)';
+                      parts.push(`${d20Count}d20${modeSuffix}`);
+                    }
+                    Object.entries(mixedDice).forEach(([key, val]) => {
+                      if (val > 0) {
+                        parts.push(`${val}${key}`);
+                      }
+                    });
+                    return parts.join(' + ');
+                  };
+                  const formula = getRollFormula();
+                  const isDisabled = !formula;
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleRollDice}
+                      disabled={isDisabled}
+                      className="w-full py-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-950/40 hover:shadow-indigo-600/10 border border-indigo-500/30 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-97 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:from-indigo-600 disabled:hover:to-violet-600"
+                    >
+                      <span>🎲</span> {isDisabled ? 'Select Dice to Roll' : `Roll ${formula}`}
+                    </button>
+                  );
+                })()}
 
                 {/* Roll History logs */}
                 <div className="border-t border-slate-800/80 pt-3">
@@ -3061,8 +3118,25 @@ export default function App() {
                   ) : (
                     <div className="max-h-56 overflow-y-auto space-y-2 pr-0.5 custom-scrollbar">
                       {rollHistory.map((roll) => {
-                        const isD20 = roll.type === 20;
-                        const hasSum = !isD20;
+                        const getFormula = (r) => {
+                          const parts = [];
+                          if (r.d20 && r.d20.count > 0) {
+                            let modeSuffix = '';
+                            if (r.d20.mode === 'advantage') modeSuffix = ' (Adv)';
+                            else if (r.d20.mode === 'disadvantage') modeSuffix = ' (Dis)';
+                            parts.push(`${r.d20.count}d20${modeSuffix}`);
+                          }
+                          if (r.dice && Array.isArray(r.dice)) {
+                            r.dice.forEach((g) => {
+                              parts.push(`${g.count}d${g.type}`);
+                            });
+                          }
+                          return parts.join(' + ');
+                        };
+                        const formula = getFormula(roll);
+                        const hasD20 = roll.d20 && roll.d20.count > 0;
+                        const hasCustomDice = roll.dice && roll.dice.length > 0;
+
                         return (
                           <div
                             key={roll.rollId}
@@ -3086,54 +3160,36 @@ export default function App() {
                               </span>
                             </div>
                             <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-indigo-400 font-extrabold">
-                                {roll.count}d{roll.type}
-                                {roll.mode !== 'normal' && (
-                                  <span className="text-slate-500 font-normal ml-1">({roll.mode === 'advantage' ? 'Adv' : 'Dis'})</span>
-                                )}
+                              <span className="text-indigo-400 font-extrabold truncate max-w-[150px]">
+                                {formula}
                               </span>
                               <div className="flex items-center gap-1.5">
-                                {isD20 ? (
-                                  roll.result.rolls.map((r, idx) => (
-                                    <span key={idx} className="flex items-center gap-1">
-                                      <DieIcon
-                                        type={20}
-                                        value={r.kept}
-                                        size="w-5 h-5"
-                                        isKept={true}
-                                      />
-                                      {roll.mode !== 'normal' && (
+                                {hasD20 && (
+                                  <div className="flex items-center gap-1">
+                                    {roll.d20.rolls.map((r, idx) => (
+                                      <span key={idx} className="flex items-center gap-0.5">
                                         <DieIcon
                                           type={20}
-                                          value={r.discarded}
+                                          value={r.kept}
                                           size="w-5 h-5"
-                                          isKept={false}
-                                          isDiscarded={true}
+                                          isKept={true}
                                         />
-                                      )}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="flex items-center gap-1">
-                                    {roll.result.rolls.map((val, idx) => (
-                                      <DieIcon
-                                        key={idx}
-                                        type={roll.type}
-                                        value={val}
-                                        size="w-5 h-5"
-                                        isKept={true}
-                                      />
-                                    ))}
-                                    {roll.mode !== 'normal' && (
-                                      <span className="text-[9px] text-slate-500 font-mono line-through ml-1" title={`Discarded: [${roll.result.discardedRolls.join(', ')}] (Sum: ${roll.result.discardedSum})`}>
-                                        (discarded)
+                                        {roll.d20.mode !== 'normal' && (
+                                          <DieIcon
+                                            type={20}
+                                            value={r.discarded}
+                                            size="w-5 h-5"
+                                            isKept={false}
+                                            isDiscarded={true}
+                                          />
+                                        )}
                                       </span>
-                                    )}
-                                  </span>
+                                    ))}
+                                  </div>
                                 )}
-                                {hasSum && (
-                                  <span className="text-indigo-400 font-black ml-1 bg-indigo-500/10 px-1 py-0.5 rounded text-[10px]">
-                                    ={roll.result.sum}
+                                {hasCustomDice && (
+                                  <span className="text-indigo-400 font-black ml-1 bg-indigo-500/10 px-1.5 py-0.5 rounded text-[10px]">
+                                    ={roll.totalSum}
                                   </span>
                                 )}
                               </div>
@@ -3824,7 +3880,40 @@ export default function App() {
       <div className="fixed top-20 right-4 z-50 flex flex-col gap-4.5 pointer-events-none max-w-sm sm:max-w-md w-full">
         {activeRolls.map((roll) => {
           const isRolling = roll.status === 'rolling';
-          const isD20 = roll.type === 20;
+          
+          // Compile flat list of dice types for rolling animation
+          const allDiceToRoll = [];
+          if (roll.d20 && roll.d20.count > 0) {
+            const d20AnimCount = roll.d20.mode !== 'normal' ? roll.d20.count * 2 : roll.d20.count;
+            for (let i = 0; i < d20AnimCount; i++) {
+              allDiceToRoll.push(20);
+            }
+          }
+          if (roll.dice && Array.isArray(roll.dice)) {
+            roll.dice.forEach((g) => {
+              for (let i = 0; i < g.count; i++) {
+                allDiceToRoll.push(g.type);
+              }
+            });
+          }
+
+          // Build formula display text
+          const getBroadcastFormula = () => {
+            const parts = [];
+            if (roll.d20 && roll.d20.count > 0) {
+              let modeSuffix = '';
+              if (roll.d20.mode === 'advantage') modeSuffix = ' (Adv)';
+              else if (roll.d20.mode === 'disadvantage') modeSuffix = ' (Dis)';
+              parts.push(`${roll.d20.count}d20${modeSuffix}`);
+            }
+            if (roll.dice && Array.isArray(roll.dice)) {
+              roll.dice.forEach((g) => {
+                parts.push(`${g.count}d${g.type}`);
+              });
+            }
+            return parts.join(' + ');
+          };
+          const formulaText = getBroadcastFormula();
 
           return (
             <div
@@ -3845,12 +3934,7 @@ export default function App() {
                   <span className="text-sm font-black text-slate-100">{roll.userName}</span>
                 </div>
                 <span className="text-xs bg-indigo-500/10 text-indigo-400 font-extrabold px-3 py-1 rounded-lg border border-indigo-500/25">
-                  {roll.count}d{roll.type}
-                  {roll.mode !== 'normal' && (
-                    <span className="ml-1 opacity-80 uppercase text-[9px] font-normal">
-                      {roll.mode === 'advantage' ? 'Adv' : 'Dis'}
-                    </span>
-                  )}
+                  {formulaText}
                 </span>
               </div>
 
@@ -3859,7 +3943,7 @@ export default function App() {
                 {isRolling ? (
                   // Rolling state: Show shaking placeholders with cycling values
                   <div className="flex flex-wrap justify-center gap-2.5 animate-pulse">
-                    {Array.from({ length: roll.count }).map((_, idx) => (
+                    {allDiceToRoll.map((type, idx) => (
                       <div
                         key={idx}
                         className="animate-spin"
@@ -3868,8 +3952,8 @@ export default function App() {
                         }}
                       >
                         <DieIcon
-                          type={roll.type}
-                          value={((rollTick + idx) % roll.type) + 1}
+                          type={type}
+                          value={((rollTick + idx) % type) + 1}
                           size="w-12 h-12"
                         />
                       </div>
@@ -3877,14 +3961,34 @@ export default function App() {
                   </div>
                 ) : (
                   // Resolved state: Show final values
-                  <div className="flex flex-col items-center gap-3.5 w-full">
-                    {/* Dice results display */}
-                    <div className="flex flex-wrap justify-center gap-2.5">
-                      {isD20 ? (
-                        roll.result.rolls.map((r, idx) => (
-                          <div key={idx} className="flex items-center bg-slate-950/80 border border-slate-800/50 p-2 rounded-xl gap-2 shadow-inner">
-                            {roll.mode !== 'normal' ? (
-                              <>
+                  <div className="flex flex-col items-center gap-4 w-full">
+                    {/* d20 roll results (rendered first, separately) */}
+                    {roll.d20 && roll.d20.count > 0 && (
+                      <div className="flex flex-col items-center gap-1.5 w-full">
+                        <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                          d20 roll
+                        </span>
+                        <div className="flex flex-wrap justify-center gap-2.5">
+                          {roll.d20.rolls.map((r, idx) => (
+                            <div key={idx} className="flex items-center bg-slate-950/80 border border-slate-800/50 p-2 rounded-xl gap-2 shadow-inner">
+                              {roll.d20.mode !== 'normal' ? (
+                                <>
+                                  <DieIcon
+                                    type={20}
+                                    value={r.kept}
+                                    size="w-10 h-10"
+                                    isKept={true}
+                                    userColor={roll.userColor}
+                                  />
+                                  <DieIcon
+                                    type={20}
+                                    value={r.discarded}
+                                    size="w-10 h-10"
+                                    isKept={false}
+                                    isDiscarded={true}
+                                  />
+                                </>
+                              ) : (
                                 <DieIcon
                                   type={20}
                                   value={r.kept}
@@ -3892,57 +3996,45 @@ export default function App() {
                                   isKept={true}
                                   userColor={roll.userColor}
                                 />
-                                <DieIcon
-                                  type={20}
-                                  value={r.discarded}
-                                  size="w-10 h-10"
-                                  isKept={false}
-                                  isDiscarded={true}
-                                />
-                              </>
-                            ) : (
-                              <DieIcon
-                                type={20}
-                                value={r.kept}
-                                size="w-10 h-10"
-                                isKept={true}
-                                userColor={roll.userColor}
-                              />
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        roll.result.rolls.map((val, idx) => (
-                          <div
-                            key={idx}
-                            className="animate-in zoom-in-50 duration-150 shadow-md"
-                            style={{ animationDelay: `${idx * 0.05}s` }}
-                          >
-                            <DieIcon
-                              type={roll.type}
-                              value={val}
-                              size="w-10 h-10"
-                              isKept={true}
-                              userColor={roll.userColor}
-                            />
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Advantage/Disadvantage discarded set preview for non-d20 */}
-                    {!isD20 && roll.mode !== 'normal' && (
-                      <div className="text-[10px] text-slate-500 flex gap-1 items-center font-mono">
-                        <span className="line-through">
-                          Discarded: [{roll.result.discardedRolls.join(', ')}] (Sum: {roll.result.discardedSum})
-                        </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
-                    {/* Total sum for non-d20 */}
-                    {!isD20 && (
-                      <div className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-4.5 py-2 rounded-full border border-indigo-500/20 animate-in zoom-in duration-300 flex items-center gap-1.5 shadow-sm">
-                        Total Sum: <span className="text-white text-base font-black">{roll.result.sum}</span>
+                    {/* Custom dice groups */}
+                    {roll.dice && roll.dice.length > 0 && (
+                      <div className="flex flex-col items-center gap-3 w-full border-t border-slate-800/40 pt-3">
+                        <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                          Dice Pool Results
+                        </span>
+                        <div className="flex flex-wrap justify-center gap-4">
+                          {roll.dice.map((group, gIdx) => (
+                            <div key={gIdx} className="flex flex-col items-center gap-1.5">
+                              <span className="text-[9px] font-extrabold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/10">
+                                {group.count}d{group.type}
+                              </span>
+                              <div className="flex flex-wrap justify-center gap-1.5">
+                                {group.rolls.map((val, idx) => (
+                                  <DieIcon
+                                    key={idx}
+                                    type={group.type}
+                                    value={val}
+                                    size="w-8 h-8"
+                                    isKept={true}
+                                    userColor={roll.userColor}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Total sum for custom dice */}
+                        <div className="text-xs font-black text-indigo-400 bg-indigo-500/10 px-4.5 py-2 rounded-full border border-indigo-500/20 animate-in zoom-in duration-300 flex items-center gap-1.5 shadow-sm mt-1">
+                          Total Sum: <span className="text-white text-base font-black">{roll.totalSum}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3977,85 +4069,111 @@ export default function App() {
           </div>
 
           {/* Formula & Mode */}
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-              Dice Formula
-            </span>
-            <span className="text-xs bg-indigo-500/10 text-indigo-400 font-black px-2.5 py-0.5 rounded border border-indigo-500/20 uppercase">
-              {hoveredRoll.count}d{hoveredRoll.type} {hoveredRoll.mode !== 'normal' && hoveredRoll.mode}
-            </span>
-          </div>
+          {(() => {
+            const getFormula = (roll) => {
+              const parts = [];
+              if (roll.d20 && roll.d20.count > 0) {
+                let modeSuffix = '';
+                if (roll.d20.mode === 'advantage') modeSuffix = ' (Adv)';
+                else if (roll.d20.mode === 'disadvantage') modeSuffix = ' (Dis)';
+                parts.push(`${roll.d20.count}d20${modeSuffix}`);
+              }
+              if (roll.dice && Array.isArray(roll.dice)) {
+                roll.dice.forEach((g) => {
+                  parts.push(`${g.count}d${g.type}`);
+                });
+              }
+              return parts.join(' + ');
+            };
+            return (
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  Dice Formula
+                </span>
+                <span className="text-xs bg-indigo-500/10 text-indigo-400 font-black px-2.5 py-0.5 rounded border border-indigo-500/20 uppercase">
+                  {getFormula(hoveredRoll)}
+                </span>
+              </div>
+            );
+          })()}
 
-          {/* Die faces (Enlarged and styled) */}
-          <div className="flex flex-col items-center gap-3 py-1 bg-slate-950/40 border border-slate-950/80 p-3 rounded-xl">
-            <div className="flex flex-wrap justify-center gap-2.5">
-              {hoveredRoll.type === 20 ? (
-                hoveredRoll.result.rolls.map((r, idx) => (
-                  <div key={idx} className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-2 gap-1.5 shadow-inner">
-                    {hoveredRoll.mode !== 'normal' ? (
-                      <>
+          {/* Detailed Results */}
+          <div className="flex flex-col gap-3.5 py-1 bg-slate-950/40 border border-slate-950/80 p-3 rounded-xl max-h-60 overflow-y-auto custom-scrollbar">
+            {/* d20 roll results */}
+            {hoveredRoll.d20 && hoveredRoll.d20.count > 0 && (
+              <div className="flex flex-col items-center gap-1.5 w-full">
+                <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  d20 roll
+                </span>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {hoveredRoll.d20.rolls.map((r, idx) => (
+                    <div key={idx} className="flex items-center bg-slate-900/90 border border-slate-800 rounded-xl p-1.5 gap-1 shadow-inner">
+                      {hoveredRoll.d20.mode !== 'normal' ? (
+                        <>
+                          <DieIcon
+                            type={20}
+                            value={r.kept}
+                            size="w-9 h-9"
+                            isKept={true}
+                            userColor={hoveredRoll.userColor}
+                          />
+                          <DieIcon
+                            type={20}
+                            value={r.discarded}
+                            size="w-9 h-9"
+                            isKept={false}
+                            isDiscarded={true}
+                          />
+                        </>
+                      ) : (
                         <DieIcon
                           type={20}
                           value={r.kept}
-                          size="w-11 h-11"
+                          size="w-9 h-9"
                           isKept={true}
                           userColor={hoveredRoll.userColor}
                         />
-                        <DieIcon
-                          type={20}
-                          value={r.discarded}
-                          size="w-11 h-11"
-                          isKept={false}
-                          isDiscarded={true}
-                        />
-                      </>
-                    ) : (
-                      <DieIcon
-                        type={20}
-                        value={r.kept}
-                        size="w-11 h-11"
-                        isKept={true}
-                        userColor={hoveredRoll.userColor}
-                      />
-                    )}
-                  </div>
-                ))
-              ) : (
-                hoveredRoll.result.rolls.map((val, idx) => (
-                  <DieIcon
-                    key={idx}
-                    type={hoveredRoll.type}
-                    value={val}
-                    size="w-11 h-11"
-                    isKept={true}
-                    userColor={hoveredRoll.userColor}
-                    className="shadow-md"
-                  />
-                ))
-              )}
-            </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            {/* If advantage/disadvantage set roll (non-d20) */}
-            {hoveredRoll.type !== 20 && hoveredRoll.mode !== 'normal' && (
-              <div className="text-[9px] text-slate-500 flex flex-col items-center gap-0.5 font-mono">
-                <span className="line-through">
-                  Discarded Set: [{hoveredRoll.result.discardedRolls.join(', ')}] (Sum: {hoveredRoll.result.discardedSum})
-                </span>
-                <span className="text-indigo-400/80 font-bold">
-                  Kept Set {hoveredRoll.result.kept}: [{hoveredRoll.result.rolls.join(', ')}]
-                </span>
+            {/* Custom dice groups */}
+            {hoveredRoll.dice && hoveredRoll.dice.length > 0 && (
+              <div className="flex flex-col gap-3 w-full border-t border-slate-800/40 pt-2.5">
+                {hoveredRoll.dice.map((group, gIdx) => (
+                  <div key={gIdx} className="flex flex-col items-center gap-1">
+                    <span className="text-[9px] font-extrabold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/10">
+                      {group.count}d{group.type}
+                    </span>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {group.rolls.map((val, idx) => (
+                        <DieIcon
+                          key={idx}
+                          type={group.type}
+                          value={val}
+                          size="w-7 h-7"
+                          isKept={true}
+                          userColor={hoveredRoll.userColor}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Sum Total if not d20 */}
-          {hoveredRoll.type !== 20 && (
+          {/* Sum Total if not d20 only */}
+          {hoveredRoll.dice && hoveredRoll.dice.length > 0 && (
             <div className="flex items-center justify-between border-t border-slate-800/80 pt-2.5">
               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                 Total Sum
               </span>
               <span className="text-base font-black text-indigo-400 bg-indigo-500/10 px-3.5 py-1 rounded-xl border border-indigo-500/20">
-                {hoveredRoll.result.sum}
+                {hoveredRoll.totalSum}
               </span>
             </div>
           )}

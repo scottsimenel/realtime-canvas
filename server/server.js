@@ -541,16 +541,11 @@ io.on('connection', (socket) => {
 
   /**
    * Handle collaborative dice rolling.
-   * Generates random values and advantage/disadvantage results, then broadcasts.
+   * Generates random values for mixed dice groups and d20 (with advantage/disadvantage), then broadcasts.
    */
   socket.on('dice-roll', (data) => {
-    const { count, type, mode } = data || {};
+    const { d20, dice } = data || {};
     const room = socket.room || DEFAULT_ROOM;
-
-    // Validate inputs
-    const safeCount = Math.max(1, Math.min(20, parseInt(count, 10) || 1));
-    const safeType = [4, 6, 8, 10, 12, 20, 100].includes(parseInt(type, 10)) ? parseInt(type, 10) : 6;
-    const safeMode = ['normal', 'advantage', 'disadvantage'].includes(mode) ? mode : 'normal';
 
     const user = registry.users.get(socket.id);
     if (!user) return;
@@ -559,20 +554,22 @@ io.on('connection', (socket) => {
     const rollId = `roll_${Date.now()}_${Math.round(Math.random() * 1e9)}`;
     const timestamp = new Date().toISOString();
 
-    let rollResult = {};
+    // 1. Process d20 roll(s)
+    let d20Result = null;
+    if (d20 && typeof d20 === 'object' && d20.count > 0) {
+      const safeD20Count = Math.max(1, Math.min(10, parseInt(d20.count, 10) || 0));
+      const safeD20Mode = ['normal', 'advantage', 'disadvantage'].includes(d20.mode) ? d20.mode : 'normal';
 
-    if (safeType === 20) {
-      // Advantage/disadvantage evaluated per-die for d20
       const rolls = [];
-      for (let i = 0; i < safeCount; i++) {
+      for (let i = 0; i < safeD20Count; i++) {
         const r1 = rollDie(20);
         const r2 = rollDie(20);
         let kept, discarded;
 
-        if (safeMode === 'advantage') {
+        if (safeD20Mode === 'advantage') {
           kept = Math.max(r1, r2);
           discarded = Math.min(r1, r2);
-        } else if (safeMode === 'disadvantage') {
+        } else if (safeD20Mode === 'disadvantage') {
           kept = Math.min(r1, r2);
           discarded = Math.max(r1, r2);
         } else {
@@ -582,50 +579,42 @@ io.on('connection', (socket) => {
 
         rolls.push({
           roll1: r1,
-          roll2: safeMode !== 'normal' ? r2 : null,
+          roll2: safeD20Mode !== 'normal' ? r2 : null,
           kept,
           discarded
         });
       }
-      rollResult = { rolls };
-    } else {
-      // For non-d20, advantage/disadvantage rolls two full sets of N dice and keeps the higher/lower sum
-      if (safeMode === 'normal') {
-        const rolls = Array.from({ length: safeCount }, () => rollDie(safeType));
-        const sum = rolls.reduce((a, b) => a + b, 0);
-        rollResult = { rolls, sum };
-      } else {
-        const rollsA = Array.from({ length: safeCount }, () => rollDie(safeType));
-        const rollsB = Array.from({ length: safeCount }, () => rollDie(safeType));
-        const sumA = rollsA.reduce((a, b) => a + b, 0);
-        const sumB = rollsB.reduce((a, b) => a + b, 0);
 
-        let kept, discarded, keptRolls, discardedRolls, keptSum, discardedSum;
-        if (safeMode === 'advantage') {
-          if (sumA >= sumB) {
-            kept = 'A'; keptRolls = rollsA; keptSum = sumA;
-            discarded = 'B'; discardedRolls = rollsB; discardedSum = sumB;
-          } else {
-            kept = 'B'; keptRolls = rollsB; keptSum = sumB;
-            discarded = 'A'; discardedRolls = rollsA; discardedSum = sumA;
-          }
-        } else {
-          if (sumA <= sumB) {
-            kept = 'A'; keptRolls = rollsA; keptSum = sumA;
-            discarded = 'B'; discardedRolls = rollsB; discardedSum = sumB;
-          } else {
-            kept = 'B'; keptRolls = rollsB; keptSum = sumB;
-            discarded = 'A'; discardedRolls = rollsA; discardedSum = sumA;
-          }
+      d20Result = {
+        count: safeD20Count,
+        mode: safeD20Mode,
+        rolls
+      };
+    }
+
+    // 2. Process other custom dice groups
+    const diceResults = [];
+    let totalSum = 0;
+
+    if (dice && Array.isArray(dice)) {
+      for (const group of dice) {
+        const type = parseInt(group.type, 10);
+        const count = parseInt(group.count, 10);
+
+        if ([4, 6, 8, 10, 12, 100].includes(type) && count > 0) {
+          const safeCount = Math.max(1, Math.min(30, count)); // Limit count per type to 30
+          const rolls = Array.from({ length: safeCount }, () => rollDie(type));
+          const sum = rolls.reduce((a, b) => a + b, 0);
+
+          diceResults.push({
+            type,
+            count: safeCount,
+            rolls,
+            sum
+          });
+
+          totalSum += sum;
         }
-
-        rollResult = {
-          rolls: keptRolls,
-          sum: keptSum,
-          discardedRolls,
-          discardedSum,
-          kept
-        };
       }
     }
 
@@ -635,10 +624,9 @@ io.on('connection', (socket) => {
       userId: socket.id,
       userName: user.name,
       userColor: user.color,
-      count: safeCount,
-      type: safeType,
-      mode: safeMode,
-      result: rollResult
+      d20: d20Result,
+      dice: diceResults,
+      totalSum
     };
 
     io.to(room).emit('dice-rolled', payload);
