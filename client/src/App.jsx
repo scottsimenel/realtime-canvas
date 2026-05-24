@@ -2859,10 +2859,9 @@ export default function App() {
         }`}>
           {/* Active Users */}
           <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-4">
-            <button
-              type="button"
+            <div
               onClick={() => setIsUsersSectionCollapsed(!isUsersSectionCollapsed)}
-              className="w-full flex items-center justify-between pb-1 text-left cursor-pointer focus:outline-none"
+              className="w-full flex items-center justify-between pb-1 text-left cursor-pointer select-none"
             >
               <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                 <span>👥 Active Users</span>
@@ -2887,7 +2886,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </button>
+            </div>
             {!isUsersSectionCollapsed && (
               <div className="space-y-2 pt-1 animate-in fade-in duration-200">
                 {users.map((user) => {
