@@ -697,7 +697,7 @@ export default function DiceEffects({ activeRolls }) {
       // Screen space limits (Three.js origin is at screen center)
       const leftLimit = -width / 2 + radius;
       const rightLimit = width / 2 - radius;
-      const bottomLimit = -height / 2 + radius + 75; // Raised bottom limit to prevent clipping behind bottom toolbar
+      const bottomLimit = -height / 2 + radius + 180; // Raised bottom limit to prevent clipping behind bottom toolbar
       const topLimit = height / 2 - radius;
 
       if (state === 'rolling') {
