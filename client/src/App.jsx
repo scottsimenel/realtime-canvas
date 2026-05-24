@@ -728,7 +728,7 @@ export default function App() {
   const [showLeftSidebar, setShowLeftSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [showRightSidebar, setShowRightSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [showTabsBar, setShowTabsBar] = useState(true);
-  const [leftPanelTab, setLeftPanelTab] = useState('shapes'); // 'shapes' | 'images' | 'canvas'
+  const [leftPanelTab, setLeftPanelTab] = useState('images'); // 'shapes' | 'images' | 'canvas'
   const [showDiceRoller, setShowDiceRoller] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
@@ -2502,17 +2502,6 @@ export default function App() {
           <div className="flex rounded-xl bg-slate-900/60 p-1 border border-slate-800/80 mb-4 shrink-0">
             <button
               type="button"
-              onClick={() => setLeftPanelTab('shapes')}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-205 cursor-pointer ${
-                leftPanelTab === 'shapes'
-                  ? 'bg-slate-800 text-sky-400 shadow-sm border border-slate-700/50'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              Shapes
-            </button>
-            <button
-              type="button"
               onClick={() => setLeftPanelTab('images')}
               className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-205 cursor-pointer ${
                 leftPanelTab === 'images'
@@ -2532,6 +2521,17 @@ export default function App() {
               }`}
             >
               Canvas
+            </button>
+            <button
+              type="button"
+              onClick={() => setLeftPanelTab('shapes')}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-205 cursor-pointer ${
+                leftPanelTab === 'shapes'
+                  ? 'bg-slate-800 text-sky-400 shadow-sm border border-slate-700/50'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              Shapes
             </button>
           </div>
 
