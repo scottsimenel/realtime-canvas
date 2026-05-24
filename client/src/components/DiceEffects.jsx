@@ -697,7 +697,7 @@ export default function DiceEffects({ activeRolls }) {
       // Screen space limits (Three.js origin is at screen center)
       const leftLimit = -width / 2 + radius;
       const rightLimit = width / 2 - radius;
-      const bottomLimit = -height / 2 + radius;
+      const bottomLimit = -height / 2 + radius + 75; // Raised bottom limit to prevent clipping behind bottom toolbar
       const topLimit = height / 2 - radius;
 
       if (state === 'rolling') {
@@ -757,8 +757,13 @@ export default function DiceEffects({ activeRolls }) {
           state = 'settling';
         }
       } else if (state === 'settling') {
-        // Torque-settle: Calculate rotation target aligning target local normal to camera +Z
-        const qTarget = getRotationToAlignNormal(d.targetLocalNormal, [0, 0, 1]);
+        // Torque-settle: Calculate rotation target aligning target local normal to the camera's line of sight
+        const camZ = cameraRef.current ? cameraRef.current.position.z : 900;
+        const toCam = [-x, -y, camZ - z];
+        const len = Math.sqrt(toCam[0]*toCam[0] + toCam[1]*toCam[1] + toCam[2]*toCam[2]);
+        const targetWorldNormal = len > 0 ? [toCam[0]/len, toCam[1]/len, toCam[2]/len] : [0, 0, 1];
+        
+        const qTarget = getRotationToAlignNormal(d.targetLocalNormal, targetWorldNormal);
         
         // Smoothly interpolate rotation
         rotation = qLerp(rotation, qTarget, 0.13);
@@ -787,7 +792,13 @@ export default function DiceEffects({ activeRolls }) {
           state = 'settled';
           vx = vy = vz = 0;
           wx = wy = wz = 0;
-          rotation = qTarget; // snap exact rotation
+          
+          // Final snap exactly to camera vector
+          const finalCamZ = cameraRef.current ? cameraRef.current.position.z : 900;
+          const finalToCam = [-x, -y, finalCamZ - z];
+          const finalLen = Math.sqrt(finalToCam[0]*finalToCam[0] + finalToCam[1]*finalToCam[1] + finalToCam[2]*finalToCam[2]);
+          const finalTargetWorldNormal = finalLen > 0 ? [finalToCam[0]/finalLen, finalToCam[1]/finalLen, finalToCam[2]/finalLen] : [0, 0, 1];
+          rotation = getRotationToAlignNormal(d.targetLocalNormal, finalTargetWorldNormal);
         }
       } else if (state === 'settled') {
         y = bottomLimit;
@@ -813,6 +824,47 @@ export default function DiceEffects({ activeRolls }) {
       if (mesh) {
         mesh.position.set(x, y, z);
         mesh.quaternion.set(rotation[0], rotation[1], rotation[2], rotation[3]);
+
+        // Dynamically adjust child text mesh opacities so only front-facing numbers are shown
+        const camZ = cameraRef.current ? cameraRef.current.position.z : 900;
+        const toCamX = -x;
+        const toCamY = -y;
+        const toCamZ = camZ - z;
+        const toCamLen = Math.sqrt(toCamX*toCamX + toCamY*toCamY + toCamZ*toCamZ);
+        const toCamNormal = toCamLen > 0 ? [toCamX/toCamLen, toCamY/toCamLen, toCamZ/toCamLen] : [0, 0, 1];
+
+        const geomData = getGeometryData(d.type);
+        const faceNormals = geomData.faces.map(face => getFaceNormal(face, geomData.vertices));
+
+        let textChildIndex = 0;
+        mesh.children.forEach(child => {
+          if (child.material && child.material.map) {
+            const fIdx = textChildIndex;
+            textChildIndex++;
+
+            const ln = faceNormals[fIdx] || [0, 0, 1];
+            const worldNormal = qRotateVector(rotation, ln);
+            const dot = worldNormal[0]*toCamNormal[0] + worldNormal[1]*toCamNormal[1] + worldNormal[2]*toCamNormal[2];
+
+            let isTargetFace = false;
+            if (d.type === 100) {
+              isTargetFace = (fIdx === Math.floor(d.target / 10));
+            } else {
+              isTargetFace = (fIdx === ((d.target - 1) % geomData.faces.length));
+            }
+
+            if (state === 'settled' && isTargetFace) {
+              child.material.opacity = 1.0;
+            } else {
+              const minFaceVisibility = d.type === 20 ? 0.35 : 0.25;
+              if (dot > minFaceVisibility) {
+                child.material.opacity = Math.min(1.0, (dot - minFaceVisibility) * (1 / (1 - minFaceVisibility)));
+              } else {
+                child.material.opacity = 0;
+              }
+            }
+          }
+        });
       }
       
       return {
