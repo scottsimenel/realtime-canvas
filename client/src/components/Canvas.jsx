@@ -18,6 +18,7 @@ export default function Canvas({
   tabId = 'tab-default',
   onVirtualDimensionsChange,
   showCursorNames = true,
+  onCanvasInteraction,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -1161,6 +1162,12 @@ export default function Canvas({
       e.target.closest('textarea')
     ) {
       return;
+    }
+
+    if (onCanvasInteraction) {
+      const coords = getCanvasCoords(e);
+      const clickedElement = getElementAtCoords(coords.x, coords.y);
+      onCanvasInteraction(!clickedElement);
     }
 
     setHoveredElementId(null);
