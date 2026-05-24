@@ -1339,12 +1339,9 @@ export default function Canvas({
 
   const handleWheel = (e) => {
     const zoomFactor = 1.08;
-    let nextZoom = userZoom;
-    if (e.deltaY < 0) {
-      nextZoom = Math.min(8.0, userZoom * zoomFactor);
-    } else {
-      nextZoom = Math.max(0.5, userZoom / zoomFactor);
-    }
+    const nextZoom = e.deltaY < 0
+      ? Math.min(8.0, userZoom * zoomFactor)
+      : Math.max(0.5, userZoom / zoomFactor);
 
     const canvas = canvasRef.current;
     if (canvas) {
@@ -2061,12 +2058,6 @@ export default function Canvas({
       dragStateRef.current = null;
       triggerRedraw();
     }
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredElementId(null);
-    eraserHoverRef.current = null;
-    handleMouseUp();
   };
 
   const getCanvasCoords = (e) => {

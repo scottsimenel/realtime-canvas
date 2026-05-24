@@ -35,8 +35,8 @@ const DieIcon = ({ type, value, size = 'w-12 h-12', className = '', isKept = tru
     }
   }
 
-  let path = '';
-  let textY = '55';
+  let path;
+  let textY;
 
   switch (type) {
     case 4: // Tetrahedron (Triangle)
@@ -679,7 +679,6 @@ export default function App() {
 
   // Custom Image Assets (Feature 3.5)
   const [assets, setAssets] = useState([]);
-  const [isImageSectionCollapsed, setIsImageSectionCollapsed] = useState(false);
   const [hiddenAssetUrls, setHiddenAssetUrls] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('canvas_hidden_assets') || '[]');
@@ -691,18 +690,13 @@ export default function App() {
   const [draggedElementId, setDraggedElementId] = useState(null);
   const [dragOverElementId, setDragOverElementId] = useState(null);
 
-  // Collaborative Room Settings computed dynamically from active tab
-  const [isSettingsSectionCollapsed, setIsSettingsSectionCollapsed] = useState(false);
-
   // Dice Roller States
   const [mixedDice, setMixedDice] = useState({ d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d100: 0 });
   const [d20Count, setD20Count] = useState(1);
   const [d20Mode, setD20Mode] = useState('normal');
   const [activeRolls, setActiveRolls] = useState([]);
   const [rollHistory, setRollHistory] = useState([]);
-  const [isDiceSectionCollapsed, setIsDiceSectionCollapsed] = useState(false);
   const [enable3dDice, setEnable3dDice] = useState(true);
-  const [isUsersSectionCollapsed, setIsUsersSectionCollapsed] = useState(false);
   const [rollTick, setRollTick] = useState(0);
   const [hoveredRoll, setHoveredRoll] = useState(null);
   const [showCursorNames, setShowCursorNames] = useState(() => {
@@ -765,9 +759,12 @@ export default function App() {
   // Auto-expand Right Inspector and collapse Left panel when elements are selected (drag-select, click, etc.)
   useEffect(() => {
     if (selectedElementIds.length > 0) {
-      if (showLeftSidebar) setLeftPanelCollapsed(true);
-      setShowRightSidebar(true);
-      setRightPanelCollapsed(false);
+      const timer = setTimeout(() => {
+        if (showLeftSidebar) setLeftPanelCollapsed(true);
+        setShowRightSidebar(true);
+        setRightPanelCollapsed(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [selectedElementIds, showLeftSidebar]);
 
