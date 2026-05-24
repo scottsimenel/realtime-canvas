@@ -253,6 +253,26 @@ io.on('connection', (socket) => {
   });
 
   /**
+   * Handle user renaming.
+   */
+  socket.on('user-rename', (data, callback) => {
+    const { name } = data || {};
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Name is required' });
+      return;
+    }
+
+    const updatedUser = registry.renameUser(socket.id, name.trim());
+    if (updatedUser) {
+      const room = socket.room || DEFAULT_ROOM;
+      io.to(room).emit('user-renamed', { userId: socket.id, name: updatedUser.name });
+      if (typeof callback === 'function') callback({ success: true, user: updatedUser });
+    } else {
+      if (typeof callback === 'function') callback({ success: false, error: 'User not found' });
+    }
+  });
+
+  /**
    * Handle user tab switching.
    */
   socket.on('tab-switch', (data, callback) => {

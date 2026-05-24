@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 // --- Quaternion Math Utilities (custom implementations to match Three.js structure) ---
-const qIdentity = () => [0, 0, 0, 1];
 
 const qMultiply = (q1, q2) => {
   const [x1, y1, z1, w1] = q1;
@@ -312,7 +311,7 @@ const createTextTexture = (text) => {
 };
 
 // React Component
-export default function DiceEffects({ activeRolls }) {
+export default function DiceEffects({ activeRolls, onCriticalRoll }) {
   const canvasWebGLRef = useRef(null);
   const canvas2dRef = useRef(null);
   
@@ -330,110 +329,7 @@ export default function DiceEffects({ activeRolls }) {
   const frameRequestRef = useRef(null);
   const rollTickRef = useRef(0);
 
-  // 1. Listen for new rolls
-  useEffect(() => {
-    if (!activeRolls || activeRolls.length === 0) return;
-    
-    const latestRoll = activeRolls[activeRolls.length - 1];
-    if (processedRollIds.current.has(latestRoll.rollId)) return;
-    processedRollIds.current.add(latestRoll.rollId);
-    
-    setIsActive(true);
-    
-    // Stagger spawn shortly to ensure canvas sizing completes
-    setTimeout(() => {
-      spawnDiceGroup(latestRoll);
-    }, 50);
-  }, [activeRolls]);
-
-  // 2. Setup Three.js Context
-  useEffect(() => {
-    if (!isActive) return;
-    
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    // WebGL Renderer Setup
-    const renderer = new THREE.WebGLRenderer({
-      canvas: canvasWebGLRef.current,
-      alpha: true,
-      antialias: true
-    });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    rendererRef.current = renderer;
-    
-    // Scene Setup
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-    
-    // Camera Setup (Map viewport to pixel coordinates at z = 0)
-    const fov = 45;
-    const distance = height / (2 * Math.tan((fov * Math.PI) / 360));
-    const camera = new THREE.PerspectiveCamera(fov, width / height, 0.1, 10000);
-    camera.position.set(0, 0, distance);
-    camera.lookAt(0, 0, 0);
-    cameraRef.current = camera;
-    
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
-    scene.add(ambientLight);
-    
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(-width / 4, height / 2, distance / 2);
-    scene.add(dirLight);
-    
-    // Setup 2D overlay size
-    if (canvas2dRef.current) {
-      canvas2dRef.current.width = width;
-      canvas2dRef.current.height = height;
-    }
-    
-    // Resize Listener
-    const handleResize = () => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      
-      if (rendererRef.current && cameraRef.current) {
-        rendererRef.current.setSize(w, h);
-        cameraRef.current.aspect = w / h;
-        const dist = h / (2 * Math.tan((fov * Math.PI) / 360));
-        cameraRef.current.position.set(0, 0, dist);
-        cameraRef.current.updateProjectionMatrix();
-      }
-      if (canvas2dRef.current) {
-        canvas2dRef.current.width = w;
-        canvas2dRef.current.height = h;
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      
-      // Cleanup meshes
-      sceneDiceRef.current.forEach(mesh => {
-        scene.remove(mesh);
-        mesh.traverse(child => {
-          if (child.geometry) child.geometry.dispose();
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(m => m.dispose());
-            } else {
-              child.material.dispose();
-            }
-          }
-        });
-      });
-      sceneDiceRef.current = [];
-      diceDataRef.current = [];
-      
-      renderer.dispose();
-    };
-  }, [isActive]);
-
-  // 3. Spawns WebGL Mesh and initializes physics state
-  const spawnDiceGroup = (roll) => {
+  function spawnDiceGroup(roll) {
     const scene = sceneRef.current;
     if (!scene) return;
     
@@ -479,13 +375,9 @@ export default function DiceEffects({ activeRolls }) {
         return [cx / face.length, cy / face.length, cz / face.length];
       });
       
-      // Determine index corresponding to the target face
-      let targetFaceIdx = 0;
-      if (diceDef.type === 100) {
-        targetFaceIdx = Math.floor(diceDef.target / 10);
-      } else {
-        targetFaceIdx = (diceDef.target - 1) % geomData.faces.length;
-      }
+      const targetFaceIdx = diceDef.type === 100
+        ? Math.floor(diceDef.target / 10)
+        : (diceDef.target - 1) % geomData.faces.length;
       
       const targetLocalNormal = faceNormals[targetFaceIdx] || [0,0,1];
       
@@ -600,7 +492,109 @@ export default function DiceEffects({ activeRolls }) {
     
     diceDataRef.current = [...diceDataRef.current, ...newDiceData];
     sceneDiceRef.current = [...sceneDiceRef.current, ...newMeshes];
-  };
+  }
+
+  // 1. Listen for new rolls
+  useEffect(() => {
+    if (!activeRolls || activeRolls.length === 0) return;
+    
+    const latestRoll = activeRolls[activeRolls.length - 1];
+    if (processedRollIds.current.has(latestRoll.rollId)) return;
+    processedRollIds.current.add(latestRoll.rollId);
+    
+    setIsActive(true);
+    
+    // Stagger spawn shortly to ensure canvas sizing completes
+    setTimeout(() => {
+      spawnDiceGroup(latestRoll);
+    }, 50);
+  }, [activeRolls]);
+
+  // 2. Setup Three.js Context
+  useEffect(() => {
+    if (!isActive) return;
+    
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // WebGL Renderer Setup
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasWebGLRef.current,
+      alpha: true,
+      antialias: true
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    rendererRef.current = renderer;
+    
+    // Scene Setup
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+    
+    // Camera Setup (Map viewport to pixel coordinates at z = 0)
+    const fov = 45;
+    const distance = height / (2 * Math.tan((fov * Math.PI) / 360));
+    const camera = new THREE.PerspectiveCamera(fov, width / height, 0.1, 10000);
+    camera.position.set(0, 0, distance);
+    camera.lookAt(0, 0, 0);
+    cameraRef.current = camera;
+    
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+    scene.add(ambientLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    dirLight.position.set(-width / 4, height / 2, distance / 2);
+    scene.add(dirLight);
+    
+    // Setup 2D overlay size
+    if (canvas2dRef.current) {
+      canvas2dRef.current.width = width;
+      canvas2dRef.current.height = height;
+    }
+    
+    // Resize Listener
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      
+      if (rendererRef.current && cameraRef.current) {
+        rendererRef.current.setSize(w, h);
+        cameraRef.current.aspect = w / h;
+        const dist = h / (2 * Math.tan((fov * Math.PI) / 360));
+        cameraRef.current.position.set(0, 0, dist);
+        cameraRef.current.updateProjectionMatrix();
+      }
+      if (canvas2dRef.current) {
+        canvas2dRef.current.width = w;
+        canvas2dRef.current.height = h;
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      
+      // Cleanup meshes
+      sceneDiceRef.current.forEach(mesh => {
+        scene.remove(mesh);
+        mesh.traverse(child => {
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => m.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      });
+      sceneDiceRef.current = [];
+      diceDataRef.current = [];
+      
+      renderer.dispose();
+    };
+  }, [isActive]);
 
   // Spark Generator
   const spawnSparks = (x, y, color, count = 8) => {
@@ -645,6 +639,139 @@ export default function DiceEffects({ activeRolls }) {
     activeParticlesRef.current = [...activeParticlesRef.current, ...newConfetti];
   };
 
+  // Critical Success (Natural 20) fireworks and rings
+  const spawnCritSuccess = (x, y) => {
+    // Confetti
+    spawnCelebration(x, y);
+
+    const newParticles = [];
+    const colors = ['#ffe066', '#f59e0b', '#fbbf24', '#ffffff', '#eab308'];
+
+    // 1. Gold stars burst
+    for (let i = 0; i < 25; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 4.5 + Math.random() * 5.0;
+      newParticles.push({
+        type: 'star',
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2.0,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 5 + Math.random() * 4,
+        alpha: 1.0,
+        life: 0,
+        maxLife: 45 + Math.floor(Math.random() * 20)
+      });
+    }
+
+    // 2. Expanding golden rings of light
+    newParticles.push({
+      type: 'ring',
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      radius: 6,
+      growSpeed: 5.5,
+      color: '#ffe066',
+      alpha: 1.0,
+      life: 0,
+      maxLife: 28,
+      lineWidth: 5
+    });
+
+    newParticles.push({
+      type: 'ring',
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      radius: 2,
+      growSpeed: 3.5,
+      color: '#fbbf24',
+      alpha: 0.8,
+      life: 0,
+      maxLife: 38,
+      lineWidth: 3
+    });
+
+    // 3. Floating textual indicator
+    newParticles.push({
+      type: 'text',
+      x,
+      y: y - 45,
+      vx: 0,
+      vy: -1.0,
+      text: 'NAT 20!',
+      color: '#fbbf24',
+      font: '900 32px "Outfit", "Inter", sans-serif',
+      shadowColor: '#d97706',
+      alpha: 1.0,
+      life: 0,
+      maxLife: 75
+    });
+
+    activeParticlesRef.current = [...activeParticlesRef.current, ...newParticles];
+  };
+
+  // Critical Failure (Natural 1) ash/smoke and warning rings
+  const spawnCritFailure = (x, y) => {
+    const newParticles = [];
+    const smokeColors = ['#3b0764', '#1e1b4b', '#475569', '#1e293b', '#b91c1c', '#7f1d1d'];
+
+    // 1. Dark smoke cloud and fire sparks
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.0 + Math.random() * 3.5;
+      newParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.6,
+        color: smokeColors[Math.floor(Math.random() * smokeColors.length)],
+        size: 7 + Math.random() * 9,
+        alpha: 0.75,
+        life: 0,
+        maxLife: 50 + Math.floor(Math.random() * 20)
+      });
+    }
+
+    // 2. Expanding dark red warning ring
+    newParticles.push({
+      type: 'ring',
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      radius: 4,
+      growSpeed: 3.8,
+      color: '#ef4444',
+      alpha: 1.0,
+      life: 0,
+      maxLife: 32,
+      lineWidth: 4
+    });
+
+    // 3. Floating FUMBLE! text
+    newParticles.push({
+      type: 'text',
+      x,
+      y: y - 45,
+      vx: 0,
+      vy: -0.7,
+      text: 'NAT 1',
+      color: '#ef4444',
+      font: '900 32px "Outfit", "Inter", sans-serif',
+      shadowColor: '#991b1b',
+      alpha: 1.0,
+      life: 0,
+      maxLife: 75
+    });
+
+    activeParticlesRef.current = [...activeParticlesRef.current, ...newParticles];
+  };
+
   // Update & Render loop
   const tick = () => {
     rollTickRef.current = (rollTickRef.current + 1) % 1000;
@@ -660,12 +787,15 @@ export default function DiceEffects({ activeRolls }) {
     
     // 1. Update 2D particles
     activeParticlesRef.current = activeParticlesRef.current.map(p => {
+      const gravityBias = p.type === 'text' || p.type === 'ring' ? 0 : 0.08;
+      const dragFactor = p.type === 'ring' ? 1.0 : 0.96;
       return {
         ...p,
         x: p.x + p.vx,
         y: p.y + p.vy,
-        vx: p.vx * 0.96,
-        vy: (p.vy + 0.08) * 0.96, // falling gravity bias
+        vx: p.vx * dragFactor,
+        vy: (p.vy + gravityBias) * dragFactor,
+        radius: p.type === 'ring' ? p.radius + (p.growSpeed || 0) : p.radius,
         alpha: 1.0 - (p.life / p.maxLife),
         life: p.life + 1
       };
@@ -677,11 +807,54 @@ export default function DiceEffects({ activeRolls }) {
       ctx.clearRect(0, 0, width, height);
       activeParticlesRef.current.forEach(p => {
         ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = Math.max(0, Math.min(p.alpha, 1.0));
+        
+        if (p.type === 'ring') {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.lineWidth || 2;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (p.type === 'text') {
+          ctx.fillStyle = p.color;
+          ctx.font = p.font || 'bold 24px monospace';
+          ctx.shadowColor = p.shadowColor || 'black';
+          ctx.shadowBlur = 8;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(p.text, p.x, p.y);
+        } else if (p.type === 'star') {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          const spikes = 5;
+          const outerRadius = p.size;
+          const innerRadius = p.size / 2;
+          let rot = Math.PI / 2 * 3;
+          let cx = p.x;
+          let cy = p.y;
+          const step = Math.PI / spikes;
+
+          ctx.moveTo(cx, cy - outerRadius);
+          for (let i = 0; i < spikes; i++) {
+            cx = p.x + Math.cos(rot) * outerRadius;
+            cy = p.y + Math.sin(rot) * outerRadius;
+            ctx.lineTo(cx, cy);
+            rot += step;
+
+            cx = p.x + Math.cos(rot) * innerRadius;
+            cy = p.y + Math.sin(rot) * innerRadius;
+            ctx.lineTo(cx, cy);
+            rot += step;
+          }
+          ctx.lineTo(p.x, p.y - outerRadius);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       });
     }
@@ -698,7 +871,6 @@ export default function DiceEffects({ activeRolls }) {
       const leftLimit = -width / 2 + radius;
       const rightLimit = width / 2 - radius;
       const bottomLimit = -height / 2 + radius + 180; // Raised bottom limit to prevent clipping behind bottom toolbar
-      const topLimit = height / 2 - radius;
 
       if (state === 'rolling') {
         x += vx;
@@ -806,13 +978,20 @@ export default function DiceEffects({ activeRolls }) {
         // Trigger critical hit particle bursts
         if (!hasMaxCelebrated) {
           hasMaxCelebrated = true;
-          const isMaxVal = d.target === d.type;
           const isCrit20 = d.type === 20 && d.target === 20;
+          const isCrit1 = d.type === 20 && d.target === 1;
+          const isMaxVal = d.target === d.type;
           
           const particleX = x + width / 2;
           const particleY = height / 2 - y;
           
-          if (isCrit20 || (isMaxVal && d.type >= 6)) {
+          if (isCrit20) {
+            spawnCritSuccess(particleX, particleY);
+            if (onCriticalRoll) onCriticalRoll({ type: 20, value: 20 });
+          } else if (isCrit1) {
+            spawnCritFailure(particleX, particleY);
+            if (onCriticalRoll) onCriticalRoll({ type: 20, value: 1 });
+          } else if (isMaxVal && d.type >= 6) {
             spawnCelebration(particleX, particleY);
           } else {
             spawnSparks(particleX, particleY, d.color, 12);
@@ -846,12 +1025,9 @@ export default function DiceEffects({ activeRolls }) {
             const worldNormal = qRotateVector(rotation, ln);
             const dot = worldNormal[0]*toCamNormal[0] + worldNormal[1]*toCamNormal[1] + worldNormal[2]*toCamNormal[2];
 
-            let isTargetFace = false;
-            if (d.type === 100) {
-              isTargetFace = (fIdx === Math.floor(d.target / 10));
-            } else {
-              isTargetFace = (fIdx === ((d.target - 1) % geomData.faces.length));
-            }
+            const isTargetFace = d.type === 100
+              ? (fIdx === Math.floor(d.target / 10))
+              : (fIdx === ((d.target - 1) % geomData.faces.length));
 
             if (state === 'settled' && isTargetFace) {
               child.material.opacity = 1.0;

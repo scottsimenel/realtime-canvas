@@ -734,6 +734,12 @@ export default function App() {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
+  // Future features states: Popover hover, User renaming, and Screen shake
+  const [showUsersPopover, setShowUsersPopover] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+  const [shakeClass, setShakeClass] = useState('');
+
   const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
 
   const handleToggleZenMode = useCallback(() => {
@@ -925,6 +931,21 @@ export default function App() {
 
     s.on('user-joined', (user) => {
       setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user]);
+    });
+
+    s.on('user-renamed', ({ userId, name }) => {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, name } : u))
+      );
+      if (userId === s.id) {
+        setCurrentUser((prev) => (prev ? { ...prev, name } : null));
+      }
+      setRollHistory((prev) =>
+        prev.map((r) => (r.userId === userId ? { ...r, userName: name } : r))
+      );
+      setActiveRolls((prev) =>
+        prev.map((r) => (r.userId === userId ? { ...r, userName: name } : r))
+      );
     });
 
     s.on('user-left', ({ userId }) => {
@@ -1325,6 +1346,33 @@ export default function App() {
     },
     [nameInput, colorInput, roomIdInput]
   );
+
+  const handleRenameUser = useCallback((newName) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    if (!newName.trim()) return;
+
+    socket.emit('user-rename', { name: newName.trim() }, (res) => {
+      if (res && res.success) {
+        nameRef.current = newName.trim();
+        setNameInput(newName.trim());
+      } else {
+        alert(res?.error || 'Failed to rename user.');
+      }
+    });
+  }, []);
+
+  const handleCriticalRoll = useCallback(({ type, value }) => {
+    if (type === 20) {
+      if (value === 20) {
+        setShakeClass('animate-shake-success');
+        setTimeout(() => setShakeClass(''), 500);
+      } else if (value === 1) {
+        setShakeClass('animate-shake-fail');
+        setTimeout(() => setShakeClass(''), 600);
+      }
+    }
+  }, []);
 
   const handleSpawnShape = useCallback(
     (type, fill, stroke) => {
@@ -1908,7 +1956,62 @@ export default function App() {
   }
 
   // Helper render functions for Figma-style floating panels
-  const renderActiveUsers = () => {
+  const renderActiveUsersList = (isCollapsedDisabled = false) => {
+    const listContent = (
+      <div className="space-y-2 pt-1 max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
+        {users.map((user) => {
+          const isMe = user.id === currentUser?.id;
+          const isUserActive = user.x !== 0 || user.y !== 0;
+
+          return (
+            <div
+              key={user.id}
+              className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-900/60 hover:border-slate-800 transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="w-3 h-3 rounded-full border border-white/10"
+                  style={{ backgroundColor: user.color }}
+                />
+                <span className="text-sm font-semibold text-slate-300 truncate max-w-[120px]">
+                  {user.name}
+                  {isMe && <span className="text-xs font-normal text-slate-500 ml-1">(you)</span>}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* Active Tab Badge */}
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-medium truncate max-w-[80px]" title={`On ${(() => {
+                  const userTabId = user.activeTabId || 'tab-default';
+                  const tab = tabs.find((t) => t.id === userTabId);
+                  return tab ? tab.name : 'Canvas';
+                })()}`}>
+                  {(() => {
+                    const userTabId = user.activeTabId || 'tab-default';
+                    const tab = tabs.find((t) => t.id === userTabId);
+                    return tab ? tab.name : 'Canvas';
+                  })()}
+                </span>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    isUserActive
+                      ? 'bg-emerald-500/10 text-emerald-400'
+                      : 'bg-slate-800 text-slate-500'
+                  }`}
+                >
+                  {isUserActive ? 'Active' : 'Idle'}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+    if (isCollapsedDisabled) {
+      return listContent;
+    }
+
     return (
       <div className="space-y-4">
         <button
@@ -1928,58 +2031,13 @@ export default function App() {
             </span>
           </div>
         </button>
-        {!isUsersSectionCollapsed && (
-          <div className="space-y-2 pt-1 max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
-            {users.map((user) => {
-              const isMe = user.id === currentUser?.id;
-              const isUserActive = user.x !== 0 || user.y !== 0;
-
-              return (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-900/60 hover:border-slate-800 transition"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="w-3 h-3 rounded-full border border-white/10"
-                      style={{ backgroundColor: user.color }}
-                    />
-                    <span className="text-sm font-semibold text-slate-300 truncate max-w-[120px]">
-                      {user.name}
-                      {isMe && <span className="text-xs font-normal text-slate-500 ml-1">(you)</span>}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    {/* Active Tab Badge */}
-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-medium truncate max-w-[80px]" title={`On ${(() => {
-                      const userTabId = user.activeTabId || 'tab-default';
-                      const tab = tabs.find((t) => t.id === userTabId);
-                      return tab ? tab.name : 'Canvas';
-                    })()}`}>
-                      {(() => {
-                        const userTabId = user.activeTabId || 'tab-default';
-                        const tab = tabs.find((t) => t.id === userTabId);
-                        return tab ? tab.name : 'Canvas';
-                      })()}
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                        isUserActive
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-slate-800 text-slate-500'
-                      }`}
-                    >
-                      {isUserActive ? 'Active' : 'Idle'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {!isUsersSectionCollapsed && listContent}
       </div>
     );
+  };
+
+  const renderActiveUsers = () => {
+    return renderActiveUsersList(false);
   };
 
   const renderElementsAndLocks = () => {
@@ -2409,7 +2467,7 @@ export default function App() {
 
   // Dashboard (Canvas Board Workspace)
   return (
-    <div className="flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full">
+    <div className={`flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full ${shakeClass}`}>
       {/* Header */}
       <header className={`transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-between z-10 ${
         showHeader
@@ -2444,8 +2502,24 @@ export default function App() {
           </div>
 
           {/* User count badge */}
-          <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300">
+          <div 
+            onMouseEnter={() => setShowUsersPopover(true)}
+            onMouseLeave={() => setShowUsersPopover(false)}
+            className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300 relative cursor-pointer hover:bg-slate-900 transition"
+          >
             👥 <span className="font-bold">{users.length}</span><span className="hidden sm:inline"> online</span>
+            {showUsersPopover && (
+              <div 
+                onMouseEnter={() => setShowUsersPopover(true)}
+                onMouseLeave={() => setShowUsersPopover(false)}
+                className="absolute top-9 right-0 w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-2xl z-50 flex flex-col gap-3 pointer-events-auto text-left animate-in fade-in duration-200"
+              >
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800/80 pb-2">
+                  Online Room Users
+                </h3>
+                {renderActiveUsersList(true)}
+              </div>
+            )}
           </div>
 
           {/* User profile capsule */}
@@ -2454,7 +2528,48 @@ export default function App() {
               className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0"
               style={{ backgroundColor: currentUser?.color }}
             />
-            <span className="font-semibold text-sm text-slate-200 hidden sm:inline">{currentUser?.name}</span>
+            {isEditingName ? (
+              <input
+                type="text"
+                value={tempName}
+                onChange={(e) => setTempName(e.target.value)}
+                onBlur={() => {
+                  setIsEditingName(false);
+                  if (tempName.trim() && tempName.trim() !== currentUser?.name) {
+                    handleRenameUser(tempName);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setIsEditingName(false);
+                    if (tempName.trim() && tempName.trim() !== currentUser?.name) {
+                      handleRenameUser(tempName);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setIsEditingName(false);
+                    setTempName(currentUser?.name || '');
+                  }
+                }}
+                autoFocus
+                className="bg-slate-900 border border-sky-500 rounded px-1.5 py-0.5 text-xs text-sky-300 font-semibold focus:outline-none w-28"
+              />
+            ) : (
+              <div 
+                className="flex items-center gap-1 group cursor-pointer"
+                onClick={() => {
+                  setTempName(currentUser?.name || '');
+                  setIsEditingName(true);
+                }}
+                title="Click to rename"
+              >
+                <span className="font-semibold text-sm text-slate-200 hover:text-white transition hidden sm:inline">
+                  {currentUser?.name}
+                </span>
+                <span className="text-slate-500 hover:text-slate-350 text-[11px] opacity-0 group-hover:opacity-100 transition hidden sm:inline">
+                  ✏️
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -3991,7 +4106,7 @@ export default function App() {
         </div>
       )}
       {enable3dDice && (
-        <DiceEffects activeRolls={activeRolls} />
+        <DiceEffects activeRolls={activeRolls} onCriticalRoll={handleCriticalRoll} />
       )}
     </div>
   );

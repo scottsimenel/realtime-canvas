@@ -450,6 +450,20 @@ export class CanvasRegistry {
   }
 
   /**
+   * Renames a user in the registry.
+   * 
+   * @param {string} userId - User's socket ID.
+   * @param {string} newName - The new name.
+   * @returns {Object|null} The updated user object, or null if not found.
+   */
+  renameUser(userId, newName) {
+    const user = this.users.get(userId);
+    if (!user) return null;
+    user.name = newName;
+    return user;
+  }
+
+  /**
    * Cleans up state when a user disconnects:
    * Removes them from the users list and releases any locks they held across ALL tabs.
    * 
