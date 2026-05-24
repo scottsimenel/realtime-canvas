@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import Canvas from './components/Canvas';
+import DiceEffects from './components/DiceEffects';
 
 const SOCKET_URL = import.meta.env.DEV
   ? (import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000')
@@ -702,6 +703,7 @@ export default function App() {
   const [activeRolls, setActiveRolls] = useState([]);
   const [rollHistory, setRollHistory] = useState([]);
   const [isDiceSectionCollapsed, setIsDiceSectionCollapsed] = useState(false);
+  const [enable3dDice, setEnable3dDice] = useState(true);
   const [isUsersSectionCollapsed, setIsUsersSectionCollapsed] = useState(false);
   const [rollTick, setRollTick] = useState(0);
   const [hoveredRoll, setHoveredRoll] = useState(null);
@@ -2957,6 +2959,22 @@ export default function App() {
 
             {!isDiceSectionCollapsed && (
               <div className="space-y-4 pt-1 animate-in fade-in duration-200">
+                {/* 3D Dice Toggle */}
+                <div className="flex items-center justify-between bg-slate-950/30 p-2.5 rounded-lg border border-slate-800/40 select-none">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Enable 3D Dice Roll
+                  </span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enable3dDice}
+                      onChange={(e) => setEnable3dDice(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-7 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-500 peer-checked:after:bg-white"></div>
+                  </label>
+                </div>
+
                 {/* d20 Configuration */}
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider select-none">
@@ -4178,6 +4196,9 @@ export default function App() {
             </div>
           )}
         </div>
+      )}
+      {enable3dDice && (
+        <DiceEffects activeRolls={activeRolls} />
       )}
     </div>
   );
