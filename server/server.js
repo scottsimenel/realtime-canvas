@@ -278,16 +278,20 @@ io.on('connection', (socket) => {
   socket.on('user-recolor', (data, callback) => {
     const { color } = data || {};
     if (!color || typeof color !== 'string' || !color.trim()) {
+      console.warn(`[recolor] Invalid color received from socket ${socket.id}:`, color);
       if (typeof callback === 'function') callback({ success: false, error: 'Color is required' });
       return;
     }
 
+    console.log(`[recolor] Socket ${socket.id} requesting recolor to: ${color.trim()}`);
     const updatedUser = registry.recolorUser(socket.id, color.trim());
     if (updatedUser) {
+      console.log(`[recolor] Successfully updated registry user ${updatedUser.name} (${socket.id}) color to: ${updatedUser.color}`);
       const room = socket.room || DEFAULT_ROOM;
       io.to(room).emit('user-recolored', { userId: socket.id, color: updatedUser.color });
       if (typeof callback === 'function') callback({ success: true, user: updatedUser });
     } else {
+      console.error(`[recolor] User not found in registry for socket ${socket.id}`);
       if (typeof callback === 'function') callback({ success: false, error: 'User not found' });
     }
   });
@@ -588,7 +592,12 @@ io.on('connection', (socket) => {
     const room = socket.room || DEFAULT_ROOM;
 
     const user = registry.users.get(socket.id);
-    if (!user) return;
+    if (!user) {
+      console.warn(`[dice-roll] Socket ${socket.id} attempted to roll but user was not found in registry`);
+      return;
+    }
+
+    console.log(`[dice-roll] Socket ${socket.id} (${user.name}) is rolling. Current registry color: ${user.color}`);
 
     const rollDie = (sides) => Math.floor(Math.random() * sides) + 1;
     const rollId = `roll_${Date.now()}_${Math.round(Math.random() * 1e9)}`;
@@ -663,7 +672,7 @@ io.on('connection', (socket) => {
       timestamp,
       userId: socket.id,
       userName: user.name,
-      userColor: user.color,
+      userColor: (data && data.userColor) || user.color || '#4f46e5',
       d20: d20Result,
       dice: diceResults,
       totalSum

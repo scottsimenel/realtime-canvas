@@ -1784,9 +1784,10 @@ export default function App() {
         count: d20Count,
         mode: d20Mode
       },
-      dice: diceGroups
+      dice: diceGroups,
+      userColor: currentUser?.color
     });
-  }, [mixedDice, d20Count, d20Mode]);
+  }, [mixedDice, d20Count, d20Mode, currentUser]);
 
   const handleUpdateRoomSettings = useCallback((updates) => {
     const socket = socketRef.current;
