@@ -273,6 +273,26 @@ io.on('connection', (socket) => {
   });
 
   /**
+   * Handle user recoloring.
+   */
+  socket.on('user-recolor', (data, callback) => {
+    const { color } = data || {};
+    if (!color || typeof color !== 'string' || !color.trim()) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Color is required' });
+      return;
+    }
+
+    const updatedUser = registry.recolorUser(socket.id, color.trim());
+    if (updatedUser) {
+      const room = socket.room || DEFAULT_ROOM;
+      io.to(room).emit('user-recolored', { userId: socket.id, color: updatedUser.color });
+      if (typeof callback === 'function') callback({ success: true, user: updatedUser });
+    } else {
+      if (typeof callback === 'function') callback({ success: false, error: 'User not found' });
+    }
+  });
+
+  /**
    * Handle user tab switching.
    */
   socket.on('tab-switch', (data, callback) => {

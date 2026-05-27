@@ -328,6 +328,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
   const rendererRef = useRef(null);
   const frameRequestRef = useRef(null);
   const rollTickRef = useRef(0);
+  const lastFrameTimeRef = useRef(0);
 
   function spawnDiceGroup(roll) {
     const scene = sceneRef.current;
@@ -773,7 +774,18 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
   };
 
   // Update & Render loop
-  const tick = () => {
+  const tick = (now) => {
+    const timestamp = now || performance.now();
+    if (!lastFrameTimeRef.current) {
+      lastFrameTimeRef.current = timestamp;
+    }
+    let dt = (timestamp - lastFrameTimeRef.current) / 16.6667;
+    lastFrameTimeRef.current = timestamp;
+
+    // Cap dt to prevent massive physics jumps on extreme lag spikes or backgrounding
+    if (dt > 4.0) dt = 4.0;
+    if (dt < 0) dt = 0;
+
     rollTickRef.current = (rollTickRef.current + 1) % 1000;
     
     const width = window.innerWidth;
@@ -791,13 +803,13 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
       const dragFactor = p.type === 'ring' ? 1.0 : 0.96;
       return {
         ...p,
-        x: p.x + p.vx,
-        y: p.y + p.vy,
-        vx: p.vx * dragFactor,
-        vy: (p.vy + gravityBias) * dragFactor,
-        radius: p.type === 'ring' ? p.radius + (p.growSpeed || 0) : p.radius,
+        x: p.x + p.vx * dt,
+        y: p.y + p.vy * dt,
+        vx: p.vx * Math.pow(dragFactor, dt),
+        vy: (p.vy + gravityBias * dt) * Math.pow(dragFactor, dt),
+        radius: p.type === 'ring' ? p.radius + (p.growSpeed || 0) * dt : p.radius,
         alpha: 1.0 - (p.life / p.maxLife),
-        life: p.life + 1
+        life: p.life + dt
       };
     }).filter(p => p.life < p.maxLife);
     
@@ -862,7 +874,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
     // 2. Physics updates for dice
     diceDataRef.current = diceDataRef.current.map((d, index) => {
       let { x, y, z, vx, vy, vz, rotation, wx, wy, wz, state, life, hasMaxCelebrated } = d;
-      life += 1;
+      life += dt;
       
       const mesh = sceneDiceRef.current[index];
       const radius = d.radius;
@@ -873,37 +885,37 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
       const bottomLimit = -height / 2 + radius + 180; // Raised bottom limit to prevent clipping behind bottom toolbar
 
       if (state === 'rolling') {
-        x += vx;
-        y += vy;
-        z += vz;
-        vy += gravity; // Pull down
+        x += vx * dt;
+        y += vy * dt;
+        z += vz * dt;
+        vy += gravity * dt; // Pull down
         
-        vx *= drag;
-        vy *= drag;
-        vz *= drag;
+        vx *= Math.pow(drag, dt);
+        vy *= Math.pow(drag, dt);
+        vz *= Math.pow(drag, dt);
         
         // Quaternion rotation accumulation
         const wSpeed = Math.sqrt(wx*wx + wy*wy + wz*wz);
         if (wSpeed > 0.001) {
           const axis = [wx / wSpeed, wy / wSpeed, wz / wSpeed];
-          const deltaQ = qFromAxisAngle(axis, wSpeed);
+          const deltaQ = qFromAxisAngle(axis, wSpeed * dt);
           rotation = qNormalize(qMultiply(rotation, deltaQ));
         }
-        wx *= 0.985;
-        wy *= 0.985;
-        wz *= 0.985;
+        wx *= Math.pow(0.985, dt);
+        wy *= Math.pow(0.985, dt);
+        wz *= Math.pow(0.985, dt);
         
         // Bounce floor (bottomLimit)
         if (y <= bottomLimit) {
           y = bottomLimit;
           vy = -vy * bounce;
-          vx *= 0.85; // slide drag
-          vz *= 0.85;
+          vx *= Math.pow(0.85, dt); // slide drag
+          vz *= Math.pow(0.85, dt);
           
           // Randomize angular momentum slightly on bounce
-          wx += (Math.random() - 0.5) * 0.15;
-          wy += (Math.random() - 0.5) * 0.15;
-          wz += (Math.random() - 0.5) * 0.15;
+          wx += (Math.random() - 0.5) * 0.15 * dt;
+          wy += (Math.random() - 0.5) * 0.15 * dt;
+          wz += (Math.random() - 0.5) * 0.15 * dt;
           
           if (Math.abs(vy) > 1.2) {
             // Map Three.js center-relative coordinates to screen-relative 2D pixel coordinates for particle bursts
@@ -938,27 +950,28 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
         const qTarget = getRotationToAlignNormal(d.targetLocalNormal, targetWorldNormal);
         
         // Smoothly interpolate rotation
-        rotation = qLerp(rotation, qTarget, 0.13);
+        const lerpFactor = 1 - Math.pow(1 - 0.13, dt);
+        rotation = qLerp(rotation, qTarget, lerpFactor);
         
         // Decelerate positions
-        x += vx;
-        y += vy;
-        z += vz;
-        vy += gravity;
+        x += vx * dt;
+        y += vy * dt;
+        z += vz * dt;
+        vy += gravity * dt;
         
         if (y <= bottomLimit) {
           y = bottomLimit;
           vy = -vy * 0.25; // heavy damping
-          vx *= 0.65;
-          vz *= 0.65;
+          vx *= Math.pow(0.65, dt);
+          vz *= Math.pow(0.65, dt);
         }
-        vx *= 0.88;
-        vy *= 0.88;
-        vz *= 0.88;
+        vx *= Math.pow(0.88, dt);
+        vy *= Math.pow(0.88, dt);
+        vz *= Math.pow(0.88, dt);
         
-        wx *= 0.65;
-        wy *= 0.65;
-        wz *= 0.65;
+        wx *= Math.pow(0.65, dt);
+        wy *= Math.pow(0.65, dt);
+        wz *= Math.pow(0.65, dt);
         
         if (life >= d.duration) {
           state = 'settled';
@@ -1061,6 +1074,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
     if (diceDataRef.current.length > 0 && allSettled && allLifeOver && activeParticlesRef.current.length === 0) {
       setIsActive(false);
       diceDataRef.current = [];
+      lastFrameTimeRef.current = 0;
     } else {
       frameRequestRef.current = requestAnimationFrame(tick);
     }
@@ -1069,6 +1083,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
   // Run Tick Loops
   useEffect(() => {
     if (isActive) {
+      lastFrameTimeRef.current = 0; // ensure reset
       frameRequestRef.current = requestAnimationFrame(tick);
     }
     return () => {

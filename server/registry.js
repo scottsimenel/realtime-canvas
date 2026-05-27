@@ -464,6 +464,20 @@ export class CanvasRegistry {
   }
 
   /**
+   * Recolors a user in the registry.
+   * 
+   * @param {string} userId - User's socket ID.
+   * @param {string} newColor - The new color hex code.
+   * @returns {Object|null} The updated user object, or null if not found.
+   */
+  recolorUser(userId, newColor) {
+    const user = this.users.get(userId);
+    if (!user) return null;
+    user.color = newColor;
+    return user;
+  }
+
+  /**
    * Cleans up state when a user disconnects:
    * Removes them from the users list and releases any locks they held across ALL tabs.
    * 

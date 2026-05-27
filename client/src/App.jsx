@@ -948,6 +948,22 @@ export default function App() {
       );
     });
 
+    s.on('user-recolored', ({ userId, color }) => {
+      // Only update local users list and currentUser color if the update is from another user.
+      // For ourselves, we update immediately (optimistically) in handleRecolorUser to prevent input jumping.
+      if (userId !== s.id) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, color } : u))
+        );
+      }
+      setRollHistory((prev) =>
+        prev.map((r) => (r.userId === userId ? { ...r, userColor: color } : r))
+      );
+      setActiveRolls((prev) =>
+        prev.map((r) => (r.userId === userId ? { ...r, userColor: color } : r))
+      );
+    });
+
     s.on('user-left', ({ userId }) => {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       setTabs((prev) =>
@@ -1358,6 +1374,35 @@ export default function App() {
         setNameInput(newName.trim());
       } else {
         alert(res?.error || 'Failed to rename user.');
+      }
+    });
+  }, []);
+
+  const handleRecolorUser = useCallback((newColor) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+    if (!newColor) return;
+
+    // Optimistically update local states immediately to prevent
+    // input jumping/lag while dragging/using the color picker.
+    setCurrentUser((prev) => (prev ? { ...prev, color: newColor } : null));
+    setUsers((prev) =>
+      prev.map((u) => (u.id === socket.id ? { ...u, color: newColor } : u))
+    );
+    setRollHistory((prev) =>
+      prev.map((r) => (r.userId === socket.id ? { ...r, userColor: newColor } : r))
+    );
+    setActiveRolls((prev) =>
+      prev.map((r) => (r.userId === socket.id ? { ...r, userColor: newColor } : r))
+    );
+    colorRef.current = newColor;
+    setColorInput(newColor);
+
+    socket.emit('user-recolor', { color: newColor }, (res) => {
+      if (res && res.success) {
+        // Already updated optimistically
+      } else {
+        console.error(res?.error || 'Failed to update color.');
       }
     });
   }, []);
@@ -1969,10 +2014,25 @@ export default function App() {
               className="flex items-center justify-between p-3 rounded-xl bg-slate-950/40 border border-slate-900/60 hover:border-slate-800 transition"
             >
               <div className="flex items-center gap-2.5">
-                <span
-                  className="w-3 h-3 rounded-full border border-white/10"
-                  style={{ backgroundColor: user.color }}
-                />
+                {isMe ? (
+                  <div 
+                    className="relative w-3.5 h-3.5 rounded-full border border-white/20 cursor-pointer overflow-hidden group hover:scale-110 active:scale-95 transition shrink-0 shadow-sm" 
+                    style={{ backgroundColor: user.color }} 
+                    title="Change your cursor color"
+                  >
+                    <input
+                      type="color"
+                      value={user.color || '#3b82f6'}
+                      onChange={(e) => handleRecolorUser(e.target.value)}
+                      className="absolute inset-0 w-full h-full p-0 border-0 opacity-0 cursor-pointer"
+                    />
+                  </div>
+                ) : (
+                  <span
+                    className="w-3 h-3 rounded-full border border-white/10 shrink-0"
+                    style={{ backgroundColor: user.color }}
+                  />
+                )}
                 <span className="text-sm font-semibold text-slate-300 truncate max-w-[120px]">
                   {user.name}
                   {isMe && <span className="text-xs font-normal text-slate-500 ml-1">(you)</span>}
@@ -2469,10 +2529,10 @@ export default function App() {
   return (
     <div className={`flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full ${shakeClass}`}>
       {/* Header */}
-      <header className={`transition-all duration-300 ease-in-out overflow-hidden flex items-center justify-between z-10 ${
+      <header className={`transition-all duration-300 ease-in-out flex items-center justify-between z-50 ${
         showHeader
-          ? 'h-16 px-4 sm:px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md opacity-100'
-          : 'h-0 py-0 px-6 border-b-0 opacity-0 pointer-events-none'
+          ? 'h-16 px-4 sm:px-6 border-b border-slate-800/80 bg-slate-900/30 backdrop-blur-md opacity-100 overflow-visible'
+          : 'h-0 py-0 px-6 border-b-0 opacity-0 pointer-events-none overflow-hidden'
       }`}>
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-blue-500/20 shrink-0">
@@ -2524,10 +2584,18 @@ export default function App() {
 
           {/* User profile capsule */}
           <div className="flex items-center gap-2.5 pl-2.5 sm:pl-3 border-l border-slate-800">
-            <span
-              className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0"
+            <div 
+              className="relative w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0 cursor-pointer overflow-hidden group hover:scale-110 active:scale-95 transition" 
               style={{ backgroundColor: currentUser?.color }}
-            />
+              title="Change your cursor color"
+            >
+              <input
+                type="color"
+                value={currentUser?.color || '#3b82f6'}
+                onChange={(e) => handleRecolorUser(e.target.value)}
+                className="absolute inset-0 w-full h-full p-0 border-0 opacity-0 cursor-pointer"
+              />
+            </div>
             {isEditingName ? (
               <input
                 type="text"
@@ -3771,6 +3839,7 @@ export default function App() {
                                     value={r.kept}
                                     size="w-5 h-5"
                                     isKept={true}
+                                    userColor={roll.userColor}
                                   />
                                   {roll.d20.mode !== 'normal' && (
                                     <DieIcon
@@ -3779,6 +3848,7 @@ export default function App() {
                                       size="w-5 h-5"
                                       isKept={false}
                                       isDiscarded={true}
+                                      userColor={roll.userColor}
                                     />
                                   )}
                                 </span>
@@ -3881,6 +3951,7 @@ export default function App() {
                           type={type}
                           value={((rollTick + idx) % type) + 1}
                           size="w-12 h-12"
+                          userColor={roll.userColor}
                         />
                       </div>
                     ))}
