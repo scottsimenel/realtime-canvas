@@ -311,7 +311,7 @@ const createTextTexture = (text) => {
 };
 
 // React Component
-export default function DiceEffects({ activeRolls, onCriticalRoll }) {
+export default function DiceEffects({ activeRolls, onCriticalRoll, diceSizeMultiplier = 1.0 }) {
   const canvasWebGLRef = useRef(null);
   const canvas2dRef = useRef(null);
   
@@ -441,7 +441,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll }) {
       });
       
       // Set physical scale (size in pixels)
-      const radius = diceDef.type === 100 ? 46 : 38;
+      const radius = (diceDef.type === 100 ? 46 : 38) * diceSizeMultiplier;
       dieMesh.scale.setScalar(radius);
       
       // Initial Position (mapped to Pixel coordinate system with 0,0 at screen center)

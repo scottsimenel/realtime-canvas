@@ -697,6 +697,23 @@ export default function App() {
   const [activeRolls, setActiveRolls] = useState([]);
   const [rollHistory, setRollHistory] = useState([]);
   const [enable3dDice, setEnable3dDice] = useState(true);
+  const [diceSizeMultiplier, setDiceSizeMultiplier] = useState(() => {
+    try {
+      const saved = localStorage.getItem('canvas_dice_size_multiplier');
+      return saved !== null ? parseFloat(saved) : 1.0;
+    } catch {
+      return 1.0;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvas_dice_size_multiplier', diceSizeMultiplier.toString());
+    } catch (e) {
+      console.error(e);
+    }
+  }, [diceSizeMultiplier]);
+
   const [rollTick, setRollTick] = useState(0);
   const [hoveredRoll, setHoveredRoll] = useState(null);
   const [isUsersSectionCollapsed, setIsUsersSectionCollapsed] = useState(false);
@@ -3609,19 +3626,39 @@ export default function App() {
           </div>
 
           {/* 3D Dice Toggle */}
-          <div className="flex items-center justify-between bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
-            <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              Enable 3D Dice Roll
-            </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enable3dDice}
-                onChange={(e) => setEnable3dDice(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-350 after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500 peer-checked:after:bg-white"></div>
-            </label>
+          <div className="flex flex-col gap-3 bg-slate-900/40 p-3 rounded-xl border border-slate-800/50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Enable 3D Dice Roll
+              </span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enable3dDice}
+                  onChange={(e) => setEnable3dDice(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-350 after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-500 peer-checked:after:bg-white"></div>
+              </label>
+            </div>
+            
+            {enable3dDice && (
+              <div className="space-y-1.5 border-t border-slate-800/40 pt-2 select-none animate-in slide-in-from-top-2 duration-200">
+                <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <span>3D Dice Size</span>
+                  <span className="text-indigo-400 font-mono">{diceSizeMultiplier.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.5"
+                  step="0.1"
+                  value={diceSizeMultiplier}
+                  onChange={(e) => setDiceSizeMultiplier(parseFloat(e.target.value))}
+                  className="w-full accent-indigo-500 h-1 bg-slate-800 rounded-lg cursor-pointer"
+                />
+              </div>
+            )}
           </div>
 
           {/* d20 Configuration */}
@@ -4178,7 +4215,7 @@ export default function App() {
         </div>
       )}
       {enable3dDice && (
-        <DiceEffects activeRolls={activeRolls} onCriticalRoll={handleCriticalRoll} />
+        <DiceEffects activeRolls={activeRolls} onCriticalRoll={handleCriticalRoll} diceSizeMultiplier={diceSizeMultiplier} />
       )}
     </div>
   );
