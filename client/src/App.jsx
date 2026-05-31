@@ -119,6 +119,7 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedElementIds, setSelectedElementIds] = useState([]);
+  const [history, setHistory] = useState([]);
   const [activeVirtualDimensions, setActiveVirtualDimensions] = useState({ width: 1920, height: 1080 });
 
   // Local states for Transform Inspector inputs to enable smooth multi-selection editing
@@ -663,6 +664,210 @@ export default function App() {
     };
   }, []);
 
+  const handleSwitchTab = useCallback((tabId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    socket.emit('tab-switch', { tabId }, (res) => {
+      if (res && res.success) {
+        setSelectedElementIds([]);
+        setActiveTabId(tabId);
+        setUsers((prev) =>
+          prev.map((u) => (u.id === socket.id ? { ...u, activeTabId: tabId } : u))
+        );
+      }
+    });
+  }, []);
+
+  const pushHistoryAction = useCallback((action) => {
+    setHistory((prev) => {
+      const next = [action, ...prev];
+      if (next.length > 50) {
+        next.pop();
+      }
+      return next;
+    });
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (history.length === 0) return;
+    const action = history[0];
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    const targetTabId = action.tabId || 'tab-default';
+
+    // Auto-switch to the correct tab if necessary
+    if (activeTabIdRef.current !== targetTabId) {
+      handleSwitchTab(targetTabId);
+    }
+
+    switch (action.type) {
+      case 'create': {
+        socket.emit('element-delete', { elementIds: action.elementIds, tabId: targetTabId }, (res) => {
+          if (res && res.success) {
+            setTabs((prev) =>
+              prev.map((t) =>
+                t.id === targetTabId
+                  ? {
+                      ...t,
+                      elements: t.elements.filter((el) => !action.elementIds.includes(el.id)),
+                    }
+                  : t
+              )
+            );
+            setSelectedElementIds((prev) => prev.filter((id) => !action.elementIds.includes(id)));
+          }
+        });
+        break;
+      }
+      case 'delete': {
+        action.elements.forEach((element) => {
+          socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+            if (res && res.success) {
+              setTabs((prev) =>
+                prev.map((t) =>
+                  t.id === targetTabId
+                    ? {
+                        ...t,
+                        elements: [...t.elements.filter((el) => el.id !== element.id), element],
+                      }
+                    : t
+                )
+              );
+            }
+          });
+        });
+        break;
+      }
+      case 'transform': {
+        const batch = action.elementsBefore.map((el) => {
+          return {
+            elementId: el.id,
+            updates: {
+              x: el.x,
+              y: el.y,
+              width: el.width,
+              height: el.height,
+              properties: el.properties,
+            },
+          };
+        });
+        socket.emit('element-update', { batch, tabId: targetTabId }, (res) => {
+          if (res && res.success) {
+            setTabs((prev) =>
+              prev.map((t) =>
+                t.id === targetTabId
+                  ? {
+                      ...t,
+                      elements: t.elements.map((el) => {
+                        const before = action.elementsBefore.find((b) => b.id === el.id);
+                        if (before) {
+                          return JSON.parse(JSON.stringify(before));
+                        }
+                        return el;
+                      }),
+                    }
+                  : t
+              )
+            );
+          }
+        });
+        break;
+      }
+      case 'erase': {
+        const toDeleteIds = action.elementsAfter.map((el) => el.id);
+        socket.emit('element-delete', { elementIds: toDeleteIds, tabId: targetTabId }, (res) => {
+          if (res && res.success) {
+            setTabs((prev) =>
+              prev.map((t) => {
+                if (t.id !== targetTabId) return t;
+                return {
+                  ...t,
+                  elements: t.elements.filter((el) => !toDeleteIds.includes(el.id)),
+                };
+              })
+            );
+
+            action.elementsBefore.forEach((element) => {
+              socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+                if (res && res.success) {
+                  setTabs((prev) =>
+                    prev.map((t) =>
+                      t.id === targetTabId
+                        ? {
+                            ...t,
+                            elements: [...t.elements.filter((el) => el.id !== element.id), element],
+                          }
+                        : t
+                    )
+                  );
+                }
+              });
+            });
+          }
+        });
+        break;
+      }
+      case 'reorder': {
+        socket.emit('elements-reorder', { orderedIds: action.orderedIdsBefore, tabId: targetTabId }, (res) => {
+          if (res && res.success) {
+            setTabs((prev) =>
+              prev.map((t) => {
+                if (t.id !== targetTabId) return t;
+                const elementMap = new Map(t.elements.map((el) => [el.id, el]));
+                const sorted = [];
+                action.orderedIdsBefore.forEach((id) => {
+                  if (elementMap.has(id)) {
+                    sorted.push(elementMap.get(id));
+                  }
+                });
+                t.elements.forEach((el) => {
+                  if (!action.orderedIdsBefore.includes(el.id)) {
+                    sorted.push(el);
+                  }
+                });
+                return {
+                  ...t,
+                  elements: sorted,
+                };
+              })
+            );
+          }
+        });
+        break;
+      }
+      default:
+        console.warn('Unknown undo action type:', action.type);
+    }
+
+    setHistory((prev) => prev.slice(1));
+  }, [history, handleSwitchTab, setSelectedElementIds]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'SELECT' ||
+        document.activeElement?.contentEditable === 'true'
+      ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleUndo]);
+
+
   const adjustElementLayer = useCallback((elementId, direction) => {
     setElements((prev) => {
       const next = [...prev];
@@ -685,9 +890,17 @@ export default function App() {
       if (socket && socket.connected) {
         socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
+
+      pushHistoryAction({
+        type: 'reorder',
+        orderedIdsBefore: prev.map((el) => el.id),
+        orderedIdsAfter: next.map((el) => el.id),
+        tabId: activeTabIdRef.current,
+      });
+
       return next;
     });
-  }, []);
+  }, [setElements, pushHistoryAction]);
 
   const adjustSelectedElementsLayer = useCallback((direction) => {
     if (selectedElementIds.length === 0) return;
@@ -723,9 +936,17 @@ export default function App() {
       if (socket && socket.connected) {
         socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
+
+      pushHistoryAction({
+        type: 'reorder',
+        orderedIdsBefore: prev.map((el) => el.id),
+        orderedIdsAfter: next.map((el) => el.id),
+        tabId: activeTabIdRef.current,
+      });
+
       return next;
     });
-  }, [selectedElementIds]);
+  }, [selectedElementIds, setElements, pushHistoryAction]);
 
   const handleDragStart = useCallback((e, id) => {
     e.dataTransfer.setData('text/plain', id);
@@ -770,9 +991,17 @@ export default function App() {
       if (socket && socket.connected) {
         socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
       }
+
+      pushHistoryAction({
+        type: 'reorder',
+        orderedIdsBefore: prev.map((el) => el.id),
+        orderedIdsAfter: next.map((el) => el.id),
+        tabId: activeTabIdRef.current,
+      });
+
       return next;
     });
-  }, [draggedElementId]);
+  }, [draggedElementId, setElements, pushHistoryAction]);
 
   const handleJoin = useCallback(
     (e) => {
@@ -914,10 +1143,16 @@ export default function App() {
           // Rollback
           setElements((prev) => prev.filter((el) => el.id !== id));
           console.error('Failed to create shape element:', response?.error);
+        } else {
+          pushHistoryAction({
+            type: 'create',
+            elementIds: [id],
+            tabId: activeTabIdRef.current,
+          });
         }
       });
     },
-    []
+    [setElements, pushHistoryAction]
   );
 
   const handleSpawnImage = useCallback(
@@ -949,6 +1184,12 @@ export default function App() {
             // Rollback
             setElements((prev) => prev.filter((el) => el.id !== id));
             console.error('Failed to create image element:', response?.error);
+          } else {
+            pushHistoryAction({
+              type: 'create',
+              elementIds: [id],
+              tabId: activeTabIdRef.current,
+            });
           }
         });
       };
@@ -976,7 +1217,7 @@ export default function App() {
         spawnWithDimensions(Math.round(160 * (150 / 110)), 150);
       };
     },
-    [setElements]
+    [setElements, pushHistoryAction]
   );
 
   const handleImageUpload = useCallback(
@@ -1059,6 +1300,7 @@ export default function App() {
   );
 
   const inspectorLockRef = useRef(false);
+  const originalInspectorElementsRef = useRef([]);
 
   const handleStartInspectorTransform = useCallback(() => {
     const socket = socketRef.current;
@@ -1070,6 +1312,12 @@ export default function App() {
     });
 
     if (unlockedIds.length === 0) return;
+
+    // Clone and record original states of selected elements
+    originalInspectorElementsRef.current = unlockedIds
+      .map((id) => elements.find((item) => item.id === id))
+      .filter(Boolean)
+      .map((el) => JSON.parse(JSON.stringify(el)));
 
     socket.emit('element-lock', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
@@ -1084,7 +1332,7 @@ export default function App() {
         });
       }
     });
-  }, [selectedElementIds, locks, currentUser]);
+  }, [selectedElementIds, locks, currentUser, elements, setLocks]);
 
   const handleEndInspectorTransform = useCallback(() => {
     setIsInspectorFocused(false);
@@ -1100,9 +1348,39 @@ export default function App() {
         });
         return next;
       });
+
+      // Compare final states to original states and record in history if changed
+      if (originalInspectorElementsRef.current.length > 0) {
+        const currentElements = originalInspectorElementsRef.current
+          .map((orig) => elements.find((item) => item.id === orig.id))
+          .filter(Boolean)
+          .map((el) => JSON.parse(JSON.stringify(el)));
+
+        const changed = originalInspectorElementsRef.current.some((before) => {
+          const after = currentElements.find((a) => a.id === before.id);
+          if (!after) return true;
+          return (
+            before.x !== after.x ||
+            before.y !== after.y ||
+            before.width !== after.width ||
+            before.height !== after.height ||
+            (before.properties?.rotation || 0) !== (after.properties?.rotation || 0)
+          );
+        });
+
+        if (changed) {
+          pushHistoryAction({
+            type: 'transform',
+            elementsBefore: originalInspectorElementsRef.current,
+            elementsAfter: currentElements,
+            tabId: activeTabIdRef.current,
+          });
+        }
+      }
     }
     inspectorLockRef.current = false;
-  }, [selectedElementIds, locks, currentUser]);
+    originalInspectorElementsRef.current = [];
+  }, [selectedElementIds, locks, currentUser, elements, pushHistoryAction, setLocks]);
 
   const handleInspectorChange = useCallback(
     (updatesMap) => {
@@ -1140,7 +1418,7 @@ export default function App() {
 
       socket.emit('element-update', { batch, tabId: activeTabIdRef.current });
     },
-    [selectedElementIds, elements, locks, currentUser]
+    [selectedElementIds, elements, locks, currentUser, setElements]
   );
 
   const handleToggleSelectionLock = useCallback((elementId) => {
@@ -1197,13 +1475,23 @@ export default function App() {
 
     if (unlockedIds.length === 0) return;
 
+    const elementsToDelete = unlockedIds
+      .map((id) => elements.find((item) => item.id === id))
+      .filter(Boolean)
+      .map((el) => JSON.parse(JSON.stringify(el)));
+
     socket.emit('element-delete', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
         setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
         setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
+        pushHistoryAction({
+          type: 'delete',
+          elements: elementsToDelete,
+          tabId: activeTabIdRef.current,
+        });
       }
     });
-  }, [selectedElementIds, elements, locks, currentUser]);
+  }, [selectedElementIds, elements, locks, currentUser, pushHistoryAction, setElements, setSelectedElementIds]);
 
   const handleClearDrawings = useCallback(() => {
     const drawingElementIds = elements
@@ -1221,14 +1509,24 @@ export default function App() {
 
       if (unlockableDrawingIds.length === 0) return;
 
+      const elementsToDelete = unlockableDrawingIds
+        .map((id) => elements.find((item) => item.id === id))
+        .filter(Boolean)
+        .map((el) => JSON.parse(JSON.stringify(el)));
+
       socket.emit('element-delete', { elementIds: unlockableDrawingIds, tabId: activeTabIdRef.current }, (res) => {
         if (res && res.success) {
           setElements((prev) => prev.filter((el) => !unlockableDrawingIds.includes(el.id)));
           setSelectedElementIds((prev) => prev.filter((id) => !unlockableDrawingIds.includes(id)));
+          pushHistoryAction({
+            type: 'delete',
+            elements: elementsToDelete,
+            tabId: activeTabIdRef.current,
+          });
         }
       });
     }
-  }, [elements, locks, currentUser, setSelectedElementIds]);
+  }, [elements, locks, currentUser, setSelectedElementIds, pushHistoryAction, setElements]);
 
   const handleRollDice = useCallback(() => {
     const socket = socketRef.current;
@@ -1275,20 +1573,8 @@ export default function App() {
     }
   }, []);
 
-  const handleSwitchTab = useCallback((tabId) => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
 
-    socket.emit('tab-switch', { tabId }, (res) => {
-      if (res && res.success) {
-        setSelectedElementIds([]);
-        setActiveTabId(tabId);
-        setUsers((prev) =>
-          prev.map((u) => (u.id === socket.id ? { ...u, activeTabId: tabId } : u))
-        );
-      }
-    });
-  }, []);
+
 
   const handleCreateTab = useCallback(() => {
     const socket = socketRef.current;
@@ -1381,6 +1667,8 @@ export default function App() {
         tabs={tabs}
         handleRecolorUser={handleRecolorUser}
         handleRenameUser={handleRenameUser}
+        handleUndo={handleUndo}
+        undoDisabled={history.length === 0}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -1706,6 +1994,7 @@ export default function App() {
               onVirtualDimensionsChange={setActiveVirtualDimensions}
               showCursorNames={showCursorNames}
               onCanvasInteraction={handleCanvasInteraction}
+              pushHistoryAction={pushHistoryAction}
             />
           </div>
         </main>
@@ -1745,6 +2034,7 @@ export default function App() {
           handleDragEnd={handleDragEnd}
           handleDrop={handleDrop}
           socketRef={socketRef}
+          pushHistoryAction={pushHistoryAction}
         />
       </div>
 

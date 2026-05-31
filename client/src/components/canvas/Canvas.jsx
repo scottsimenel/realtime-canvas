@@ -19,6 +19,25 @@ import {
   drawDragSelectBox
 } from './CanvasRenderer.js';
 
+const hasElementsChanged = (before, after) => {
+  if (before.length !== after.length) return true;
+  for (let i = 0; i < before.length; i++) {
+    const b = before[i];
+    const a = after.find((item) => item.id === b.id);
+    if (!a) return true;
+    if (
+      b.x !== a.x ||
+      b.y !== a.y ||
+      b.width !== a.width ||
+      b.height !== a.height ||
+      (b.properties?.rotation || 0) !== (a.properties?.rotation || 0)
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export default function Canvas({
   socketRef,
   elements,
@@ -38,6 +57,7 @@ export default function Canvas({
   onVirtualDimensionsChange,
   showCursorNames = true,
   onCanvasInteraction,
+  pushHistoryAction,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -290,10 +310,22 @@ export default function Canvas({
 
           if (unlockedIds.length === 0) return;
 
+          const deletedElements = unlockedIds
+            .map((id) => elements.find((el) => el.id === id))
+            .filter(Boolean)
+            .map((el) => JSON.parse(JSON.stringify(el)));
+
           socket.emit('element-delete', { elementIds: unlockedIds, tabId }, (response) => {
             if (response && response.success) {
               setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
               setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
+              if (pushHistoryAction) {
+                pushHistoryAction({
+                  type: 'delete',
+                  elements: deletedElements,
+                  tabId,
+                });
+              }
             }
           });
         }
@@ -302,7 +334,7 @@ export default function Canvas({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedElementIds, elements, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId]);
+  }, [selectedElementIds, elements, locks, currentUser, socketRef, setElements, setSelectedElementIds, tabId, pushHistoryAction]);
 
   // Spacebar panning key listeners
   useEffect(() => {
@@ -556,8 +588,16 @@ export default function Canvas({
     }
 
     if (activeTool === 'eraser') {
+      const deletedIds = [];
+      const createdElements = [];
+
       dragStateRef.current = {
         mode: 'erase',
+        deletedIds,
+        createdElements,
+        originalElementsMap: new Map(
+          elements.filter((el) => el.type === 'path').map((el) => [el.id, JSON.parse(JSON.stringify(el))])
+        ),
       };
       eraserHoverRef.current = coords;
 
@@ -595,6 +635,9 @@ export default function Canvas({
             toCreateElements.forEach((newEl) => {
               socket.emit('element-create', { element: newEl, tabId });
             });
+
+            deletedIds.push(...toDeleteIds);
+            createdElements.push(...toCreateElements);
           }
         }
       }
@@ -615,6 +658,10 @@ export default function Canvas({
             initialMouseY: coords.y,
             initialElements: elements.map(el => ({ ...el, properties: { ...el.properties } })),
             lockedIds: [],
+            originalElements: selectedElementIds
+              .map((id) => elements.find((el) => el.id === id))
+              .filter(Boolean)
+              .map((el) => JSON.parse(JSON.stringify(el))),
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
@@ -659,6 +706,7 @@ export default function Canvas({
               initialMouseY: coords.y,
               aspectRatio: activeElement.width / activeElement.height,
               hasLock: false,
+              originalElements: [JSON.parse(JSON.stringify(activeElement))],
             };
 
             socket.emit('element-lock', { elementId: activeElement.id, tabId }, (response) => {
@@ -704,6 +752,10 @@ export default function Canvas({
             offsetY: coords.y,
             initialElements: elements.map(el => ({ ...el, properties: { ...el.properties } })),
             lockedIds: [],
+            originalElements: selectedElementIds
+              .map((id) => elements.find((el) => el.id === id))
+              .filter(Boolean)
+              .map((el) => JSON.parse(JSON.stringify(el))),
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
@@ -733,6 +785,7 @@ export default function Canvas({
         offsetX: coords.x - element.x,
         offsetY: coords.y - element.y,
         hasLock: false,
+        originalElements: [JSON.parse(JSON.stringify(element))],
       };
 
       socket.emit('element-lock', { elementId: element.id, tabId }, (response) => {
@@ -823,6 +876,11 @@ export default function Canvas({
                 toCreateElements.forEach((newEl) => {
                   socket.emit('element-create', { element: newEl, tabId });
                 });
+              }
+
+              if (dragStateRef.current && dragStateRef.current.mode === 'erase') {
+                dragStateRef.current.deletedIds.push(...toDeleteIds);
+                dragStateRef.current.createdElements.push(...toCreateElements);
               }
             }
           }
@@ -1118,6 +1176,14 @@ export default function Canvas({
           if (socket && socket.connected) {
             socket.emit('element-create', { element, tabId });
           }
+
+          if (pushHistoryAction) {
+            pushHistoryAction({
+              type: 'create',
+              elementIds: [element.id],
+              tabId,
+            });
+          }
         }
         tempDrawingPathRef.current = null;
         dragStateRef.current = null;
@@ -1126,6 +1192,20 @@ export default function Canvas({
       }
 
       if (drag.mode === 'erase') {
+        if (pushHistoryAction && drag.deletedIds && drag.deletedIds.length > 0) {
+          const elementsBefore = drag.deletedIds
+            .map((id) => drag.originalElementsMap.get(id))
+            .filter(Boolean);
+          const elementsAfter = drag.createdElements.filter((el) =>
+            elements.some((currentEl) => currentEl.id === el.id)
+          );
+          pushHistoryAction({
+            type: 'erase',
+            elementsBefore,
+            elementsAfter,
+            tabId,
+          });
+        }
         dragStateRef.current = null;
         triggerRedraw();
         return;
@@ -1185,9 +1265,26 @@ export default function Canvas({
             return next;
           });
         }
-      } else if (drag.hasLock) {
+
+        if (pushHistoryAction && drag.originalElements) {
+          const affectedIds = drag.originalElements.map((el) => el.id);
+          const currentElements = affectedIds
+            .map((id) => elements.find((el) => el.id === id))
+            .filter(Boolean)
+            .map((el) => JSON.parse(JSON.stringify(el)));
+
+          if (hasElementsChanged(drag.originalElements, currentElements)) {
+            pushHistoryAction({
+              type: 'transform',
+              elementsBefore: drag.originalElements,
+              elementsAfter: currentElements,
+              tabId,
+            });
+          }
+        }
+      } else if (drag.hasLock || drag.mode === 'move') {
         const socket = socketRef.current;
-        if (socket && socket.connected) {
+        if (socket && socket.connected && drag.hasLock) {
           socket.emit('element-unlock', { elementId: drag.elementId, tabId });
         }
         setLocks((prev) => {
@@ -1195,6 +1292,21 @@ export default function Canvas({
           delete next[drag.elementId];
           return next;
         });
+
+        if (pushHistoryAction && drag.originalElements) {
+          const currentElement = elements.find((el) => el.id === drag.elementId);
+          if (currentElement) {
+            const elCopy = JSON.parse(JSON.stringify(currentElement));
+            if (hasElementsChanged(drag.originalElements, [elCopy])) {
+              pushHistoryAction({
+                type: 'transform',
+                elementsBefore: drag.originalElements,
+                elementsAfter: [elCopy],
+                tabId,
+              });
+            }
+          }
+        }
       }
       dragStateRef.current = null;
       triggerRedraw();

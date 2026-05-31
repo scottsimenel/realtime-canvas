@@ -10,6 +10,8 @@ export default function Header({
   tabs,
   handleRecolorUser,
   handleRenameUser,
+  handleUndo,
+  undoDisabled,
 }) {
   const [showUsersPopover, setShowUsersPopover] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -35,7 +37,22 @@ export default function Header({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-5">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Undo button */}
+        <button
+          onClick={handleUndo}
+          disabled={undoDisabled}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
+            undoDisabled
+              ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
+              : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
+          }`}
+          title="Undo last action (Ctrl+Z)"
+        >
+          <span className="text-xs">↩️</span>
+          <span>Undo</span>
+        </button>
+
         {/* Connection status badge */}
         <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs">
           <span
@@ -104,7 +121,7 @@ export default function Header({
                 if (e.key === 'Enter') {
                   setIsEditingName(false);
                   if (tempName.trim() && tempName.trim() !== currentUser?.name) {
-                    handleRenameUser(tempName.trim());
+                     handleRenameUser(tempName.trim());
                   }
                 } else if (e.key === 'Escape') {
                   setIsEditingName(false);

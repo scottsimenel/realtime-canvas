@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   qMultiply,
@@ -61,7 +61,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll, diceSizeMulti
   const rollTickRef = useRef(0);
   const lastFrameTimeRef = useRef(0);
 
-  function spawnDiceGroup(roll) {
+  const spawnDiceGroup = useCallback((roll) => {
     const scene = sceneRef.current;
     if (!scene) return;
     
@@ -224,7 +224,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll, diceSizeMulti
     
     diceDataRef.current = [...diceDataRef.current, ...newDiceData];
     sceneDiceRef.current = [...sceneDiceRef.current, ...newMeshes];
-  }
+  }, [diceSizeMultiplier]);
 
   // 1. Listen for new rolls
   useEffect(() => {
@@ -240,7 +240,7 @@ export default function DiceEffects({ activeRolls, onCriticalRoll, diceSizeMulti
     setTimeout(() => {
       spawnDiceGroup(latestRoll);
     }, 50);
-  }, [activeRolls]);
+  }, [activeRolls, spawnDiceGroup]);
 
   // 2. Setup Three.js Context
   useEffect(() => {
