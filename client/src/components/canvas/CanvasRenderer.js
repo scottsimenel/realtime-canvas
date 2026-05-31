@@ -442,7 +442,11 @@ export const drawMeasurementRule = (ctx, measurePoints, roomSettings, scale) => 
   // Grid settings
   const gridSize = roomSettings?.gridSize || 40;
   const gridType = roomSettings?.gridType || 'square';
-  const gridScaleNumber = roomSettings?.gridScaleNumber !== undefined ? roomSettings.gridScaleNumber : 5;
+  const rawScale = roomSettings?.gridScaleNumber;
+  const parsedScale = parseFloat(rawScale);
+  const gridScaleNumber = (rawScale === undefined || rawScale === null)
+    ? 5
+    : (isNaN(parsedScale) ? 0 : parsedScale);
   const gridScaleUnit = roomSettings?.gridScaleUnit || 'ft';
 
   // Spacing unit: Hex columns spacing is staggered, row spacing is sqrt(3)*R.

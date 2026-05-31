@@ -598,15 +598,21 @@ export default function LeftSidebar({
                       <div className="flex-1 flex items-center gap-1.5 rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80">
                         <span className="text-slate-500 text-xs select-none">1 space =</span>
                         <input
-                          type="number"
+                          type="text"
                           value={roomSettings.gridScaleNumber !== undefined ? roomSettings.gridScaleNumber : 5}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            handleUpdateRoomSettings({ gridScaleNumber: isNaN(val) ? 0 : val });
+                            const val = e.target.value;
+                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                              handleUpdateRoomSettings({ gridScaleNumber: val });
+                            }
                           }}
-                          className="w-12 bg-transparent text-white text-xs font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          min="0.1"
-                          step="0.5"
+                          onBlur={(e) => {
+                            if (e.target.value.trim() === '') {
+                              handleUpdateRoomSettings({ gridScaleNumber: 5 });
+                            }
+                          }}
+                          className="w-12 bg-transparent text-white text-xs font-medium focus:outline-none"
+                          placeholder="5"
                         />
                       </div>
                       <div className="w-20 rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80">
