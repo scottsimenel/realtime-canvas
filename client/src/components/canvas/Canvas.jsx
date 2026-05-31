@@ -1180,7 +1180,7 @@ export default function Canvas({
           if (pushHistoryAction) {
             pushHistoryAction({
               type: 'create',
-              elementIds: [element.id],
+              elements: [element],
               tabId,
             });
           }

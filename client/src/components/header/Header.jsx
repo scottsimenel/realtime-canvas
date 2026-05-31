@@ -12,6 +12,8 @@ export default function Header({
   handleRenameUser,
   handleUndo,
   undoDisabled,
+  handleRedo,
+  redoDisabled,
 }) {
   const [showUsersPopover, setShowUsersPopover] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -38,20 +40,38 @@ export default function Header({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Undo button */}
-        <button
-          onClick={handleUndo}
-          disabled={undoDisabled}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
-            undoDisabled
-              ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
-              : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
-          }`}
-          title="Undo last action (Ctrl+Z)"
-        >
-          <span className="text-xs">↩️</span>
-          <span>Undo</span>
-        </button>
+        {/* Undo / Redo Actions Group */}
+        <div className="flex items-center gap-1.5">
+          {/* Undo button */}
+          <button
+            onClick={handleUndo}
+            disabled={undoDisabled}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
+              undoDisabled
+                ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
+                : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
+            }`}
+            title="Undo last action (Ctrl+Z)"
+          >
+            <span className="text-xs">↩️</span>
+            <span>Undo</span>
+          </button>
+
+          {/* Redo button */}
+          <button
+            onClick={handleRedo}
+            disabled={redoDisabled}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
+              redoDisabled
+                ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
+                : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
+            }`}
+            title="Redo last action (Ctrl+Shift+Z)"
+          >
+            <span className="text-xs">↪️</span>
+            <span>Redo</span>
+          </button>
+        </div>
 
         {/* Connection status badge */}
         <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs">
