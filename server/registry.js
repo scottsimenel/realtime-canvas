@@ -77,6 +77,15 @@ export class CanvasRegistry {
   }
 
   /**
+   * Retrieves a valid fallback tab ID from the registry.
+   * 
+   * @returns {string} The first available tab ID, or 'tab-default' if empty.
+   */
+  getFallbackTabId() {
+    return this.tabs.keys().next().value || 'tab-default';
+  }
+
+  /**
    * Registers a user joining the room.
    * 
    * @param {string} userId - The socket ID of the user.
@@ -85,13 +94,14 @@ export class CanvasRegistry {
    * @returns {{ users: User[], assets: Object[], tabs: Object[], activeTabId: string }} The current state of the room.
    */
   joinRoom(userId, name, color) {
+    const fallbackTabId = this.getFallbackTabId();
     const user = {
       id: userId,
       name: name || `User_${userId.substring(0, 4)}`,
       color: color || '#000000',
       x: 0,
       y: 0,
-      activeTabId: 'tab-default'
+      activeTabId: fallbackTabId
     };
     this.users.set(userId, user);
 
@@ -108,7 +118,7 @@ export class CanvasRegistry {
       users: Array.from(this.users.values()),
       assets: Array.from(this.assets.values()),
       tabs: tabsList,
-      activeTabId: 'tab-default'
+      activeTabId: fallbackTabId
     };
   }
 
