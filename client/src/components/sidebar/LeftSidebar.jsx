@@ -535,6 +535,25 @@ export default function LeftSidebar({
 
               {roomSettings.showGrid && (
                 <div className="space-y-3 animate-in fade-in duration-200">
+                  {/* Grid Snapping */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Grid Snapping</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateRoomSettings({ gridSnapping: !roomSettings.gridSnapping })}
+                      className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none cursor-pointer ${
+                        roomSettings.gridSnapping ? 'bg-sky-500' : 'bg-slate-800'
+                      }`}
+                      title="Toggle Grid Snapping"
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+                          roomSettings.gridSnapping ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
                   {/* Grid Type */}
                   <div className="space-y-1.5">
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Pattern Variant</span>

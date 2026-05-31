@@ -186,6 +186,37 @@ export default function InspectorWidget({
           </div>
         </div>
 
+        {/* Snapping Control */}
+        <div className="flex items-center justify-between border-t border-slate-800/85 pt-3 select-none">
+          <div className="flex flex-col gap-0.5 text-left">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Snap to Grid
+            </span>
+            <span className="text-[9px] text-slate-500">
+              Align center to nearest grid center
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const currentSnap = selectedEl.properties?.snapToGrid !== false;
+              handleInspectorChange({
+                properties: {
+                  snapToGrid: !currentSnap
+                }
+              });
+            }}
+            className={`w-10 h-6.5 rounded-full p-1 border transition-colors duration-200 cursor-pointer flex items-center ${
+              selectedEl.properties?.snapToGrid !== false
+                ? 'bg-sky-500 border-sky-600 justify-end'
+                : 'bg-slate-950/80 border-slate-800 justify-start'
+            }`}
+            title="Toggle snapping to grid for selected element"
+          >
+            <span className="w-4.5 h-4.5 rounded-full shadow-md bg-white" />
+          </button>
+        </div>
+
         {/* Layer Order Controls */}
         <div className="border-t border-slate-800/85 pt-3 space-y-2">
           <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider select-none">

@@ -19,6 +19,47 @@ import {
   drawDragSelectBox
 } from './CanvasRenderer.js';
 
+const getSnappedCenter = (cx, cy, gridType, gridSize) => {
+  if (gridType === 'hexagon') {
+    const R = gridSize;
+    const hSpacing = 1.5 * R;
+    const vSpacing = Math.sqrt(3) * R;
+
+    const approxCol = Math.round(cx / hSpacing);
+    
+    let minDistance = Infinity;
+    let snapCx = cx;
+    let snapCy = cy;
+
+    for (let dCol = -2; dCol <= 2; dCol++) {
+      const col = approxCol + dCol;
+      if (col < 0) continue;
+      const tcx = col * hSpacing;
+      const isOdd = Math.abs(col) % 2 === 1;
+      const yOffset = isOdd ? vSpacing / 2 : 0;
+      
+      const approxRow = Math.round((cy - yOffset) / vSpacing);
+      for (let dRow = -2; dRow <= 2; dRow++) {
+        const row = approxRow + dRow;
+        if (row < 0) continue;
+        const tcy = row * vSpacing + yOffset;
+        
+        const dist = Math.hypot(cx - tcx, cy - tcy);
+        if (dist < minDistance) {
+          minDistance = dist;
+          snapCx = tcx;
+          snapCy = tcy;
+        }
+      }
+    }
+    return { x: snapCx, y: snapCy };
+  } else {
+    const snapCx = Math.round((cx - gridSize / 2) / gridSize) * gridSize + gridSize / 2;
+    const snapCy = Math.round((cy - gridSize / 2) / gridSize) * gridSize + gridSize / 2;
+    return { x: snapCx, y: snapCy };
+  }
+};
+
 const hasElementsChanged = (before, after) => {
   if (before.length !== after.length) return true;
   for (let i = 0; i < before.length; i++) {
@@ -901,6 +942,24 @@ export default function Canvas({
         const dx = Math.round(coords.x - drag.offsetX);
         const dy = Math.round(coords.y - drag.offsetY);
 
+        let finalDx = dx;
+        let finalDy = dy;
+
+        const globalGridSnapping = roomSettings?.gridSnapping === true;
+        const showGrid = roomSettings?.showGrid === true;
+        
+        const primaryEl = drag.initialElements.find(item => item.id === drag.elementId);
+        if (primaryEl && globalGridSnapping && primaryEl.properties?.snapToGrid !== false && showGrid) {
+          const w = primaryEl.width;
+          const h = primaryEl.height;
+          const cx = primaryEl.x + dx + w / 2;
+          const cy = primaryEl.y + dy + h / 2;
+          const snapped = getSnappedCenter(cx, cy, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40);
+          
+          finalDx = Math.round(snapped.x - w / 2 - primaryEl.x);
+          finalDy = Math.round(snapped.y - h / 2 - primaryEl.y);
+        }
+
         const activeIds = drag.lockedIds.length > 0
           ? drag.lockedIds
           : selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
@@ -911,8 +970,8 @@ export default function Canvas({
           return {
             elementId: id,
             updates: {
-              x: initEl.x + dx,
-              y: initEl.y + dy,
+              x: initEl.x + finalDx,
+              y: initEl.y + finalDy,
             }
           };
         }).filter(Boolean);
@@ -1023,8 +1082,23 @@ export default function Canvas({
         let updates = {};
 
         if (drag.mode === 'move') {
-          const newX = Math.round(coords.x - drag.offsetX);
-          const newY = Math.round(coords.y - drag.offsetY);
+          let newX = Math.round(coords.x - drag.offsetX);
+          let newY = Math.round(coords.y - drag.offsetY);
+
+          const globalGridSnapping = roomSettings?.gridSnapping === true;
+          const showGrid = roomSettings?.showGrid === true;
+          const isSnapEnabled = globalGridSnapping && (element.properties?.snapToGrid !== false);
+
+          if (isSnapEnabled && showGrid) {
+            const w = element.width;
+            const h = element.height;
+            const cx = newX + w / 2;
+            const cy = newY + h / 2;
+            const snapped = getSnappedCenter(cx, cy, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40);
+            newX = Math.round(snapped.x - w / 2);
+            newY = Math.round(snapped.y - h / 2);
+          }
+
           updates = { x: newX, y: newY };
         } else if (drag.mode === 'rotate') {
           const cx = drag.initialX + drag.initialWidth / 2;
