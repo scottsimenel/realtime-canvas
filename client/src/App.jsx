@@ -30,6 +30,8 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
   const socketRef = useRef(null);
+  const clipboardRef = useRef([]);
+  const pasteOffsetRef = useRef(20);
 
   // Setup refs for socket event handlers to access latest state
   const nameRef = useRef('');
@@ -1040,6 +1042,87 @@ export default function App() {
     setRedoStack((prev) => prev.slice(1));
   }, [redoStack, handleSwitchTab, setSelectedElementIds]);
 
+  const handleCopy = useCallback(() => {
+    if (selectedElementIds.length === 0) return;
+    const elementsToCopy = selectedElementIds
+      .map((id) => elements.find((item) => item.id === id))
+      .filter(Boolean)
+      .map((el) => JSON.parse(JSON.stringify(el)));
+
+    clipboardRef.current = elementsToCopy;
+    pasteOffsetRef.current = 20;
+  }, [selectedElementIds, elements]);
+
+  const handleCut = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected || selectedElementIds.length === 0) return;
+
+    const unlockedIds = selectedElementIds.filter((id) => {
+      const el = elements.find((item) => item.id === id);
+      if (!el || el.properties?.locked) return false;
+      const lockHolderId = locks[id];
+      return !lockHolderId || lockHolderId === currentUser?.id;
+    });
+
+    if (unlockedIds.length === 0) return;
+
+    const elementsToCut = unlockedIds
+      .map((id) => elements.find((item) => item.id === id))
+      .filter(Boolean)
+      .map((el) => JSON.parse(JSON.stringify(el)));
+
+    clipboardRef.current = elementsToCut;
+    pasteOffsetRef.current = 20;
+
+    socket.emit('element-delete', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
+      if (res && res.success) {
+        setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
+        setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
+        pushHistoryAction({
+          type: 'delete',
+          elements: elementsToCut,
+          tabId: activeTabIdRef.current,
+        });
+      }
+    });
+  }, [selectedElementIds, elements, locks, currentUser, pushHistoryAction, setElements, setSelectedElementIds]);
+
+  const handlePaste = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected || clipboardRef.current.length === 0) return;
+
+    const offset = pasteOffsetRef.current;
+    pasteOffsetRef.current += 20;
+
+    const newElements = clipboardRef.current.map((el) => {
+      const cloned = JSON.parse(JSON.stringify(el));
+      cloned.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}_${cloned.id.substring(3, 8)}`;
+      cloned.x += offset;
+      cloned.y += offset;
+      if (cloned.properties) {
+        delete cloned.properties.locked;
+      }
+      return cloned;
+    });
+
+    setElements((prev) => [...prev, ...newElements]);
+    setSelectedElementIds(newElements.map((el) => el.id));
+
+    newElements.forEach((element) => {
+      socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (res) => {
+        if (!res || !res.success) {
+          console.error('Failed to create pasted element:', res?.error);
+        }
+      });
+    });
+
+    pushHistoryAction({
+      type: 'create',
+      elements: newElements,
+      tabId: activeTabIdRef.current,
+    });
+  }, [setElements, setSelectedElementIds, pushHistoryAction]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (
@@ -1061,6 +1144,15 @@ export default function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        handleCopy();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+        e.preventDefault();
+        handleCut();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        handlePaste();
       }
     };
 
@@ -1068,7 +1160,7 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, handleCopy, handleCut, handlePaste]);
 
   const fetchSaves = useCallback(() => {
     const socket = socketRef.current;
