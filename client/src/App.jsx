@@ -1134,23 +1134,23 @@ export default function App() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
           handleRedo();
         } else {
           handleUndo();
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         handleRedo();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         handleCopy();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
         e.preventDefault();
         handleCut();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault();
         handlePaste();
       }
