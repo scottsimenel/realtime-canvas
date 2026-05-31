@@ -789,6 +789,7 @@ export default function Canvas({
           dragStateRef.current = {
             mode: 'group-move',
             bbox,
+            elementId: element.id,
             offsetX: coords.x,
             offsetY: coords.y,
             initialElements: elements.map(el => ({ ...el, properties: { ...el.properties } })),

@@ -67,6 +67,7 @@ export class CanvasRegistry {
         backgroundImageUrl: null,
         showBackground: true,
         showGrid: true,
+        gridSnapping: false,
         gridType: 'square', // 'square', 'hexagon'
         gridSize: 40, // spacing/radius range 15 to 150
         customBackgroundWidth: null,
@@ -128,6 +129,7 @@ export class CanvasRegistry {
         backgroundImageUrl: null,
         showBackground: true,
         showGrid: true,
+        gridSnapping: false,
         gridType: 'square',
         gridSize: 40,
         customBackgroundWidth: null,
@@ -217,6 +219,7 @@ export class CanvasRegistry {
     if (updates.backgroundImageUrl !== undefined) settings.backgroundImageUrl = updates.backgroundImageUrl;
     if (updates.showBackground !== undefined) settings.showBackground = updates.showBackground;
     if (updates.showGrid !== undefined) settings.showGrid = updates.showGrid;
+    if (updates.gridSnapping !== undefined) settings.gridSnapping = updates.gridSnapping;
     if (updates.gridType !== undefined) settings.gridType = updates.gridType;
     if (updates.gridSize !== undefined) settings.gridSize = updates.gridSize;
     if (updates.customBackgroundWidth !== undefined) settings.customBackgroundWidth = updates.customBackgroundWidth;
@@ -645,6 +648,7 @@ export class CanvasRegistry {
             backgroundImageUrl: null,
             showBackground: true,
             showGrid: true,
+            gridSnapping: false,
             gridType: 'square',
             gridSize: 40,
             customBackgroundWidth: null,
