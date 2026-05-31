@@ -14,6 +14,7 @@ export default function Header({
   undoDisabled,
   handleRedo,
   redoDisabled,
+  onOpenSaves,
 }) {
   const [showUsersPopover, setShowUsersPopover] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -70,6 +71,16 @@ export default function Header({
           >
             <span className="text-xs">↪️</span>
             <span>Redo</span>
+          </button>
+
+          {/* Saves button */}
+          <button
+            onClick={onOpenSaves}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md"
+            title="Manage saved states"
+          >
+            <span className="text-xs">💾</span>
+            <span>Saves</span>
           </button>
         </div>
 

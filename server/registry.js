@@ -1,3 +1,11 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const savesDir = path.join(__dirname, 'saves');
+
 /**
  * @typedef {Object} User
  * @property {string} id - The unique socket ID of the user.
@@ -25,6 +33,11 @@
  */
 export class CanvasRegistry {
   constructor() {
+    // Ensure saves directory exists
+    if (!fs.existsSync(savesDir)) {
+      fs.mkdirSync(savesDir, { recursive: true });
+    }
+
     /**
      * Map of active users, keyed by their socket ID.
      * @type {Map<string, User>}
@@ -526,5 +539,164 @@ export class CanvasRegistry {
 
     tab.elements = newElements;
     return Array.from(tab.elements.keys());
+  }
+
+  /**
+   * Saves the current canvas state to a JSON file.
+   * 
+   * @param {string} name - Name of the save.
+   * @param {string} [customId] - Optional custom ID (e.g. 'autosave').
+   * @returns {Object} The save metadata.
+   */
+  saveState(name, customId) {
+    const timestamp = new Date().toISOString();
+    const saveId = customId || `save_${Date.now()}`;
+    
+    // Map tabs to serializable structures
+    const serializedTabs = Array.from(this.tabs.values()).map(tab => ({
+      id: tab.id,
+      name: tab.name,
+      elements: Array.from(tab.elements.values()),
+      roomSettings: tab.roomSettings
+    }));
+    
+    const saveContent = {
+      id: saveId,
+      name: name || `Save - ${new Date().toLocaleString()}`,
+      timestamp,
+      tabs: serializedTabs,
+      assets: Array.from(this.assets.values())
+    };
+    
+    const filePath = path.join(savesDir, `${saveId}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(saveContent, null, 2), 'utf-8');
+    
+    return {
+      id: saveId,
+      name: saveContent.name,
+      timestamp
+    };
+  }
+
+  /**
+   * Lists all available saves sorted by timestamp descending.
+   * 
+   * @returns {Array<{ id: string, name: string, timestamp: string }>} List of save metadata.
+   */
+  listSaves() {
+    if (!fs.existsSync(savesDir)) return [];
+    
+    try {
+      const files = fs.readdirSync(savesDir);
+      const saves = [];
+      
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          try {
+            const content = fs.readFileSync(path.join(savesDir, file), 'utf-8');
+            const data = JSON.parse(content);
+            saves.push({
+              id: data.id,
+              name: data.name,
+              timestamp: data.timestamp
+            });
+          } catch (err) {
+            console.error(`Error reading save file ${file}:`, err);
+          }
+        }
+      }
+      
+      // Sort newest first
+      return saves.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    } catch (err) {
+      console.error('Error listing saves:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Loads a specific save by its ID.
+   * 
+   * @param {string} saveId - The ID of the save.
+   * @returns {boolean} True if successful.
+   */
+  loadState(saveId) {
+    const filePath = path.join(savesDir, `${saveId}.json`);
+    if (!fs.existsSync(filePath)) return false;
+    
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const data = JSON.parse(content);
+      
+      // Reconstruct tabs Map
+      this.tabs.clear();
+      data.tabs.forEach(tabData => {
+        const elementsMap = new Map();
+        (tabData.elements || []).forEach(el => {
+          elementsMap.set(el.id, el);
+        });
+        
+        this.tabs.set(tabData.id, {
+          id: tabData.id,
+          name: tabData.name,
+          elements: elementsMap,
+          locks: new Map(),
+          roomSettings: tabData.roomSettings || {
+            backgroundImageUrl: null,
+            showBackground: true,
+            showGrid: true,
+            gridType: 'square',
+            gridSize: 40,
+            customBackgroundWidth: null,
+            customBackgroundHeight: null
+          }
+        });
+      });
+      
+      // Reconstruct assets Map
+      this.assets.clear();
+      (data.assets || []).forEach(asset => {
+        this.assets.set(asset.id, asset);
+      });
+      
+      return true;
+    } catch (err) {
+      console.error(`Error loading save ${saveId}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Deletes a specific save file.
+   * 
+   * @param {string} saveId - Save ID.
+   * @returns {boolean} True if deleted successfully.
+   */
+  deleteSave(saveId) {
+    const filePath = path.join(savesDir, `${saveId}.json`);
+    if (!fs.existsSync(filePath)) return false;
+    
+    try {
+      fs.unlinkSync(filePath);
+      return true;
+    } catch (err) {
+      console.error(`Error deleting save ${saveId}:`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Automatically loads the latest save from disk.
+   * Runs on server startup.
+   */
+  loadLatestSave() {
+    const list = this.listSaves();
+    if (list.length > 0) {
+      const latest = list[0];
+      console.log(`Auto-restoring latest save: "${latest.name}" from ${latest.timestamp}`);
+      this.loadState(latest.id);
+    } else {
+      console.log('No existing saves found. Starting with default canvas state.');
+    }
   }
 }

@@ -9,6 +9,7 @@ import RightSidebar from './components/sidebar/RightSidebar.jsx';
 import DiceRollerWidget from './components/sidebar/DiceRollerWidget.jsx';
 import TabButton from './components/common/TabButton.jsx';
 import DieIcon from './components/common/DieIcon.jsx';
+import SavesModal from './components/saves/SavesModal.jsx';
 import { RANDOM_NAMES, PRESET_COLORS, SAMPLE_IMAGES } from './constants.js';
 
 const SOCKET_URL = import.meta.env.DEV
@@ -121,6 +122,8 @@ export default function App() {
   const [selectedElementIds, setSelectedElementIds] = useState([]);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
+  const [showSavesModal, setShowSavesModal] = useState(false);
+  const [saves, setSaves] = useState([]);
   const [activeVirtualDimensions, setActiveVirtualDimensions] = useState({ width: 1920, height: 1080 });
 
   // Local states for Transform Inspector inputs to enable smooth multi-selection editing
@@ -660,6 +663,32 @@ export default function App() {
       );
     });
 
+    s.on('room-state-loaded', ({ tabs, assets }) => {
+      const formattedTabs = (tabs || []).map((tab) => {
+        const lockMap = {};
+        (tab.locks || []).forEach(([eId, uId]) => {
+          lockMap[eId] = uId;
+        });
+        return {
+          ...tab,
+          locks: lockMap,
+        };
+      });
+      setTabs(formattedTabs);
+      setAssets(assets || []);
+      
+      setActiveTabId((prev) => {
+        if (formattedTabs.some((t) => t.id === prev)) {
+          return prev;
+        }
+        return formattedTabs[0]?.id || 'tab-default';
+      });
+
+      setHistory([]);
+      setRedoStack([]);
+      setSelectedElementIds([]);
+    });
+
     return () => {
       s.disconnect();
     };
@@ -1034,6 +1063,66 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleUndo, handleRedo]);
+
+  const fetchSaves = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    socket.emit('save-list', (res) => {
+      if (res && res.success) {
+        setSaves(res.saves || []);
+      } else {
+        console.error('Failed to fetch saves:', res?.error);
+      }
+    });
+  }, []);
+
+  const handleCreateSave = useCallback((name) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    socket.emit('save-create', { name }, (res) => {
+      if (res && res.success) {
+        fetchSaves();
+      } else {
+        alert(`Failed to create save: ${res?.error || 'Unknown error'}`);
+      }
+    });
+  }, [fetchSaves]);
+
+  const handleLoadSave = useCallback((saveId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    if (!confirm('Are you sure you want to load this save? This will overwrite the current canvas state for all connected users.')) {
+      return;
+    }
+
+    socket.emit('save-load', { saveId }, (res) => {
+      if (res && res.success) {
+        setShowSavesModal(false);
+      } else {
+        alert(`Failed to load save: ${res?.error || 'Unknown error'}`);
+      }
+    });
+  }, []);
+
+  const handleDeleteSave = useCallback((saveId) => {
+    const socket = socketRef.current;
+    if (!socket || !socket.connected) return;
+
+    if (!confirm('Are you sure you want to delete this save?')) {
+      return;
+    }
+
+    socket.emit('save-delete', { saveId }, (res) => {
+      if (res && res.success) {
+        fetchSaves();
+      } else {
+        alert(`Failed to delete save: ${res?.error || 'Unknown error'}`);
+      }
+    });
+  }, [fetchSaves]);
 
 
   const adjustElementLayer = useCallback((elementId, direction) => {
@@ -1837,6 +1926,12 @@ export default function App() {
         handleRenameUser={handleRenameUser}
         handleUndo={handleUndo}
         undoDisabled={history.length === 0}
+        handleRedo={handleRedo}
+        redoDisabled={redoStack.length === 0}
+        onOpenSaves={() => {
+          fetchSaves();
+          setShowSavesModal(true);
+        }}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -2523,6 +2618,16 @@ export default function App() {
 
       {enable3dDice && (
         <DiceEffects activeRolls={activeRolls} onCriticalRoll={handleCriticalRoll} diceSizeMultiplier={diceSizeMultiplier} />
+      )}
+
+      {showSavesModal && (
+        <SavesModal
+          saves={saves}
+          onClose={() => setShowSavesModal(false)}
+          onCreateSave={handleCreateSave}
+          onLoadSave={handleLoadSave}
+          onDeleteSave={handleDeleteSave}
+        />
       )}
     </div>
   );

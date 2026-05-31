@@ -11,6 +11,7 @@ import { registerConnectionHandlers } from './handlers/connectionHandler.js';
 import { registerElementHandlers } from './handlers/elementHandler.js';
 import { registerTabHandlers } from './handlers/tabHandler.js';
 import { registerDiceHandlers } from './handlers/diceHandler.js';
+import { registerSaveHandlers } from './handlers/saveHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,6 +131,23 @@ const io = new Server(httpServer, {
 const registry = new CanvasRegistry();
 const DEFAULT_ROOM = 'canvas-default';
 
+// Automatically restore latest save if available on boot
+try {
+  registry.loadLatestSave();
+} catch (err) {
+  console.error('Failed to auto-restore latest canvas save:', err);
+}
+
+// Set up periodic background autosave (every 2 minutes)
+setInterval(() => {
+  try {
+    registry.saveState('Autosave (Auto)', 'autosave');
+    console.log('Background periodic autosave completed successfully.');
+  } catch (err) {
+    console.error('Periodic background autosave failed:', err);
+  }
+}, 2 * 60 * 1000);
+
 /**
  * Socket.io connection and event handling.
  */
@@ -141,6 +159,7 @@ io.on('connection', (socket) => {
   registerElementHandlers(io, socket, registry, DEFAULT_ROOM);
   registerTabHandlers(io, socket, registry, DEFAULT_ROOM);
   registerDiceHandlers(io, socket, registry, DEFAULT_ROOM);
+  registerSaveHandlers(io, socket, registry, DEFAULT_ROOM);
 });
 
 // Run server on configured port
