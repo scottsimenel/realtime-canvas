@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SAMPLE_IMAGES } from '../../constants.js';
 import ActiveUsersWidget from './ActiveUsersWidget.jsx';
 
@@ -32,6 +33,27 @@ export default function LeftSidebar({
   handleRecolorUser,
   getFullUrl,
 }) {
+  const [spawnShapeType, setSpawnShapeType] = useState('rectangle');
+  const [spawnFillColor, setSpawnFillColor] = useState('#3b82f6');
+  const [spawnFillOpacity, setSpawnFillOpacity] = useState(1);
+  const [spawnStrokeEnabled, setSpawnStrokeEnabled] = useState(true);
+  const [spawnStrokeColor, setSpawnStrokeColor] = useState('#2563eb');
+  const [spawnStrokeOpacity, setSpawnStrokeOpacity] = useState(1);
+  const [spawnStrokeWidth, setSpawnStrokeWidth] = useState(2);
+
+  const PRESET_COLORS = [
+    '#3b82f6', // blue
+    '#ef4444', // red
+    '#10b981', // green
+    '#8b5cf6', // purple
+    '#f59e0b', // orange
+    '#ec4899', // pink
+    '#14b8a6', // teal
+    '#64748b', // slate
+    '#ffffff', // white
+    '#000000', // black
+  ];
+
   return (
     <aside 
       className={`group fixed left-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out select-none ${
@@ -105,39 +127,230 @@ export default function LeftSidebar({
       {/* Tab Content */}
       <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 space-y-5 custom-scrollbar">
         {leftPanelTab === 'shapes' && (
-          <div className="space-y-4 animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-              Quick Spawn Shapes
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-4.5 animate-in fade-in duration-200">
+            {/* Custom Shape Configurator */}
+            <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-4 shadow-xl">
+              <div>
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 select-none">
+                  1. Select Shape
+                </h4>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[
+                    { type: 'rectangle', label: 'Rect', icon: '⬜' },
+                    { type: 'circle', label: 'Circle', icon: '⚪' },
+                    { type: 'triangle', label: 'Tri', icon: '🔺' },
+                    { type: 'star', label: 'Star', icon: '⭐' },
+                    { type: 'hexagon', label: 'Hex', icon: '⬢' },
+                  ].map((s) => (
+                    <button
+                      key={s.type}
+                      type="button"
+                      onClick={() => setSpawnShapeType(s.type)}
+                      className={`py-2 rounded-xl text-center border transition flex flex-col items-center gap-1 active:scale-95 cursor-pointer ${
+                        spawnShapeType === s.type
+                          ? 'bg-sky-500/15 border-sky-500/50 text-sky-400'
+                          : 'bg-slate-950/40 border-slate-800/60 text-slate-400 hover:bg-slate-900 hover:border-slate-700'
+                      }`}
+                      title={s.label}
+                    >
+                      <span className="text-sm">{s.icon}</span>
+                      <span className="text-[8px] font-bold uppercase tracking-wider">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fill Section */}
+              <div className="space-y-2 border-t border-slate-800/40 pt-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none">
+                    2. Fill Color & Opacity
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-bold">{Math.round(spawnFillOpacity * 100)}%</span>
+                </div>
+                
+                {/* Presets + Picker */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setSpawnFillColor(c)}
+                      className={`w-6 h-6 rounded-full border transition-all duration-150 cursor-pointer hover:scale-110 active:scale-95 ${
+                        spawnFillColor === c
+                          ? 'ring-2 ring-sky-500 border-white scale-105'
+                          : 'border-slate-800'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                  <div className="relative w-6 h-6 rounded-full border border-slate-800 overflow-hidden cursor-pointer bg-slate-950 flex items-center justify-center">
+                    <input
+                      type="color"
+                      value={spawnFillColor}
+                      onChange={(e) => setSpawnFillColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={spawnFillOpacity}
+                  onChange={(e) => setSpawnFillOpacity(parseFloat(e.target.value))}
+                  className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                />
+              </div>
+
+              {/* Outline Section */}
+              <div className="space-y-2 border-t border-slate-800/40 pt-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none">
+                    3. Outline Settings
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSpawnStrokeEnabled(!spawnStrokeEnabled)}
+                    className={`w-9 h-5 rounded-full p-0.5 border transition-colors duration-200 cursor-pointer flex items-center ${
+                      spawnStrokeEnabled
+                        ? 'bg-sky-500 border-sky-600 justify-end'
+                        : 'bg-slate-950/80 border-slate-800 justify-start'
+                    }`}
+                  >
+                    <span className="w-3.5 h-3.5 rounded-full bg-white shadow-sm" />
+                  </button>
+                </div>
+
+                {spawnStrokeEnabled && (
+                  <div className="space-y-2.5 animate-in fade-in duration-200 pt-1">
+                    {/* Outline Color */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {PRESET_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSpawnStrokeColor(c)}
+                          className={`w-6 h-6 rounded-full border transition-all duration-150 cursor-pointer hover:scale-110 active:scale-95 ${
+                            spawnStrokeColor === c
+                              ? 'ring-2 ring-sky-500 border-white scale-105'
+                              : 'border-slate-800'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                      <div className="relative w-6 h-6 rounded-full border border-slate-800 overflow-hidden cursor-pointer bg-slate-950 flex items-center justify-center">
+                        <input
+                          type="color"
+                          value={spawnStrokeColor}
+                          onChange={(e) => setSpawnStrokeColor(e.target.value)}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                      </div>
+                    </div>
+
+                    {/* Thickness */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                        <span>Width</span>
+                        <span>{spawnStrokeWidth}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="12"
+                        step="1"
+                        value={spawnStrokeWidth}
+                        onChange={(e) => setSpawnStrokeWidth(parseInt(e.target.value, 10))}
+                        className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                      />
+                    </div>
+
+                    {/* Opacity */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                        <span>Opacity</span>
+                        <span>{Math.round(spawnStrokeOpacity * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={spawnStrokeOpacity}
+                        onChange={(e) => setSpawnStrokeOpacity(parseFloat(e.target.value))}
+                        className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Spawn Shape Trigger */}
               <button
-                onClick={() => handleSpawnShape('rectangle', '#3b82f6', '#2563eb')}
-                className="py-3 px-3 bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/30 hover:border-blue-500/40 rounded-xl text-blue-450 font-bold text-xs transition flex flex-col items-center gap-2 active:scale-95 cursor-pointer"
+                type="button"
+                onClick={() => {
+                  handleSpawnShape(
+                    spawnShapeType,
+                    spawnFillColor,
+                    spawnStrokeColor,
+                    {
+                      strokeWidth: spawnStrokeWidth,
+                      fillOpacity: spawnFillOpacity,
+                      strokeOpacity: spawnStrokeOpacity,
+                      strokeEnabled: spawnStrokeEnabled,
+                    }
+                  );
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition active:scale-[0.98] shadow-lg shadow-sky-500/20 hover:shadow-sky-500/30 flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
-                <div className="w-8 h-6 bg-blue-500 rounded border border-blue-600" />
-                <span>Blue Rect</span>
+                ➕ Spawn Shape
               </button>
-              <button
-                onClick={() => handleSpawnShape('rectangle', '#ef4444', '#dc2626')}
-                className="py-3 px-3 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 hover:border-rose-500/40 rounded-xl text-rose-450 font-bold text-xs transition flex flex-col items-center gap-2 active:scale-95 cursor-pointer"
-              >
-                <div className="w-8 h-6 bg-rose-500 rounded border border-rose-600" />
-                <span>Red Rect</span>
-              </button>
-              <button
-                onClick={() => handleSpawnShape('circle', '#10b981', '#059669')}
-                className="py-3 px-3 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/30 hover:border-emerald-500/40 rounded-xl text-emerald-450 font-bold text-xs transition flex flex-col items-center gap-2 active:scale-95 cursor-pointer"
-              >
-                <div className="w-6 h-6 bg-emerald-500 rounded-full border border-emerald-600" />
-                <span>Green Circle</span>
-              </button>
-              <button
-                onClick={() => handleSpawnShape('circle', '#8b5cf6', '#7c3aed')}
-                className="py-3 px-3 bg-purple-500/10 hover:bg-purple-500/15 border border-purple-500/30 hover:border-purple-500/40 rounded-xl text-purple-450 font-bold text-xs transition flex flex-col items-center gap-2 active:scale-95 cursor-pointer"
-              >
-                <div className="w-6 h-6 bg-purple-500 rounded-full border border-purple-600" />
-                <span>Purple Circle</span>
-              </button>
+            </div>
+
+            {/* Quick Spawn Accordion / Classic Presets */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/40">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest select-none">
+                Quick Presets
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSpawnShape('rectangle', '#3b82f6', '#2563eb', { fillOpacity: 1, strokeOpacity: 1, strokeEnabled: true, strokeWidth: 2 })}
+                  className="py-2 px-2.5 bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 rounded-xl text-slate-300 font-medium text-[11px] transition flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <div className="w-4 h-3 bg-blue-500 rounded border border-blue-600 shrink-0" />
+                  <span>Blue Rect</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSpawnShape('rectangle', '#ef4444', '#dc2626', { fillOpacity: 1, strokeOpacity: 1, strokeEnabled: true, strokeWidth: 2 })}
+                  className="py-2 px-2.5 bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 rounded-xl text-slate-300 font-medium text-[11px] transition flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <div className="w-4 h-3 bg-rose-500 rounded border border-rose-600 shrink-0" />
+                  <span>Red Rect</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSpawnShape('circle', '#10b981', '#059669', { fillOpacity: 1, strokeOpacity: 1, strokeEnabled: true, strokeWidth: 2 })}
+                  className="py-2 px-2.5 bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 rounded-xl text-slate-300 font-medium text-[11px] transition flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <div className="w-4 h-4 bg-emerald-500 rounded-full border border-emerald-600 shrink-0" />
+                  <span>Green Circle</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSpawnShape('circle', '#8b5cf6', '#7c3aed', { fillOpacity: 1, strokeOpacity: 1, strokeEnabled: true, strokeWidth: 2 })}
+                  className="py-2 px-2.5 bg-slate-900/30 hover:bg-slate-900/50 border border-slate-800 rounded-xl text-slate-300 font-medium text-[11px] transition flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <div className="w-4 h-4 bg-purple-500 rounded-full border border-purple-600 shrink-0" />
+                  <span>Purple Circle</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

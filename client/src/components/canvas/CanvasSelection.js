@@ -253,6 +253,35 @@ export const getElementAtCoords = (x, y, elements) => {
       if (dx * dx + dy * dy <= 1) {
         return el;
       }
+    } else if (el.type === 'triangle') {
+      // Vertices: A(0, -hh), B(hw, hh), C(-hw, hh)
+      const sign = (p1, p2, p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+      const d1 = sign(local, { x: 0, y: -hh }, { x: hw, y: hh });
+      const d2 = sign(local, { x: hw, y: hh }, { x: -hw, y: hh });
+      const d3 = sign(local, { x: -hw, y: hh }, { x: 0, y: -hh });
+      const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      if (!(has_neg && has_pos)) {
+        return el;
+      }
+    } else if (el.type === 'hexagon') {
+      let inside = true;
+      for (let j = 0; j < 6; j++) {
+        const a1 = (Math.PI / 3) * j;
+        const a2 = (Math.PI / 3) * (j + 1);
+        const p1 = { x: hw * Math.cos(a1), y: hh * Math.sin(a1) };
+        const p2 = { x: hw * Math.cos(a2), y: hh * Math.sin(a2) };
+        const cross = (p2.x - p1.x) * (local.y - p1.y) - (p2.y - p1.y) * (local.x - p1.x);
+        if (cross < 0) {
+          inside = false;
+          break;
+        }
+      }
+      if (inside) return el;
+    } else if (el.type === 'star') {
+      if (local.x >= -hw && local.x <= hw && local.y >= -hh && local.y <= hh) {
+        return el;
+      }
     } else if (el.type === 'path') {
       if (checkEraserIntersectsPath(x, y, 8, el)) {
         return el;
@@ -266,7 +295,7 @@ export const getElementAtCoords = (x, y, elements) => {
 export const getHoveredElement = (x, y, elements) => {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
-    if (el.type !== 'rectangle' && el.type !== 'circle' && el.type !== 'image') continue;
+    if (el.type !== 'rectangle' && el.type !== 'circle' && el.type !== 'image' && el.type !== 'triangle' && el.type !== 'star' && el.type !== 'hexagon') continue;
     
     const local = getLocalCoords(x, y, el);
     const hw = el.width / 2;
@@ -280,6 +309,34 @@ export const getHoveredElement = (x, y, elements) => {
       const dx = local.x / hw;
       const dy = local.y / hh;
       if (dx * dx + dy * dy <= 1) {
+        return el;
+      }
+    } else if (el.type === 'triangle') {
+      const sign = (p1, p2, p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+      const d1 = sign(local, { x: 0, y: -hh }, { x: hw, y: hh });
+      const d2 = sign(local, { x: hw, y: hh }, { x: -hw, y: hh });
+      const d3 = sign(local, { x: -hw, y: hh }, { x: 0, y: -hh });
+      const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      if (!(has_neg && has_pos)) {
+        return el;
+      }
+    } else if (el.type === 'hexagon') {
+      let inside = true;
+      for (let j = 0; j < 6; j++) {
+        const a1 = (Math.PI / 3) * j;
+        const a2 = (Math.PI / 3) * (j + 1);
+        const p1 = { x: hw * Math.cos(a1), y: hh * Math.sin(a1) };
+        const p2 = { x: hw * Math.cos(a2), y: hh * Math.sin(a2) };
+        const cross = (p2.x - p1.x) * (local.y - p1.y) - (p2.y - p1.y) * (local.x - p1.x);
+        if (cross < 0) {
+          inside = false;
+          break;
+        }
+      }
+      if (inside) return el;
+    } else if (el.type === 'star') {
+      if (local.x >= -hw && local.x <= hw && local.y >= -hh && local.y <= hh) {
         return el;
       }
     }

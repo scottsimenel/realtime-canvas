@@ -1380,7 +1380,7 @@ export default function App() {
   }, []);
 
   const handleSpawnShape = useCallback(
-    (type, fill, stroke) => {
+    (type, fill, stroke, additionalProps = {}) => {
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
 
@@ -1390,12 +1390,16 @@ export default function App() {
         type,
         x: Math.floor(Math.random() * 200) + 120,
         y: Math.floor(Math.random() * 200) + 120,
-        width: type === 'circle' ? 100 : 120,
+        width: (type === 'circle' || type === 'star' || type === 'hexagon') ? 100 : 120,
         height: 100,
         properties: {
           fill,
           stroke,
-          strokeWidth: 2,
+          strokeWidth: additionalProps.strokeWidth !== undefined ? additionalProps.strokeWidth : 2,
+          fillOpacity: additionalProps.fillOpacity !== undefined ? additionalProps.fillOpacity : 1,
+          strokeOpacity: additionalProps.strokeOpacity !== undefined ? additionalProps.strokeOpacity : 1,
+          strokeEnabled: additionalProps.strokeEnabled !== undefined ? additionalProps.strokeEnabled : true,
+          rotation: 0,
         },
       };
 

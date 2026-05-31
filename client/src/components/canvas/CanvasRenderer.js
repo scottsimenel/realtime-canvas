@@ -87,23 +87,171 @@ export const drawElements = (ctx, elements, locks, users, currentUser, getOrLoad
 
     // Render shapes centered on (0, 0)
     if (element.type === 'rectangle') {
+      // Fill
+      ctx.save();
+      const fillOpacity = element.properties?.fillOpacity !== undefined ? element.properties.fillOpacity : 1;
+      ctx.globalAlpha = fillOpacity;
       ctx.fillStyle = element.properties?.fill || '#3b82f6';
       ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
 
-      ctx.strokeStyle = element.properties?.stroke || '#2563eb';
-      ctx.lineWidth = element.properties?.strokeWidth || 2;
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      // Stroke
+      const strokeEnabled = element.properties?.strokeEnabled !== false;
+      const strokeWidth = element.properties?.strokeWidth !== undefined ? element.properties.strokeWidth : 2;
+      if (strokeEnabled && strokeWidth > 0) {
+        ctx.save();
+        const strokeOpacity = element.properties?.strokeOpacity !== undefined ? element.properties.strokeOpacity : 1;
+        ctx.globalAlpha = strokeOpacity;
+        ctx.strokeStyle = element.properties?.stroke || '#2563eb';
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeRect(-w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
     } else if (element.type === 'circle') {
+      // Fill
+      ctx.save();
+      const fillOpacity = element.properties?.fillOpacity !== undefined ? element.properties.fillOpacity : 1;
+      ctx.globalAlpha = fillOpacity;
       ctx.fillStyle = element.properties?.fill || '#10b981';
       ctx.beginPath();
       ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 2 * Math.PI);
       ctx.fill();
+      ctx.restore();
 
-      ctx.strokeStyle = element.properties?.stroke || '#059669';
-      ctx.lineWidth = element.properties?.strokeWidth || 2;
+      // Stroke
+      const strokeEnabled = element.properties?.strokeEnabled !== false;
+      const strokeWidth = element.properties?.strokeWidth !== undefined ? element.properties.strokeWidth : 2;
+      if (strokeEnabled && strokeWidth > 0) {
+        ctx.save();
+        const strokeOpacity = element.properties?.strokeOpacity !== undefined ? element.properties.strokeOpacity : 1;
+        ctx.globalAlpha = strokeOpacity;
+        ctx.strokeStyle = element.properties?.stroke || '#059669';
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (element.type === 'triangle') {
+      // Fill
+      ctx.save();
+      const fillOpacity = element.properties?.fillOpacity !== undefined ? element.properties.fillOpacity : 1;
+      ctx.globalAlpha = fillOpacity;
+      ctx.fillStyle = element.properties?.fill || '#3b82f6';
       ctx.beginPath();
-      ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, 2 * Math.PI);
-      ctx.stroke();
+      ctx.moveTo(0, -h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // Stroke
+      const strokeEnabled = element.properties?.strokeEnabled !== false;
+      const strokeWidth = element.properties?.strokeWidth !== undefined ? element.properties.strokeWidth : 2;
+      if (strokeEnabled && strokeWidth > 0) {
+        ctx.save();
+        const strokeOpacity = element.properties?.strokeOpacity !== undefined ? element.properties.strokeOpacity : 1;
+        ctx.globalAlpha = strokeOpacity;
+        ctx.strokeStyle = element.properties?.stroke || '#2563eb';
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        ctx.moveTo(0, -h / 2);
+        ctx.lineTo(w / 2, h / 2);
+        ctx.lineTo(-w / 2, h / 2);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (element.type === 'star') {
+      const spikes = 5;
+      const outerRadius = Math.min(w, h) / 2;
+      const innerRadius = outerRadius * 0.4;
+      const step = Math.PI / spikes;
+
+      // Fill
+      ctx.save();
+      const fillOpacity = element.properties?.fillOpacity !== undefined ? element.properties.fillOpacity : 1;
+      ctx.globalAlpha = fillOpacity;
+      ctx.fillStyle = element.properties?.fill || '#3b82f6';
+      ctx.beginPath();
+      let rot = (Math.PI / 2) * 3;
+      ctx.moveTo(0, -outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        let x = Math.cos(rot) * outerRadius;
+        let y = Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = Math.cos(rot) * innerRadius;
+        y = Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // Stroke
+      const strokeEnabled = element.properties?.strokeEnabled !== false;
+      const strokeWidth = element.properties?.strokeWidth !== undefined ? element.properties.strokeWidth : 2;
+      if (strokeEnabled && strokeWidth > 0) {
+        ctx.save();
+        const strokeOpacity = element.properties?.strokeOpacity !== undefined ? element.properties.strokeOpacity : 1;
+        ctx.globalAlpha = strokeOpacity;
+        ctx.strokeStyle = element.properties?.stroke || '#2563eb';
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        let rot2 = (Math.PI / 2) * 3;
+        ctx.moveTo(0, -outerRadius);
+        for (let i = 0; i < spikes; i++) {
+          let x = Math.cos(rot2) * outerRadius;
+          let y = Math.sin(rot2) * outerRadius;
+          ctx.lineTo(x, y);
+          rot2 += step;
+
+          x = Math.cos(rot2) * innerRadius;
+          y = Math.sin(rot2) * innerRadius;
+          ctx.lineTo(x, y);
+          rot2 += step;
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (element.type === 'hexagon') {
+      // Fill
+      ctx.save();
+      const fillOpacity = element.properties?.fillOpacity !== undefined ? element.properties.fillOpacity : 1;
+      ctx.globalAlpha = fillOpacity;
+      ctx.fillStyle = element.properties?.fill || '#3b82f6';
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i;
+        ctx.lineTo((w / 2) * Math.cos(angle), (h / 2) * Math.sin(angle));
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // Stroke
+      const strokeEnabled = element.properties?.strokeEnabled !== false;
+      const strokeWidth = element.properties?.strokeWidth !== undefined ? element.properties.strokeWidth : 2;
+      if (strokeEnabled && strokeWidth > 0) {
+        ctx.save();
+        const strokeOpacity = element.properties?.strokeOpacity !== undefined ? element.properties.strokeOpacity : 1;
+        ctx.globalAlpha = strokeOpacity;
+        ctx.strokeStyle = element.properties?.stroke || '#2563eb';
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          ctx.lineTo((w / 2) * Math.cos(angle), (h / 2) * Math.sin(angle));
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
     } else if (element.type === 'image') {
       const img = getOrLoadImage(element.properties?.url);
       if (img && img.width > 0) {
