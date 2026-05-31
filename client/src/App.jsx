@@ -63,6 +63,8 @@ export default function App() {
         gridSize: 40,
         customBackgroundWidth: null,
         customBackgroundHeight: null,
+        gridScaleNumber: 5,
+        gridScaleUnit: 'ft',
       },
     },
   ]);
@@ -87,6 +89,8 @@ export default function App() {
       gridSize: 40,
       customBackgroundWidth: null,
       customBackgroundHeight: null,
+      gridScaleNumber: 5,
+      gridScaleUnit: 'ft',
     },
   };
   const elements = activeTab.elements;
@@ -137,7 +141,7 @@ export default function App() {
   const [isInspectorFocused, setIsInspectorFocused] = useState(false);
 
   // States for collaborative drawing tool
-  const [activeTool, setActiveTool] = useState('select'); // 'select', 'pen', 'eraser'
+  const [activeTool, setActiveTool] = useState('select'); // 'select', 'pan', 'pen', 'eraser', 'measure'
   const [penColor, setPenColor] = useState('#3b82f6');
   const [penSize, setPenSize] = useState(4);
   const [eraserSize, setEraserSize] = useState(20);
@@ -2139,6 +2143,20 @@ export default function App() {
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTool('measure')}
+                  className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                    activeTool === 'measure'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                      : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'
+                  }`}
+                  title="Measurement Tool (Ruler)"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
                   </svg>
                 </button>
 

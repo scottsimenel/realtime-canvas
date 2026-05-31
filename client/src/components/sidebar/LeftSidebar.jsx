@@ -590,6 +590,37 @@ export default function LeftSidebar({
                       className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
                     />
                   </div>
+
+                  {/* Grid Scale Configuration */}
+                  <div className="space-y-1.5 border-t border-slate-800/40 pt-3">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Measurement Scale</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-1.5 rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80">
+                        <span className="text-slate-500 text-xs select-none">1 space =</span>
+                        <input
+                          type="number"
+                          value={roomSettings.gridScaleNumber !== undefined ? roomSettings.gridScaleNumber : 5}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            handleUpdateRoomSettings({ gridScaleNumber: isNaN(val) ? 0 : val });
+                          }}
+                          className="w-12 bg-transparent text-white text-xs font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          min="0.1"
+                          step="0.5"
+                        />
+                      </div>
+                      <div className="w-20 rounded-xl bg-slate-950/60 px-3 py-2 border border-slate-800/80">
+                        <input
+                          type="text"
+                          value={roomSettings.gridScaleUnit || 'ft'}
+                          onChange={(e) => handleUpdateRoomSettings({ gridScaleUnit: e.target.value })}
+                          className="w-full bg-transparent text-white text-xs font-medium focus:outline-none"
+                          placeholder="unit"
+                          maxLength="10"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -16,7 +16,8 @@ import {
   drawSelectionOutlines,
   drawActiveLocalStroke,
   drawEraserCursor,
-  drawDragSelectBox
+  drawDragSelectBox,
+  drawMeasurementRule
 } from './CanvasRenderer.js';
 
 const getSnappedCenter = (cx, cy, gridType, gridSize) => {
@@ -111,6 +112,15 @@ export default function Canvas({
   const [redrawTrigger, setRedrawTrigger] = useState(0);
   const [virtualDimensions, setVirtualDimensions] = useState({ width: 1920, height: 1080 });
   const [hoveredElementId, setHoveredElementId] = useState(null);
+  const [measurePoints, setMeasurePoints] = useState(null); // { start: {x,y}, current: {x,y}, isEstablished: boolean }
+
+  const [prevActiveTool, setPrevActiveTool] = useState(activeTool);
+  if (activeTool !== prevActiveTool) {
+    setPrevActiveTool(activeTool);
+    if (activeTool !== 'measure') {
+      setMeasurePoints(null);
+    }
+  }
 
   const [userZoom, setUserZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -301,8 +311,12 @@ export default function Canvas({
 
     drawDragSelectBox(ctx, dragStateRef, scale);
 
+    if (measurePoints) {
+      drawMeasurementRule(ctx, measurePoints, roomSettings, scale);
+    }
+
     ctx.restore();
-  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, activeTool, eraserSize, roomSettings, getViewportTransform]);
+  }, [canvasSize, elements, locks, users, currentUser, getOrLoadImage, selectedElementIds, activeTool, eraserSize, roomSettings, getViewportTransform, measurePoints]);
 
   // Adjust high DPI canvas scaling and trigger redraws
   useEffect(() => {
@@ -538,6 +552,21 @@ export default function Canvas({
           setHoveredElementId(null);
         }
       }
+
+      if (activeTool === 'measure' && measurePoints && !measurePoints.isEstablished) {
+        const globalGridSnapping = roomSettings?.gridSnapping === true;
+        const showGrid = roomSettings?.showGrid === true;
+        const snappedCoords = (globalGridSnapping && showGrid)
+          ? getSnappedCenter(coords.x, coords.y, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40)
+          : coords;
+
+        setMeasurePoints((prev) => {
+          if (!prev) return prev;
+          if (prev.current.x === snappedCoords.x && prev.current.y === snappedCoords.y) return prev;
+          return { ...prev, current: snappedCoords };
+        });
+        triggerRedraw();
+      }
     }
   };
 
@@ -614,6 +643,30 @@ export default function Canvas({
     if (!socket || !socket.connected) return;
     const coords = getCanvasCoords(e);
     const { scale } = getViewportTransform();
+
+    if (activeTool === 'measure') {
+      const globalGridSnapping = roomSettings?.gridSnapping === true;
+      const showGrid = roomSettings?.showGrid === true;
+      const snappedCoords = (globalGridSnapping && showGrid)
+        ? getSnappedCenter(coords.x, coords.y, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40)
+        : coords;
+
+      if (!measurePoints || measurePoints.isEstablished) {
+        setMeasurePoints({
+          start: snappedCoords,
+          current: snappedCoords,
+          isEstablished: false
+        });
+      } else {
+        setMeasurePoints((prev) => ({
+          ...prev,
+          current: snappedCoords,
+          isEstablished: true
+        }));
+      }
+      triggerRedraw();
+      return;
+    }
 
     if (activeTool === 'pen') {
       tempDrawingPathRef.current = {

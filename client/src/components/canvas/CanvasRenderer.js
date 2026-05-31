@@ -429,3 +429,105 @@ export const drawDragSelectBox = (ctx, dragStateRef, scale) => {
     ctx.restore();
   }
 };
+
+// Draw distance measurement ruler
+export const drawMeasurementRule = (ctx, measurePoints, roomSettings, scale) => {
+  if (!measurePoints) return;
+  const { start, current, isEstablished } = measurePoints;
+
+  const dx = current.x - start.x;
+  const dy = current.y - start.y;
+  const distPixels = Math.hypot(dx, dy);
+
+  // Grid settings
+  const gridSize = roomSettings?.gridSize || 40;
+  const gridType = roomSettings?.gridType || 'square';
+  const gridScaleNumber = roomSettings?.gridScaleNumber !== undefined ? roomSettings.gridScaleNumber : 5;
+  const gridScaleUnit = roomSettings?.gridScaleUnit || 'ft';
+
+  // Spacing unit: Hex columns spacing is staggered, row spacing is sqrt(3)*R.
+  // Adjacent hex centers distance is sqrt(3)*gridSize vertically/diagonally.
+  const scaleFactor = gridType === 'hexagon' ? Math.sqrt(3) * gridSize : gridSize;
+  const numSpaces = distPixels / scaleFactor;
+  const scaledDistance = numSpaces * gridScaleNumber;
+
+  ctx.save();
+
+  // 1. Draw glowing blue connector line
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(current.x, current.y);
+  
+  ctx.shadowColor = '#0ea5e9';
+  ctx.shadowBlur = 8 * scale;
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 3.5 / scale;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Reset shadow for remaining elements
+  ctx.shadowBlur = 0;
+
+  // 2. Draw end cap indicators
+  ctx.beginPath();
+  ctx.arc(start.x, start.y, 5 / scale, 0, Math.PI * 2);
+  ctx.fillStyle = '#38bdf8';
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 1.5 / scale;
+  ctx.fill();
+  ctx.stroke();
+
+  if (isEstablished) {
+    ctx.beginPath();
+    ctx.arc(current.x, current.y, 5 / scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8';
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 1.5 / scale;
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 3. Draw glassmorphic distance badge
+  let badgeX, badgeY;
+  if (isEstablished) {
+    badgeX = start.x + dx / 2;
+    badgeY = start.y + dy / 2;
+  } else {
+    // Offset badge slightly up-right to avoid cursor block
+    badgeX = current.x + 15 / scale;
+    badgeY = current.y - 15 / scale;
+  }
+
+  const label = `${scaledDistance.toFixed(1)} ${gridScaleUnit}`;
+  const fontSize = Math.max(10, Math.min(14, 12 / scale));
+  ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+  const textWidth = ctx.measureText(label).width;
+  
+  const padX = 8 / scale;
+  const padY = 4 / scale;
+  const rectW = textWidth + padX * 2;
+  const rectH = fontSize + padY * 2;
+  const rx = badgeX - rectW / 2;
+  const ry = badgeY - rectH / 2;
+  const radius = 6 / scale;
+
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(rx, ry, rectW, rectH, radius);
+  } else {
+    ctx.rect(rx, ry, rectW, rectH);
+  }
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+  ctx.strokeStyle = 'rgba(51, 65, 85, 0.85)';
+  ctx.lineWidth = 1 / scale;
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, badgeX, badgeY);
+
+  ctx.restore();
+};
+

@@ -71,7 +71,9 @@ export class CanvasRegistry {
         gridType: 'square', // 'square', 'hexagon'
         gridSize: 40, // spacing/radius range 15 to 150
         customBackgroundWidth: null,
-        customBackgroundHeight: null
+        customBackgroundHeight: null,
+        gridScaleNumber: 5,
+        gridScaleUnit: 'ft'
       }
     });
   }
@@ -143,7 +145,9 @@ export class CanvasRegistry {
         gridType: 'square',
         gridSize: 40,
         customBackgroundWidth: null,
-        customBackgroundHeight: null
+        customBackgroundHeight: null,
+        gridScaleNumber: 5,
+        gridScaleUnit: 'ft'
       }
     };
     this.tabs.set(tabId, newTab);
@@ -234,6 +238,8 @@ export class CanvasRegistry {
     if (updates.gridSize !== undefined) settings.gridSize = updates.gridSize;
     if (updates.customBackgroundWidth !== undefined) settings.customBackgroundWidth = updates.customBackgroundWidth;
     if (updates.customBackgroundHeight !== undefined) settings.customBackgroundHeight = updates.customBackgroundHeight;
+    if (updates.gridScaleNumber !== undefined) settings.gridScaleNumber = updates.gridScaleNumber;
+    if (updates.gridScaleUnit !== undefined) settings.gridScaleUnit = updates.gridScaleUnit;
     return settings;
   }
 
@@ -662,7 +668,9 @@ export class CanvasRegistry {
             gridType: 'square',
             gridSize: 40,
             customBackgroundWidth: null,
-            customBackgroundHeight: null
+            customBackgroundHeight: null,
+            gridScaleNumber: 5,
+            gridScaleUnit: 'ft'
           }
         });
       });
