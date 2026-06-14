@@ -14,3 +14,40 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+# Lockfiles (extremely large and heavy for models to read)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+package-lock.json.log
+
+# IDEs & Editor configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build caches & output
+.next/
+.nuxt/
+.cache/
+.vite/
+
+# Media and assets (binary formats models cannot read as source code)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.wav
+*.mp3
+*.mp4
+*.webm
+*.zip
+*.tar.gz
+*.gz
+*.pdf
