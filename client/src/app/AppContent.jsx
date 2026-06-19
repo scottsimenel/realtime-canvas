@@ -8,11 +8,11 @@ import DiceRollerWidget from '../components/sidebar/DiceRollerWidget.jsx';
 import TabButton from '../components/common/TabButton.jsx';
 import DieIcon from '../components/common/DieIcon.jsx';
 import SavesModal from '../components/saves/SavesModal.jsx';
-import { SAMPLE_IMAGES } from '../constants.js';
-import { SOCKET_URL, getSocket } from '../lib/socket.js';
+import { getSocket } from '../lib/socket.js';
 import { getFullUrl } from '../lib/url.js';
 import { locksArrayToMap } from '../lib/locks.js';
-import { newElementId, newAssetId } from '../lib/ids.js';
+import { useUploadStore } from '../state/uploadStore.js';
+import { useElementActions } from './hooks/useElementActions.js';
 import { mergeElement } from '../lib/mergeElement.js';
 import { useUiStore } from '../state/uiStore.js';
 import { useDiceStore } from '../state/diceStore.js';
@@ -39,19 +39,34 @@ export default function AppContent({
 }) {
   const [showSavesModal, setShowSavesModal] = useState(false);
   const [saves, setSaves] = useState([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [assets, setAssets] = useState([]);
-  const [hiddenAssetUrls, setHiddenAssetUrls] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('canvas_hidden_assets') || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [showHiddenMode, setShowHiddenMode] = useState(false);
-  const [draggedElementId, setDraggedElementId] = useState(null);
-  const [dragOverElementId, setDragOverElementId] = useState(null);
+  const {
+    setAssets,
+    hiddenAssetUrls,
+    setHiddenAssetUrls,
+    showHiddenMode,
+    setShowHiddenMode,
+    isUploading,
+    uploadError,
+    toggleHideAsset,
+    handleImageUpload,
+    allImageAssets,
+    visibleAssets,
+    hiddenAssets,
+    draggedElementId,
+    dragOverElementId
+  } = useUploadStore();
+
+  const {
+    handleSpawnShape,
+    handleSpawnImage,
+    adjustElementLayer,
+    adjustSelectedElementsLayer,
+    handleDragStart,
+    handleDragOver,
+    handleDragLeave,
+    handleDragEnd,
+    handleDrop
+  } = useElementActions();
   const [activeVirtualDimensions, setActiveVirtualDimensions] = useState({ width: 1920, height: 1080 });
 
   // States for collaborative drawing tool
@@ -190,30 +205,7 @@ export default function AppContent({
     }
   }, [showCursorNames]);
 
-  useEffect(() => {
-    localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
-  }, [hiddenAssetUrls]);
 
-  const allImageAssets = [
-    ...SAMPLE_IMAGES.map((img, index) => ({ id: `preset_${index}`, name: img.name, url: img.url, isPreset: true })),
-    ...assets.map(asset => ({ id: asset.id, name: asset.name, url: asset.url, isPreset: false }))
-  ];
-
-  const visibleAssets = allImageAssets.filter(asset => !hiddenAssetUrls.includes(asset.url));
-  const hiddenAssets = allImageAssets.filter(asset => hiddenAssetUrls.includes(asset.url));
-
-  const toggleHideAsset = useCallback((url) => {
-    setHiddenAssetUrls(prev => {
-      const next = prev.includes(url)
-        ? prev.filter(u => u !== url)
-        : [...prev, url];
-      
-      if (next.length === 0) {
-        setShowHiddenMode(false);
-      }
-      return next;
-    });
-  }, []);
 
   const handleRenameUser = useCallback((newName) => {
     const socket = socketRef.current;
@@ -316,327 +308,7 @@ export default function AppContent({
     });
   }, [fetchSaves, socketRef]);
 
-  const handleSpawnShape = useCallback(
-    (type, fill, stroke, additionalProps = {}) => {
-      const socket = socketRef.current;
-      if (!socket || !socket.connected) return;
 
-      const id = newElementId();
-      const element = {
-        id,
-        type,
-        x: Math.floor(Math.random() * 200) + 120,
-        y: Math.floor(Math.random() * 200) + 120,
-        width: (type === 'circle' || type === 'star' || type === 'hexagon') ? 100 : 120,
-        height: 100,
-        properties: {
-          fill,
-          stroke,
-          strokeWidth: additionalProps.strokeWidth !== undefined ? additionalProps.strokeWidth : 2,
-          fillOpacity: additionalProps.fillOpacity !== undefined ? additionalProps.fillOpacity : 1,
-          strokeOpacity: additionalProps.strokeOpacity !== undefined ? additionalProps.strokeOpacity : 1,
-          strokeEnabled: additionalProps.strokeEnabled !== undefined ? additionalProps.strokeEnabled : true,
-          rotation: 0,
-        },
-      };
-
-      setElements((prev) => [...prev, element]);
-
-      socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
-        if (!response || !response.success) {
-          // Rollback
-          setElements((prev) => prev.filter((el) => el.id !== id));
-          console.error('Failed to create shape element:', response?.error);
-        } else {
-          pushHistoryAction({
-            type: 'create',
-            elements: [element],
-            tabId: activeTabIdRef.current,
-          });
-        }
-      });
-    },
-    [setElements, pushHistoryAction, socketRef]
-  );
-
-  const handleSpawnImage = useCallback(
-    (url) => {
-      const socket = socketRef.current;
-      if (!socket || !socket.connected) return;
-
-      const img = new Image();
-      img.src = url;
-
-      const spawnWithDimensions = (w, h) => {
-        const id = newElementId();
-        const element = {
-          id,
-          type: 'image',
-          x: Math.floor(Math.random() * 200) + 120,
-          y: Math.floor(Math.random() * 200) + 120,
-          width: w,
-          height: h,
-          properties: {
-            url,
-          },
-        };
-
-        setElements((prev) => [...prev, element]);
-
-        socket.emit('element-create', { element, tabId: activeTabIdRef.current }, (response) => {
-          if (!response || !response.success) {
-            // Rollback
-            setElements((prev) => prev.filter((el) => el.id !== id));
-            console.error('Failed to create image element:', response?.error);
-          } else {
-            pushHistoryAction({
-              type: 'create',
-              elements: [element],
-              tabId: activeTabIdRef.current,
-            });
-          }
-        });
-      };
-
-      img.onload = () => {
-        const w = img.naturalWidth || 160;
-        const h = img.naturalHeight || 110;
-
-        let targetW;
-        let targetH;
-
-        if (w <= h) {
-          targetW = 150;
-          targetH = Math.round(h * (150 / w));
-        } else {
-          targetH = 150;
-          targetW = Math.round(w * (150 / h));
-        }
-
-        spawnWithDimensions(targetW, targetH);
-      };
-
-      img.onerror = () => {
-        console.error('Failed to load image native dimensions:', url);
-        spawnWithDimensions(Math.round(160 * (150 / 110)), 150);
-      };
-    },
-    [setElements, pushHistoryAction, socketRef]
-  );
-
-  const handleImageUpload = useCallback(
-    async (files) => {
-      if (!files || files.length === 0) return;
-
-      const filesArray = Array.from(files);
-      const filesToUpload = filesArray.slice(0, 50);
-
-      const invalidFiles = filesToUpload.filter(
-        (file) => !file.type.startsWith('image/') || file.size > 20 * 1024 * 1024
-      );
-      const validFiles = filesToUpload.filter(
-        (file) => file.type.startsWith('image/') && file.size <= 20 * 1024 * 1024
-      );
-
-      if (validFiles.length === 0) {
-        if (invalidFiles.length > 0) {
-          setUploadError('None of the selected files are valid images under 20MB.');
-        }
-        return;
-      }
-
-      let warningText = '';
-      if (filesArray.length > 50) {
-        warningText = 'Only the first 50 files will be uploaded. ';
-      }
-      if (invalidFiles.length > 0) {
-        warningText += `${invalidFiles.length} file(s) skipped (must be images under 20MB).`;
-      }
-      if (warningText) {
-        setUploadError(warningText);
-      } else {
-        setUploadError('');
-      }
-
-      setIsUploading(true);
-
-      const formData = new FormData();
-      validFiles.forEach((file) => {
-        formData.append('image', file);
-      });
-
-      try {
-        const response = await fetch(`${SOCKET_URL}/api/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        const data = await response.json();
-        if (data.success && data.files) {
-          data.files.forEach((uploadedFile) => {
-            const assetId = newAssetId();
-            const originalName = uploadedFile.originalname || uploadedFile.filename;
-            const assetName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
-            const newAsset = { id: assetId, name: assetName, url: uploadedFile.url };
-
-            const socket = socketRef.current;
-            if (socket && socket.connected) {
-              socket.emit('asset-create', { asset: newAsset }, (res) => {
-                if (res && res.success) {
-                  setAssets((prev) => [...prev.filter((a) => a.id !== res.asset.id), res.asset]);
-                }
-              });
-            } else {
-              setAssets((prev) => [...prev, newAsset]);
-            }
-          });
-        } else {
-          setUploadError(data.error || 'Failed to upload images.');
-        }
-      } catch (err) {
-        console.error('Error uploading images:', err);
-        setUploadError('Server connection error.');
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [socketRef]
-  );
-
-  const adjustElementLayer = useCallback((elementId, direction) => {
-    setElements((prev) => {
-      const next = [...prev];
-      const index = next.findIndex((el) => el.id === elementId);
-      if (index === -1) return prev;
-
-      if (direction === 'forward' && index < next.length - 1) {
-        const temp = next[index];
-        next[index] = next[index + 1];
-        next[index + 1] = temp;
-      } else if (direction === 'backward' && index > 0) {
-        const temp = next[index];
-        next[index] = next[index - 1];
-        next[index - 1] = temp;
-      } else {
-        return prev;
-      }
-
-      const socket = socketRef.current;
-      if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
-      }
-
-      pushHistoryAction({
-        type: 'reorder',
-        orderedIdsBefore: prev.map((el) => el.id),
-        orderedIdsAfter: next.map((el) => el.id),
-        tabId: activeTabIdRef.current,
-      });
-
-      return next;
-    });
-  }, [setElements, pushHistoryAction, socketRef]);
-
-  const adjustSelectedElementsLayer = useCallback((direction) => {
-    if (selectedElementIds.length === 0) return;
-
-    setElements((prev) => {
-      const next = [...prev];
-      const selectedIndices = selectedElementIds
-        .map((id) => next.findIndex((el) => el.id === id))
-        .filter((idx) => idx !== -1)
-        .sort((a, b) => a - b);
-
-      if (direction === 'forward') {
-        for (let i = selectedIndices.length - 1; i >= 0; i--) {
-          const idx = selectedIndices[i];
-          if (idx < next.length - 1) {
-            const temp = next[idx];
-            next[idx] = next[idx + 1];
-            next[idx + 1] = temp;
-          }
-        }
-      } else {
-        for (let i = 0; i < selectedIndices.length; i++) {
-          const idx = selectedIndices[i];
-          if (idx > 0) {
-            const temp = next[idx];
-            next[idx] = next[idx - 1];
-            next[idx - 1] = temp;
-          }
-        }
-      }
-
-      const socket = socketRef.current;
-      if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
-      }
-
-      pushHistoryAction({
-        type: 'reorder',
-        orderedIdsBefore: prev.map((el) => el.id),
-        orderedIdsAfter: next.map((el) => el.id),
-        tabId: activeTabIdRef.current,
-      });
-
-      return next;
-    });
-  }, [selectedElementIds, setElements, pushHistoryAction, socketRef]);
-
-  const handleDragStart = useCallback((e, id) => {
-    e.dataTransfer.setData('text/plain', id);
-    setDraggedElementId(id);
-  }, []);
-
-  const handleDragOver = useCallback((e, id) => {
-    e.preventDefault();
-    if (draggedElementId && draggedElementId !== id) {
-      setDragOverElementId(id);
-    }
-  }, [draggedElementId]);
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverElementId(null);
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedElementId(null);
-    setDragOverElementId(null);
-  }, []);
-
-  const handleDrop = useCallback((e, targetId) => {
-    e.preventDefault();
-    const sourceId = e.dataTransfer.getData('text/plain') || draggedElementId;
-    setDraggedElementId(null);
-    setDragOverElementId(null);
-
-    if (!sourceId || sourceId === targetId) return;
-
-    setElements((prev) => {
-      const next = [...prev];
-      const sourceIndex = next.findIndex((el) => el.id === sourceId);
-      const targetIndex = next.findIndex((el) => el.id === targetId);
-
-      if (sourceIndex === -1 || targetIndex === -1) return prev;
-
-      const [removed] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, removed);
-
-      const socket = socketRef.current;
-      if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabIdRef.current });
-      }
-
-      pushHistoryAction({
-        type: 'reorder',
-        orderedIdsBefore: prev.map((el) => el.id),
-        orderedIdsAfter: next.map((el) => el.id),
-        tabId: activeTabIdRef.current,
-      });
-
-      return next;
-    });
-  }, [draggedElementId, setElements, pushHistoryAction, socketRef]);
 
   const inspectorLockRef = useRef(false);
   const originalInspectorElementsRef = useRef([]);

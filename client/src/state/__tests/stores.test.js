@@ -5,6 +5,8 @@ import { HistoryProvider, useHistoryStore } from '../historyStore.js';
 import { SelectionProvider, useSelectionStore } from '../selectionStore.js';
 import { ClipboardProvider, useClipboardStore } from '../clipboardStore.js';
 import { CanvasProvider, useCanvasStore } from '../canvasStore.js';
+import { UploadProvider, useUploadStore } from '../uploadStore.js';
+import { useElementActions } from '../../app/hooks/useElementActions.js';
 
 describe('State stores export check', () => {
   test('UiProvider and useUiStore are defined', () => {
@@ -35,5 +37,14 @@ describe('State stores export check', () => {
   test('CanvasProvider and useCanvasStore are defined', () => {
     expect(CanvasProvider).toBeDefined();
     expect(useCanvasStore).toBeDefined();
+  });
+
+  test('UploadProvider and useUploadStore are defined', () => {
+    expect(UploadProvider).toBeDefined();
+    expect(useUploadStore).toBeDefined();
+  });
+
+  test('useElementActions is defined', () => {
+    expect(useElementActions).toBeDefined();
   });
 });
