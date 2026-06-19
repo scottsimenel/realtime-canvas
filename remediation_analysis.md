@@ -46,8 +46,8 @@ Based on a detailed check of the active workspace, here is the validation of the
 * **Remediation**: Slim the file to **< 500 lines** by moving tool configurations, active tools, canvas-preference states, and selection transform refs into `uiStore` and `selectionStore`.
 
 ### 5. Gap G5: Housekeeping & Self-Edits (🟢 Low Severity)
-* **Problem**: A stray untracked Windows `nul` file is present in the workspace. Guidelines (`agent.md`) were self-edited without top-level changelogs.
-* **Remediation**: Remove `nul`, ignore `/nul` in `.gitignore`, document rules history at the top of `agent.md`, and verify `STRUCTURE.md` completeness.
+* **Problem**: Guidelines (`agent.md`) were self-edited without top-level changelogs.
+* **Remediation**: Document rules history at the top of `agent.md`, and verify `STRUCTURE.md` completeness.
 
 ---
 
@@ -65,10 +65,8 @@ graph TD
 
 ### WS5: Housekeeping
 * **Tasks**:
-  1. Delete the `nul` file.
-  2. Add `/nul` to `.gitignore`.
-  3. Add the changelog reference at the top of the Workflows section in [agent.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/agent.md).
-  4. Cross-check [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md) for 100% file coverage.
+  1. Add the changelog reference at the top of the Workflows section in [agent.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/agent.md).
+  2. Cross-check [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md) for 100% file coverage.
 * **Git Commit**: `Housekeeping: Remove stray files, update gitignore, and document guidelines edit history`
 
 ### WS1: Protocol Rewiring

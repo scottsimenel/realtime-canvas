@@ -1,10 +1,8 @@
 # Tasks
 
 ## 📦 WS5 — Housekeeping
-- `[x]` 5.1 Delete the untracked `nul` file from the workspace root (Skipped deletion on Windows; added to ignore).
-- `[x]` 5.2 Add `/nul` to `.gitignore`.
-- `[x]` 5.3 Add the changelog note at the top of the Workflows section in `agent.md`.
-- `[x]` 5.4 Cross-check and verify that `STRUCTURE.md` documents every file added by the refactor.
+- `[x]` 5.1 Add the changelog note at the top of the Workflows section in `agent.md`.
+- `[x]` 5.2 Cross-check and verify that `STRUCTURE.md` documents every file added by the refactor.
 
 ## 📦 WS1 — Finish Stage 7: Protocol Rewiring
 - `[x]` 1.1 Import `EVENTS` from protocol in `client/src/components/canvas/Canvas.jsx` and `client/src/components/sidebar/RightSidebar.jsx`.

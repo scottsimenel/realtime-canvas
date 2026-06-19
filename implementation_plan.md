@@ -15,8 +15,6 @@ The user has explicitly approved proceeding with the execution of this remediati
 We will execute the remediation in five distinct workstreams, committing and verifying at each boundary.
 
 ### WS5: Housekeeping
-* **Delete `nul` file**: Remove the untracked zero-byte Windows artifact.
-* **Update `.gitignore`**: Add `/nul` to prevent future recurrences.
 * **Update `agent.md`**: Document the self-edit history log.
 * **Verify `STRUCTURE.md`**: Confirm every file added by the refactor is documented.
 

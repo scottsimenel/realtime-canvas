@@ -20,7 +20,7 @@ But a code-level review (lint/build/test run independently, coverage report read
 | R2 | `historyStore` (367 lines, the highest-risk module) has **no behavioral test** — not even imported by any test; `state/` coverage 58.87% stmts / 28.84% branches, below the ≥70%/60% target | 🔴 High | ❌ Untouched |
 | R3 | `splitPathElement` has **no positive-split test** — the one existing case asserts `length === 0` (correct for those inputs, but misleadingly named, and no case exercises an actual split) | 🟡 Medium | ❌ Untouched |
 | R4 | `useSelectionActions.js` is **load-bearing but undocumented** in `STRUCTURE.md` (0 mentions) — §Arch 6 violation | 🟡 Medium | ❌ Untouched |
-| R5 | `nul` file still on disk (gitignored, harmless); `npm run lint` now warns on generated `coverage/` file | 🟢 Low | ⚠️ Partial |
+| R5 | `npm run lint` now warns on generated `coverage/` file | 🟢 Low | ⚠️ Partial |
 
 This plan closes all five. Each workstream is independently shippable and independently revertible.
 
@@ -32,7 +32,7 @@ This plan closes all five. Each workstream is independently shippable and indepe
 - [ ] A **behavioral** `historyStore` test suite exists: push/undo/redo across all 5 action types, the 50-action cap eviction, and empty-stack no-op.
 - [ ] A **positive-split** `splitPathElement` test exists that asserts ≥1 child element with correct geometry; the misleadingly-named test is renamed or its inputs made honest.
 - [ ] `useSelectionActions.js` is documented in `STRUCTURE.md`.
-- [ ] `nul` deleted from disk; `coverage/` added to ESLint `globalIgnores` so `npm run lint` is warning-free.
+- [ ] `coverage/` added to ESLint `globalIgnores` so `npm run lint` is warning-free.
 - [ ] `npm run lint`, `npm run build`, `npm run test -- --coverage` all green; `state/` branch coverage **≥60%**; output pasted into walkthrough.
 
 ---
@@ -178,28 +178,23 @@ The existing test at line 60–79 is titled *"splits path at eraser points corre
 
 ---
 
-# RW5 — Housekeeping: Delete `nul`, Restore Clean Lint
+# RW5 — Housekeeping: Restore Clean Lint
 
-**Severity:** 🟢 Low · **Risk:** None · **Files touched:** repo root, `client/eslint.config.js`
+**Severity:** 🟢 Low · **Risk:** None · **Files touched:** `client/eslint.config.js`
 
 ### Problem
-Two minor loose ends:
-1. The `nul` file (105 bytes, a Windows artifact) still exists on disk. It's gitignored (so it won't pollute commits), but the prior plan said to delete it.
-2. Running `npm run test -- --coverage` generates `coverage/`, and `npm run lint` then warns: *"Unused eslint-disable directive"* against `coverage/block-navigation.js`. The ESLint config's `globalIgnores` only excludes `dist`.
+Running `npm run test -- --coverage` generates `coverage/`, and `npm run lint` then warns: *"Unused eslint-disable directive"* against `coverage/block-navigation.js`. The ESLint config's `globalIgnores` only excludes `dist`.
 
 ### Steps
-1. **Confirm `nul` is safe to delete**: `git ls-files nul` returns empty (it's untracked), and `git grep -w nul` should find no code references to it. Then delete it: `rm nul` (or the Windows equivalent). Verify `git status` is clean afterward.
-2. **Add `coverage` to ESLint ignores**: in `client/eslint.config.js`, change `globalIgnores(['dist'])` → `globalIgnores(['dist', 'coverage'])`. This restores `npm run lint` to zero warnings after a coverage run.
+1. **Add `coverage` to ESLint ignores**: in `client/eslint.config.js`, change `globalIgnores(['dist'])` → `globalIgnores(['dist', 'coverage'])`. This restores `npm run lint` to zero warnings after a coverage run.
 
 ### Verification gate
 ```bash
 npm --prefix client run test -- --coverage   # generates coverage/
 npm --prefix client run lint                 # must report 0 warnings
-git status                                   # clean, nul gone
 ```
 
 ### Exit criteria
-- `nul` no longer on disk; `git status` clean.
 - `npm run lint` reports **0 errors, 0 warnings** immediately after a coverage run.
 
 ---
