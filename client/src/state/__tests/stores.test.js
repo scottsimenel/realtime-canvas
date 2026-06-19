@@ -33,7 +33,7 @@ vi.mock('react', () => {
     useMemo: (fn) => fn(),
     useEffect: () => {},
     createContext: () => ({}),
-    useContext: () => ({}),
+    useContext: () => reactMockValueCapture.captured,
     createElement: (type, props) => {
       if (props && props.value) {
         reactMockValueCapture.captured = props.value;
@@ -44,8 +44,8 @@ vi.mock('react', () => {
 });
 
 // Import the providers *after* the react mock is defined
-import { UiProvider } from '../uiStore.js';
-import { ClipboardProvider } from '../clipboardStore.js';
+import { UiProvider, useUiStore } from '../uiStore.js';
+import { ClipboardProvider, useClipboardStore } from '../clipboardStore.js';
 
 // Mock Socket
 const mockSocket = {
@@ -113,21 +113,45 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     // Run Provider
     UiProvider({ children: null });
 
-    const value = reactMockValueCapture.captured;
+    let value = reactMockValueCapture.captured;
     expect(value).not.toBeNull();
+
+    // Show sidebars explicitly since window is undefined in Node test environment
+    value.setShowLeftSidebar(true);
+    value.setShowRightSidebar(true);
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+
     expect(value.isZenMode).toBe(false);
     expect(value.showHeader).toBe(true);
+
+    // Call handleCanvasInteraction with true (clicked empty space)
+    value.handleCanvasInteraction(true);
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+    expect(value.leftPanelCollapsed).toBe(true);
+    expect(value.rightPanelCollapsed).toBe(true);
 
     // Call toggle Zen Mode callback
     value.handleToggleZenMode();
 
-    // Re-run Provider to get updated states
+    // Re-run Provider to get updated states after Zen mode toggle
     stateIndex = 0;
     UiProvider({ children: null });
 
-    const nextValue = reactMockValueCapture.captured;
-    expect(nextValue.isZenMode).toBe(true);
-    expect(nextValue.showHeader).toBe(false);
+    value = reactMockValueCapture.captured;
+    expect(value.isZenMode).toBe(true);
+    expect(value.showHeader).toBe(false);
+
+    // Call handleCanvasInteraction with false (clicked element)
+    value.handleCanvasInteraction(false);
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+    expect(value.showRightSidebar).toBe(true);
+    expect(value.rightPanelCollapsed).toBe(false);
   });
 
   test('ClipboardProvider copy and paste calculations', () => {
@@ -146,5 +170,15 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     expect(mockSetSelectedElementIds).toHaveBeenCalled();
     expect(mockPushHistoryAction).toHaveBeenCalled();
     expect(mockSocket.emit).toHaveBeenCalled();
+  });
+
+  test('useUiStore throws error when used outside provider', () => {
+    reactMockValueCapture.captured = null;
+    expect(() => useUiStore()).toThrowError('useUiStore must be used within a UiProvider');
+  });
+
+  test('useClipboardStore throws error when used outside provider', () => {
+    reactMockValueCapture.captured = null;
+    expect(() => useClipboardStore()).toThrowError('useClipboardStore must be used within a ClipboardProvider');
   });
 });
