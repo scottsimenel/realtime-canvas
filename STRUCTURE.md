@@ -42,9 +42,19 @@ graph TD
 ### 3. Frontend Client (`/client`)
 *   `App.jsx`: The layout orchestrator. Manages parent React state bindings, establishes Socket.io event receivers, handles optimistic local merges, and arranges the grid panels.
 *   `constants.js`: Holds application config tokens (preset colors, default sidebar items, sample background images).
-*   `/client/src/lib/`: Custom utility libraries, URL helper utilities, ID generators, lock formatting, and lazy Socket.io singleton constructor.
-*   `/client/src/state/`: Modular stores mapping states for elements, locks, selection, history, copy/cut/paste clipboard, upload trackers, and UI layout toggles.
-*   `/client/src/app/`: App compositional layouts, context provider systems, and custom hooks managing dice ticks, keyboard shortcuts, and websocket handlers.
+*   `/client/src/lib/`: Custom utility libraries.
+    *   `socket.js`: Lazy socket resolver and URL setup.
+    *   `url.js`: Normalizes path variables to absolute socket asset URLs.
+    *   `locks.js`: Maps raw array lock logs `[eId, uId][]` to index maps `{[eId]: uId}`.
+    *   `ids.js`: Handles element, tab, asset, and roll ID template generation.
+    *   `mergeElement.js`: Standardizes deep element and properties updates merging.
+*   `/client/src/state/`: Modular context stores mapping states.
+    *   `uiStore.js`: Layout panel visibility state triggers and toggles.
+    *   `diceStore.js`: Mixed dice roller bag totals, animations data, and roll triggers.
+*   `/client/src/app/`: Layout providers and custom state hooks.
+    *   `AppProviders.jsx`: Root provider chaining State Contexts.
+    *   `hooks/useDiceTick.js`: Sets up a 60ms ticker for dice tumble animations.
+    *   `hooks/useZenModeShortcut.js`: Registers the keydown keyboard shortcut `\` for Zen Mode.
 *   `/client/src/components/common/`:
     *   `DieIcon.jsx`: Renders scalable vector SVG representations for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
     *   `TabButton.jsx`: Render tab capsules in the workspace header supporting double-click renaming, custom delete controls, and inline active user indicators.

@@ -16,8 +16,39 @@ import { getFullUrl } from './lib/url.js';
 import { locksArrayToMap } from './lib/locks.js';
 import { newElementId, newTabId, newAssetId } from './lib/ids.js';
 import { mergeElement } from './lib/mergeElement.js';
+import { useUiStore } from './state/uiStore.js';
+import { useDiceStore } from './state/diceStore.js';
+import { useZenModeShortcut } from './app/hooks/useZenModeShortcut.js';
 
 export default function App() {
+  const {
+    showHeader,
+    showLeftSidebar, setShowLeftSidebar,
+    showRightSidebar, setShowRightSidebar,
+    showTabsBar,
+    leftPanelTab, setLeftPanelTab,
+    showDiceRoller, setShowDiceRoller,
+    leftPanelCollapsed, setLeftPanelCollapsed,
+    rightPanelCollapsed, setRightPanelCollapsed,
+    isZenMode, handleToggleZenMode, handleCanvasInteraction
+  } = useUiStore();
+
+  const {
+    mixedDice, setMixedDice,
+    d20Count, setD20Count,
+    d20Mode, setD20Mode,
+    activeRolls, setActiveRolls,
+    rollHistory, setRollHistory,
+    enable3dDice, setEnable3dDice,
+    hoveredRoll, setHoveredRoll,
+    shakeClass,
+    rollTick, diceSizeMultiplier, setDiceSizeMultiplier,
+    handleCriticalRoll, handleRollDice: storeRollDice
+  } = useDiceStore();
+
+  // Register Zen Mode global shortcut
+  useZenModeShortcut();
+
   // Connection states
   const [connected, setConnected] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -157,32 +188,7 @@ export default function App() {
   const [draggedElementId, setDraggedElementId] = useState(null);
   const [dragOverElementId, setDragOverElementId] = useState(null);
 
-  // Dice Roller States
-  const [mixedDice, setMixedDice] = useState({ d4: 0, d6: 0, d8: 0, d10: 0, d12: 0, d100: 0 });
-  const [d20Count, setD20Count] = useState(1);
-  const [d20Mode, setD20Mode] = useState('normal');
-  const [activeRolls, setActiveRolls] = useState([]);
-  const [rollHistory, setRollHistory] = useState([]);
-  const [enable3dDice, setEnable3dDice] = useState(true);
-  const [diceSizeMultiplier, setDiceSizeMultiplier] = useState(() => {
-    try {
-      const saved = localStorage.getItem('canvas_dice_size_multiplier');
-      return saved !== null ? parseFloat(saved) : 1.0;
-    } catch {
-      return 1.0;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('canvas_dice_size_multiplier', diceSizeMultiplier.toString());
-    } catch (e) {
-      console.error(e);
-    }
-  }, [diceSizeMultiplier]);
-
-  const [rollTick, setRollTick] = useState(0);
-  const [hoveredRoll, setHoveredRoll] = useState(null);
+  // Dice roller states are now managed by useDiceStore()
   const [showCursorNames, setShowCursorNames] = useState(() => {
     try {
       const saved = localStorage.getItem('canvas_show_cursor_names');
@@ -200,46 +206,7 @@ export default function App() {
     }
   }, [showCursorNames]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRollTick((prev) => (prev + 1) % 100);
-    }, 60);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Layout Panel Visibility States
-  const [showHeader, setShowHeader] = useState(true);
-  const [showLeftSidebar, setShowLeftSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
-  const [showRightSidebar, setShowRightSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
-  const [showTabsBar, setShowTabsBar] = useState(true);
-  const [leftPanelTab, setLeftPanelTab] = useState('images'); // 'shapes' | 'images' | 'canvas'
-  const [showDiceRoller, setShowDiceRoller] = useState(false);
-  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
-  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
-  const [shakeClass, setShakeClass] = useState('');
-
-  const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
-
-  const handleToggleZenMode = useCallback(() => {
-    const nextState = isZenMode;
-    setShowHeader(nextState);
-    setShowLeftSidebar(nextState);
-    setShowRightSidebar(nextState);
-    setShowTabsBar(nextState);
-    setLeftPanelCollapsed(false);
-    setRightPanelCollapsed(false);
-  }, [isZenMode]);
-
-  const handleCanvasInteraction = useCallback((clickedEmptySpace) => {
-    if (clickedEmptySpace) {
-      if (showLeftSidebar) setLeftPanelCollapsed(true);
-      if (showRightSidebar) setRightPanelCollapsed(true);
-    } else {
-      if (showLeftSidebar) setLeftPanelCollapsed(true);
-      setShowRightSidebar(true);
-      setRightPanelCollapsed(false);
-    }
-  }, [showLeftSidebar, showRightSidebar]);
+  // UI panel states and tick timer are now managed by useUiStore() and useDiceStore()
 
   // Auto-expand Right Inspector and collapse Left panel when elements are selected
   useEffect(() => {
@@ -251,26 +218,9 @@ export default function App() {
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [selectedElementIds, showLeftSidebar]);
+  }, [selectedElementIds, showLeftSidebar, setLeftPanelCollapsed, setShowRightSidebar, setRightPanelCollapsed]);
 
-  useEffect(() => {
-    const handleGlobalKeyDown = (e) => {
-      if (e.key === '\\') {
-        const activeEl = document.activeElement;
-        const isInput = activeEl && (
-          activeEl.tagName === 'INPUT' || 
-          activeEl.tagName === 'TEXTAREA' || 
-          activeEl.isContentEditable
-        );
-        if (!isInput) {
-          e.preventDefault();
-          handleToggleZenMode();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [handleToggleZenMode]);
+  // Zen Mode global shortcut is registered via useZenModeShortcut() hook
 
   useEffect(() => {
     localStorage.setItem('canvas_hidden_assets', JSON.stringify(hiddenAssetUrls));
@@ -656,7 +606,7 @@ export default function App() {
     return () => {
       s.disconnect();
     };
-  }, []);
+  }, [setActiveRolls, setRollHistory]);
 
   const handleSwitchTab = useCallback((tabId) => {
     const socket = socketRef.current;
@@ -1407,19 +1357,9 @@ export default function App() {
         console.error(res?.error || 'Failed to update color.');
       }
     });
-  }, []);
+  }, [setActiveRolls, setRollHistory]);
 
-  const handleCriticalRoll = useCallback(({ type, value }) => {
-    if (type === 20) {
-      if (value === 20) {
-        setShakeClass('animate-shake-success');
-        setTimeout(() => setShakeClass(''), 500);
-      } else if (value === 1) {
-        setShakeClass('animate-shake-fail');
-        setTimeout(() => setShakeClass(''), 600);
-      }
-    }
-  }, []);
+  // handleCriticalRoll is now managed by useDiceStore()
 
   const handleSpawnShape = useCallback(
     (type, fill, stroke, additionalProps = {}) => {
@@ -1821,25 +1761,8 @@ export default function App() {
   }, [elements, locks, currentUser, setSelectedElementIds, pushHistoryAction, setElements]);
 
   const handleRollDice = useCallback(() => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
-
-    const diceGroups = Object.entries(mixedDice)
-      .map(([key, val]) => ({
-        type: parseInt(key.substring(1), 10),
-        count: val
-      }))
-      .filter((g) => g.count > 0);
-
-    socket.emit('dice-roll', {
-      d20: {
-        count: d20Count,
-        mode: d20Mode
-      },
-      dice: diceGroups,
-      userColor: currentUser?.color
-    });
-  }, [mixedDice, d20Count, d20Mode, currentUser]);
+    storeRollDice(currentUser?.color);
+  }, [storeRollDice, currentUser]);
 
   const handleUpdateRoomSettings = useCallback((updates) => {
     const socket = socketRef.current;
