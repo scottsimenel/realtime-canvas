@@ -30,6 +30,12 @@ Below is the directory map of the modularized monorepo. Every file is mapped to 
   ├── README.md                # Main project documentation manual
   ├── STRUCTURE.md             # Codebase architecture guidelines
   ├── ROADMAP.md               # Feature checklist and design proposals
+  ├── REFACTOR_PLAN.md         # Plan for App.jsx decomposition (Implemented)
+  ├── REMEDIATION_PLAN.md      # Plan to close architectural and test gaps (Implemented)
+  ├── remediation_analysis.md  # Analysis of refactor gaps and remediation roadmap (Completed)
+  ├── implementation_plan.md   # Step-by-step implementation plan (Fully Executed)
+  ├── task.md                  # Checklist tracking task execution (All Completed)
+  ├── walkthrough.md           # Verification report and test coverage audit
   │
   ├── /server                  # Express + Socket.io Server (Port 5000 / 5001)
   │     ├── package.json       # Backend script dependencies
@@ -76,10 +82,16 @@ Below is the directory map of the modularized monorepo. Every file is mapped to 
                           └── TabButton.jsx      # Renamable tab capsules
 ```
 
-### 1. Root Configuration Files
+### 1. Root Configuration and Documentation Files
 *   [README.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/README.md) - The main documentation manual.
 *   [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md) - Design structure rules and architectural maps.
 *   [ROADMAP.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md) - Long-term product roadmaps and technical drafts.
+*   [REFACTOR_PLAN.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/REFACTOR_PLAN.md) - Staged refactor plan for the decomposition of App.jsx (Implemented).
+*   [REMEDIATION_PLAN.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/REMEDIATION_PLAN.md) - Action plan to resolve codebase architecture and test coverage gaps (Implemented).
+*   [remediation_analysis.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/remediation_analysis.md) - In-depth assessment of the gaps and execution roadmap (Completed).
+*   [implementation_plan.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/implementation_plan.md) - Step-by-step implementation details for remediation (Fully Executed).
+*   [task.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/task.md) - Checklist tracking status of execution tasks (All Completed).
+*   [walkthrough.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/walkthrough.md) - Verification report and testing/coverage logs (Updated).
 
 ### 2. Backend Server Components (`/server`)
 *   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js) - Sets up Express, static client routing in production, handles image upload multipart requests via `multer` to `/api/upload`, and maps socket channels to sub-handlers.
