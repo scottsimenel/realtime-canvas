@@ -28,6 +28,7 @@ graph TD
 *   [README.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/README.md): Operational guide detailing local startup commands, build steps, and production self-hosting via Cloudflare Tunnels.
 *   [ROADMAP.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md): Product features planner and event schemas specifications.
 *   [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md): This architectural guide.
+*   [shared/protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js): Standardized event strings and payload protocols used between client and server.
 
 ### 2. Backend Server (`/server`)
 *   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js): Entry point that instantiates the Express application, serving compiled client files in production, setting up the `/api/upload` endpoint, and routing incoming socket connections to sub-event handlers.
@@ -41,6 +42,9 @@ graph TD
 ### 3. Frontend Client (`/client`)
 *   `App.jsx`: The layout orchestrator. Manages parent React state bindings, establishes Socket.io event receivers, handles optimistic local merges, and arranges the grid panels.
 *   `constants.js`: Holds application config tokens (preset colors, default sidebar items, sample background images).
+*   `/client/src/lib/`: Custom utility libraries, URL helper utilities, ID generators, lock formatting, and lazy Socket.io singleton constructor.
+*   `/client/src/state/`: Modular stores mapping states for elements, locks, selection, history, copy/cut/paste clipboard, upload trackers, and UI layout toggles.
+*   `/client/src/app/`: App compositional layouts, context provider systems, and custom hooks managing dice ticks, keyboard shortcuts, and websocket handlers.
 *   `/client/src/components/common/`:
     *   `DieIcon.jsx`: Renders scalable vector SVG representations for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
     *   `TabButton.jsx`: Render tab capsules in the workspace header supporting double-click renaming, custom delete controls, and inline active user indicators.
