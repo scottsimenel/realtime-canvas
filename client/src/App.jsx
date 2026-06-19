@@ -11,19 +11,11 @@ import TabButton from './components/common/TabButton.jsx';
 import DieIcon from './components/common/DieIcon.jsx';
 import SavesModal from './components/saves/SavesModal.jsx';
 import { RANDOM_NAMES, PRESET_COLORS, SAMPLE_IMAGES } from './constants.js';
-
-const SOCKET_URL = import.meta.env.DEV
-  ? (import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000')
-  : window.location.origin;
-
-const getFullUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
-    return url;
-  }
-  const path = url.startsWith('/') ? url : `/${url}`;
-  return `${SOCKET_URL}${path}`;
-};
+import { SOCKET_URL } from './lib/socket.js';
+import { getFullUrl } from './lib/url.js';
+import { locksArrayToMap } from './lib/locks.js';
+import { newElementId, newTabId, newAssetId } from './lib/ids.js';
+import { mergeElement } from './lib/mergeElement.js';
 
 export default function App() {
   // Connection states
@@ -374,16 +366,10 @@ export default function App() {
           },
           (res) => {
             if (res && res.success) {
-              const formattedTabs = (res.tabs || []).map((tab) => {
-                const lockMap = {};
-                (tab.locks || []).forEach(([eId, uId]) => {
-                  lockMap[eId] = uId;
-                });
-                return {
-                  ...tab,
-                  locks: lockMap,
-                };
-              });
+              const formattedTabs = (res.tabs || []).map((tab) => ({
+                ...tab,
+                locks: locksArrayToMap(tab.locks),
+              }));
               setTabs(formattedTabs);
               setUsers(res.users || []);
               setAssets(res.assets || []);
@@ -499,19 +485,9 @@ export default function App() {
           if (t.id !== targetTabId) return t;
           return {
             ...t,
-            elements: t.elements.map((el) => {
-              if (el.id === elementId) {
-                return {
-                  ...el,
-                  ...updates,
-                  properties: {
-                    ...(el.properties || {}),
-                    ...(updates.properties || {}),
-                  },
-                };
-              }
-              return el;
-            }),
+            elements: t.elements.map((el) =>
+              el.id === elementId ? mergeElement(el, updates) : el
+            ),
           };
         })
       );
@@ -526,17 +502,7 @@ export default function App() {
             ...t,
             elements: t.elements.map((el) => {
               const match = batch.find((item) => item.elementId === el.id);
-              if (match) {
-                return {
-                  ...el,
-                  ...match.updates,
-                  properties: {
-                    ...(el.properties || {}),
-                    ...(match.updates.properties || {}),
-                  },
-                };
-              }
-              return el;
+              return match ? mergeElement(el, match.updates) : el;
             }),
           };
         })
@@ -616,15 +582,11 @@ export default function App() {
     s.on('tab-created', ({ tab }) => {
       setTabs((prev) => {
         if (prev.some((t) => t.id === tab.id)) return prev;
-        const lockMap = {};
-        (tab.locks || []).forEach(([eId, uId]) => {
-          lockMap[eId] = uId;
-        });
         return [
           ...prev,
           {
             ...tab,
-            locks: lockMap,
+            locks: locksArrayToMap(tab.locks),
           },
         ];
       });
@@ -672,16 +634,10 @@ export default function App() {
     });
 
     s.on('room-state-loaded', ({ tabs, assets }) => {
-      const formattedTabs = (tabs || []).map((tab) => {
-        const lockMap = {};
-        (tab.locks || []).forEach(([eId, uId]) => {
-          lockMap[eId] = uId;
-        });
-        return {
-          ...tab,
-          locks: lockMap,
-        };
-      });
+      const formattedTabs = (tabs || []).map((tab) => ({
+        ...tab,
+        locks: locksArrayToMap(tab.locks),
+      }));
       setTabs(formattedTabs);
       setAssets(assets || []);
       
@@ -1096,7 +1052,7 @@ export default function App() {
 
     const newElements = clipboardRef.current.map((el) => {
       const cloned = JSON.parse(JSON.stringify(el));
-      cloned.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}_${cloned.id.substring(3, 8)}`;
+      cloned.id = `${newElementId()}_${cloned.id.substring(3, 8)}`;
       cloned.x += offset;
       cloned.y += offset;
       if (cloned.properties) {
@@ -1374,16 +1330,10 @@ export default function App() {
           },
           (res) => {
             if (res && res.success) {
-              const formattedTabs = (res.tabs || []).map((tab) => {
-                const lockMap = {};
-                (tab.locks || []).forEach(([eId, uId]) => {
-                  lockMap[eId] = uId;
-                });
-                return {
-                  ...tab,
-                  locks: lockMap,
-                };
-              });
+              const formattedTabs = (res.tabs || []).map((tab) => ({
+                ...tab,
+                locks: locksArrayToMap(tab.locks),
+              }));
               setTabs(formattedTabs);
               setUsers(res.users || []);
               setAssets(res.assets || []);
@@ -1476,7 +1426,7 @@ export default function App() {
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
 
-      const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      const id = newElementId();
       const element = {
         id,
         type,
@@ -1523,7 +1473,7 @@ export default function App() {
       img.src = url;
 
       const spawnWithDimensions = (w, h) => {
-        const id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const id = newElementId();
         const element = {
           id,
           type: 'image',
@@ -1629,7 +1579,7 @@ export default function App() {
         const data = await response.json();
         if (data.success && data.files) {
           data.files.forEach((uploadedFile) => {
-            const assetId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const assetId = newAssetId();
             const originalName = uploadedFile.originalname || uploadedFile.filename;
             const assetName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
             const newAsset = { id: assetId, name: assetName, url: uploadedFile.url };
@@ -1761,17 +1711,7 @@ export default function App() {
       setElements((prev) =>
         prev.map((el) => {
           const match = batch.find((b) => b.elementId === el.id);
-          if (match) {
-            return {
-              ...el,
-              ...match.updates,
-              properties: {
-                ...(el.properties || {}),
-                ...(match.updates.properties || {}),
-              },
-            };
-          }
-          return el;
+          return match ? mergeElement(el, match.updates) : el;
         })
       );
 
@@ -1791,18 +1731,11 @@ export default function App() {
     const nextLocked = !currentlyLocked;
 
     setElements((prev) =>
-      prev.map((item) => {
-        if (item.id === elementId) {
-          return {
-            ...item,
-            properties: {
-              ...(item.properties || {}),
-              locked: nextLocked,
-            },
-          };
-        }
-        return item;
-      })
+      prev.map((item) =>
+        item.id === elementId
+          ? mergeElement(item, { properties: { locked: nextLocked } })
+          : item
+      )
     );
 
     if (nextLocked) {
@@ -1939,21 +1872,17 @@ export default function App() {
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
 
-    const newTabId = `tab_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const createdTabId = newTabId();
     const newName = `Canvas ${tabs.length + 1}`;
 
-    socket.emit('tab-create', { tabId: newTabId, name: newName }, (res) => {
+    socket.emit('tab-create', { tabId: createdTabId, name: newName }, (res) => {
       if (res && res.success && res.tab) {
-        const lockMap = {};
-        (res.tab.locks || []).forEach(([eId, uId]) => {
-          lockMap[eId] = uId;
-        });
         const formattedTab = {
           ...res.tab,
-          locks: lockMap,
+          locks: locksArrayToMap(res.tab.locks),
         };
         setTabs((prev) => [...prev, formattedTab]);
-        handleSwitchTab(newTabId);
+        handleSwitchTab(createdTabId);
       }
     });
   }, [tabs.length, handleSwitchTab]);
