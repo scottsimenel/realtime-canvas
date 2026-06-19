@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, createElement } from 'react';
+import { useCanvasStore } from './canvasStore.js';
 
 const SelectionContext = createContext(null);
 
@@ -6,7 +7,8 @@ const SelectionContext = createContext(null);
  * Selection State Store Provider.
  * Manages active canvas selection and inspector transform input synchronizations.
  */
-export function SelectionProvider({ children, elements }) {
+export function SelectionProvider({ children }) {
+  const { elements } = useCanvasStore();
   const [selectedElementIds, setSelectedElementIds] = useState([]);
   const [inputWidth, setInputWidth] = useState('');
   const [inputHeight, setInputHeight] = useState('');

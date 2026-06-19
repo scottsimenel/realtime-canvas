@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, createElement } from 'react';
 import { getSocket } from '../lib/socket.js';
 import { useSelectionStore } from './selectionStore.js';
+import { useCanvasStore } from './canvasStore.js';
 
 const HistoryContext = createContext(null);
 
@@ -8,13 +9,9 @@ const HistoryContext = createContext(null);
  * History State Store Provider.
  * Manages undo and redo actions stack.
  */
-export function HistoryProvider({
-  children,
-  setTabs,
-  handleSwitchTab,
-  activeTabId
-}) {
+export function HistoryProvider({ children }) {
   const { setSelectedElementIds } = useSelectionStore();
+  const { setTabs, activeTabId, setActiveTabId } = useCanvasStore();
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
@@ -38,7 +35,8 @@ export function HistoryProvider({
     const targetTabId = action.tabId || 'tab-default';
 
     if (activeTabId !== targetTabId) {
-      handleSwitchTab(targetTabId);
+      setActiveTabId(targetTabId);
+      socket.emit('tab-switch', { tabId: targetTabId });
     }
 
     switch (action.type) {
@@ -183,7 +181,7 @@ export function HistoryProvider({
 
     setRedoStack((prev) => [action, ...prev]);
     setHistory((prev) => prev.slice(1));
-  }, [history, activeTabId, handleSwitchTab, setTabs, setSelectedElementIds]);
+  }, [history, activeTabId, setActiveTabId, setTabs, setSelectedElementIds]);
 
   const handleRedo = useCallback(() => {
     if (redoStack.length === 0) return;
@@ -194,7 +192,8 @@ export function HistoryProvider({
     const targetTabId = action.tabId || 'tab-default';
 
     if (activeTabId !== targetTabId) {
-      handleSwitchTab(targetTabId);
+      setActiveTabId(targetTabId);
+      socket.emit('tab-switch', { tabId: targetTabId });
     }
 
     switch (action.type) {
@@ -339,7 +338,7 @@ export function HistoryProvider({
 
     setHistory((prev) => [action, ...prev]);
     setRedoStack((prev) => prev.slice(1));
-  }, [redoStack, activeTabId, handleSwitchTab, setTabs, setSelectedElementIds]);
+  }, [redoStack, activeTabId, setActiveTabId, setTabs, setSelectedElementIds]);
 
   const value = {
     history,

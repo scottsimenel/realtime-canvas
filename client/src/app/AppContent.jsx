@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Canvas from '../components/canvas/Canvas.jsx';
 import DiceEffects from '../components/dice/DiceEffects.jsx';
 import Header from '../components/header/Header.jsx';
@@ -18,6 +18,8 @@ import { useUiStore } from '../state/uiStore.js';
 import { useDiceStore } from '../state/diceStore.js';
 import { useSelectionStore } from '../state/selectionStore.js';
 import { useHistoryStore } from '../state/historyStore.js';
+import { useCanvasStore } from '../state/canvasStore.js';
+import { useTabs } from './hooks/useTabs.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 
 /**
@@ -33,18 +35,7 @@ export default function AppContent({
   setCurrentUser,
   users,
   setUsers,
-  tabs,
-  setTabs,
-  activeTabId,
-  setActiveTabId,
-  locks,
-  setLocks,
-  roomIdInput,
-  handleSwitchTab,
-  handleUpdateRoomSettings,
-  handleCreateTab,
-  handleDeleteTab,
-  handleRenameTab
+  roomIdInput
 }) {
   const [showSavesModal, setShowSavesModal] = useState(false);
   const [saves, setSaves] = useState([]);
@@ -130,9 +121,48 @@ export default function AppContent({
     handleCriticalRoll, handleRollDice: storeRollDice
   } = useDiceStore();
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
-  const elements = useMemo(() => activeTab ? activeTab.elements : [], [activeTab]);
-  const roomSettings = activeTab ? activeTab.roomSettings : {};
+  const {
+    tabs,
+    setTabs,
+    activeTabId,
+    setActiveTabId,
+    elements,
+    locks,
+    setLocks,
+    roomSettings,
+    setElements
+  } = useCanvasStore();
+
+  const {
+    handleSwitchTab,
+    handleCreateTab,
+    handleDeleteTab,
+    handleRenameTab
+  } = useTabs(setUsers);
+
+  const handleUpdateRoomSettings = useCallback((updates) => {
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId
+            ? { ...t, roomSettings: { ...t.roomSettings, ...updates } }
+            : t
+        )
+      );
+      socket.emit('room-settings-update', { updates, tabId: activeTabId }, (res) => {
+        if (res && res.success && res.roomSettings) {
+          setTabs((prev) =>
+            prev.map((t) =>
+              t.id === activeTabId
+                ? { ...t, roomSettings: res.roomSettings }
+                : t
+            )
+          );
+        }
+      });
+    }
+  }, [activeTabId, setTabs, socketRef]);
 
   const nameRef = useRef('');
   const colorRef = useRef('');
@@ -184,20 +214,6 @@ export default function AppContent({
       return next;
     });
   }, []);
-
-  const setElements = useCallback((updater) => {
-    setTabs((prev) =>
-      prev.map((t) =>
-        t.id === activeTabIdRef.current
-          ? {
-              ...t,
-              elements:
-                typeof updater === 'function' ? updater(t.elements) : updater,
-            }
-          : t
-      )
-    );
-  }, [setTabs]);
 
   const handleRenameUser = useCallback((newName) => {
     const socket = socketRef.current;

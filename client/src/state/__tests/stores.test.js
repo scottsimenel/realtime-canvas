@@ -4,6 +4,7 @@ import { DiceProvider, useDiceStore } from '../diceStore.js';
 import { HistoryProvider, useHistoryStore } from '../historyStore.js';
 import { SelectionProvider, useSelectionStore } from '../selectionStore.js';
 import { ClipboardProvider, useClipboardStore } from '../clipboardStore.js';
+import { CanvasProvider, useCanvasStore } from '../canvasStore.js';
 
 describe('State stores export check', () => {
   test('UiProvider and useUiStore are defined', () => {
@@ -29,5 +30,10 @@ describe('State stores export check', () => {
   test('ClipboardProvider and useClipboardStore are defined', () => {
     expect(ClipboardProvider).toBeDefined();
     expect(useClipboardStore).toBeDefined();
+  });
+
+  test('CanvasProvider and useCanvasStore are defined', () => {
+    expect(CanvasProvider).toBeDefined();
+    expect(useCanvasStore).toBeDefined();
   });
 });

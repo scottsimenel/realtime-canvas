@@ -3,6 +3,7 @@ import { getSocket } from '../lib/socket.js';
 import { newElementId } from '../lib/ids.js';
 import { useHistoryStore } from './historyStore.js';
 import { useSelectionStore } from './selectionStore.js';
+import { useCanvasStore } from './canvasStore.js';
 
 const ClipboardContext = createContext(null);
 
@@ -11,15 +12,11 @@ const ClipboardContext = createContext(null);
  * Manages element copying, cutting, and pasting operations.
  */
 export function ClipboardProvider({
-  children,
-  elements,
-  setElements,
-  activeTabId,
-  locks,
-  currentUser
+  children
 }) {
   const { pushHistoryAction } = useHistoryStore();
   const { selectedElementIds, setSelectedElementIds } = useSelectionStore();
+  const { elements, setElements, activeTabId, locks } = useCanvasStore();
   const clipboardRef = useRef([]);
   const pasteOffsetRef = useRef(20);
 
@@ -42,7 +39,7 @@ export function ClipboardProvider({
       const el = elements.find((item) => item.id === id);
       if (!el || el.properties?.locked) return false;
       const lockHolderId = locks[id];
-      return !lockHolderId || lockHolderId === currentUser?.id;
+      return !lockHolderId || lockHolderId === socket.id;
     });
 
     if (unlockedIds.length === 0) return;
@@ -66,7 +63,7 @@ export function ClipboardProvider({
         });
       }
     });
-  }, [selectedElementIds, elements, locks, currentUser, pushHistoryAction, setElements, setSelectedElementIds, activeTabId]);
+  }, [selectedElementIds, elements, locks, pushHistoryAction, setElements, setSelectedElementIds, activeTabId]);
 
   const handlePaste = useCallback(() => {
     const socket = getSocket();
