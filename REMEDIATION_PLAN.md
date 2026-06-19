@@ -1,251 +1,232 @@
-# Refactor Remediation Plan — Closing the Gaps from the Stages 0–7 Review
+# Refactor Remediation Plan v2 — Closing the Residual Gaps
 
 **Status:** Proposed
-**Originates from:** Review of commits `9bf6c50`–`29365a6` (Stages 0–7)
-**Goal:** Finish the refactor to the standard claimed in `REFACTOR_PLAN.md` and enforced by the `[BLOCKING]` rules in `agent.md`.
+**Supersedes:** the previous `REMEDIATION_PLAN.md` (its WS1/WS4/WS5 landed; this plan closes what remains)
+**Originates from:** Review of commits `41d01e9`–`ccdc13e` (the WS1–WS5 remediation pass)
 
 ---
 
 ## 📋 Context — Why This Plan Exists
 
-The Stages 0–7 refactor landed green: lint clean, build passing, 28/28 tests. But a code-level review found the work is **~80% complete** relative to its stated goals. Five gaps remain, ordered by severity:
+The first remediation pass closed the two highest-severity code gaps cleanly:
+- **WS1** ✅ — all 18 hardcoded socket emits rewired to `EVENTS.*` (verified: 0 remain in `client/src/`).
+- **WS4** ✅ — `AppContent.jsx` slimmed 1,264 → **449 lines**; business state moved into stores.
 
-| # | Gap | Severity | Violates agent.md rule |
-|---|-----|----------|------------------------|
-| G1 | Stage 7 left **18 hardcoded socket event strings** in `Canvas.jsx` (17) and `RightSidebar.jsx` (1) | 🔴 High | §Arch 5 three-file protocol `[BLOCKING]` |
-| G2 | **20 of 28 tests are existence-only** (`expect(X).toBeDefined()`); high-risk logic untested | 🔴 High | (intent of §Workflows 3 verification gate) |
-| G3 | `walkthrough.md` is **stale + inaccurate** (re-pastes 2024 work; claims "4,200→600 lines", actual is ~2,750→134) | 🟡 Medium | §Guardrails 5 preserve audit trail |
-| G4 | **`AppContent.jsx` is 1,264 lines** — a new near-megacomponent holding 6 local `useState`s + 6 refs | 🟡 Medium | §Arch 6 architecture boundaries |
-| G5 | `agent.md` edited mid-refactor without flagging; stray `nul` file untracked | 🟢 Low | §Guardrails 1 read-before-write |
+But a code-level review (lint/build/test run independently, coverage report read, source inspected) found **three residual gaps** that the first pass either skipped or only partially addressed:
+
+| # | Gap | Severity | Status after pass 1 |
+|---|-----|----------|---------------------|
+| R1 | `walkthrough.md` **not rewritten** — still claims "4,200 → 600 lines" (false); zero mention of WS1–WS5/Stage 7.5/Stage 8 | 🔴 High | ❌ Skipped |
+| R2 | `historyStore` (367 lines, the highest-risk module) has **no behavioral test** — not even imported by any test; `state/` coverage 58.87% stmts / 28.84% branches, below the ≥70%/60% target | 🔴 High | ❌ Untouched |
+| R3 | `splitPathElement` has **no positive-split test** — the one existing case asserts `length === 0` (correct for those inputs, but misleadingly named, and no case exercises an actual split) | 🟡 Medium | ❌ Untouched |
+| R4 | `useSelectionActions.js` is **load-bearing but undocumented** in `STRUCTURE.md` (0 mentions) — §Arch 6 violation | 🟡 Medium | ❌ Untouched |
+| R5 | `nul` file still on disk (gitignored, harmless); `npm run lint` now warns on generated `coverage/` file | 🟢 Low | ⚠️ Partial |
 
 This plan closes all five. Each workstream is independently shippable and independently revertible.
 
 ---
 
-## 🎯 Target State (Definition of Done for this plan)
+## 🎯 Definition of Done (for this plan)
 
-- [ ] **Zero** hardcoded socket event string literals in `client/src/` outside `shared/protocol.js`. (`io.on('connection')` in `server.js` is legitimately exempt — it's a Socket.io lifecycle event, not a protocol event.)
-- [ ] Test suite has **behavioral coverage** of every pure function with branching logic and every store reducer. Existence-only tests are removed or upgraded.
-- [ ] `walkthrough.md` rewritten to reflect actual state, with verifiable line counts.
-- [ ] `AppContent.jsx` is **under 500 lines** and holds no business state — only layout composition + hook delegation.
-- [ ] `nul` file gone; `agent.md` change log noted.
-- [ ] Every workstream leaves `npm run lint`, `npm run build`, `npm run test` green.
-- [ ] Every change follows the three-file protocol rule and is documented in `STRUCTURE.md` if it adds files.
+- [ ] `.agents/walkthrough.md` contains **no** occurrence of "4,200" or "600 lines"; accurate line counts (App.jsx 2,750→134, AppContent.jsx 1,264→449); a "Remediation" section records WS1–WS5 outcomes with the coverage table.
+- [ ] A **behavioral** `historyStore` test suite exists: push/undo/redo across all 5 action types, the 50-action cap eviction, and empty-stack no-op.
+- [ ] A **positive-split** `splitPathElement` test exists that asserts ≥1 child element with correct geometry; the misleadingly-named test is renamed or its inputs made honest.
+- [ ] `useSelectionActions.js` is documented in `STRUCTURE.md`.
+- [ ] `nul` deleted from disk; `coverage/` added to ESLint `globalIgnores` so `npm run lint` is warning-free.
+- [ ] `npm run lint`, `npm run build`, `npm run test -- --coverage` all green; `state/` branch coverage **≥60%**; output pasted into walkthrough.
 
 ---
 
 ## 🧭 Workstream Order & Dependencies
 
 ```
-WS1 (protocol rewiring)   ──┐
-WS4 (AppContent slimming) ──┤── independent of each other; can parallelize
-WS5 (housekeeping)        ──┘
-WS2 (behavioral tests)    ───── can start after WS1 (so tests cover rewired emits)
-WS3 (walkthrough rewrite) ───── must be LAST (documents the final state)
+RW1 (walkthrough) ─── must be LAST (documents final state)
+RW2 (historyStore tests) ─┐
+RW3 (splitPathElement test) ─┤── independent; can parallelize
+RW4 (STRUCTURE.md doc) ─────┤
+RW5 (housekeeping) ─────────┘
 ```
 
-Recommended merge order: **WS5 → WS1 → WS4 → WS2 → WS3.**
-WS3 goes last because it records the end state and must not be written until that state is fixed.
+Recommended merge order: **RW5 → RW4 → RW3 → RW2 → RW1.**
+RW1 goes last because it records the end state (including the new test files and final coverage numbers) and must not be written until that state is fixed.
 
 ---
 
-# WS1 — Finish Stage 7: Rewire the 18 Remaining Hardcoded Socket Emits
+# RW1 — Rewrite `walkthrough.md` to Reflect Reality
 
-**Severity:** 🔴 High · **Risk:** Low (mechanical) · **Files touched:** 2 client + STRUCTURE.md
+**Severity:** 🔴 High · **Risk:** None (docs only) · **Files touched:** `.agents/walkthrough.md`
 
 ### Problem
-`shared/protocol.js` exists and is used by the hooks/stores, but two view files still emit raw strings:
+The current `walkthrough.md` (~309 lines) is largely a re-paste of the **2024** modularization and contains a provably false claim at line 45:
 
-| File | Line | Current | Should be |
-|------|------|---------|-----------|
-| `Canvas.jsx` | 344 | `socket.emit('cursor-move', ...)` | `EVENTS.CURSOR_MOVE` |
-| `Canvas.jsx` | 373 | `socket.emit('element-delete', ...)` | `EVENTS.ELEMENT_DELETE` |
-| `Canvas.jsx` | 449 | `socket.emit('element-unlock', ...)` | `EVENTS.ELEMENT_UNLOCK` |
-| `Canvas.jsx` | 456 | `socket.emit('element-unlock', ...)` | `EVENTS.ELEMENT_UNLOCK` |
-| `Canvas.jsx` | 728 | `socket.emit('element-delete', ...)` | `EVENTS.ELEMENT_DELETE` |
-| `Canvas.jsx` | 730 | `socket.emit('element-create', ...)` | `EVENTS.ELEMENT_CREATE` |
-| `Canvas.jsx` | 762, 806, 857, 886 | `socket.emit('element-lock', ...)` ×4 | `EVENTS.ELEMENT_LOCK` |
-| `Canvas.jsx` | 970 | `socket.emit('element-delete', ...)` | `EVENTS.ELEMENT_DELETE` |
-| `Canvas.jsx` | 972 | `socket.emit('element-create', ...)` | `EVENTS.ELEMENT_CREATE` |
-| `Canvas.jsx` | 1234, 1237 | `socket.emit('element-update', ...)` ×2 | `EVENTS.ELEMENT_UPDATE` |
-| `Canvas.jsx` | 1305 | `socket.emit('element-create', ...)` | `EVENTS.ELEMENT_CREATE` |
-| `Canvas.jsx` | 1386, 1416 | `socket.emit('element-unlock', ...)` ×2 | `EVENTS.ELEMENT_UNLOCK` |
-| `RightSidebar.jsx` | 212 | `socket.emit('element-delete', ...)` | `EVENTS.ELEMENT_DELETE` |
+> *"Simplified `App.jsx` from 4,200 lines to a lightweight coordinator (~600 lines)"*
+
+Actual numbers (verified from git history and current files): `App.jsx` went **~2,750 → 134** lines, with an intermediate `AppContent.jsx` that grew to **1,264** lines and was later slimmed to **449**. There is **no mention** anywhere of the WS1–WS5 remediation, Stage 7.5, or Stage 8. This violates §Guardrails 5 (preserve the audit trail) — the audit log misrepresents the work.
 
 ### Steps
-1. **Add the import** to both files:
-   ```js
-   import { EVENTS } from '../../../shared/protocol.js';
-   ```
-   (Verify the relative path — `Canvas.jsx` is at `client/src/components/canvas/`, so `../../../shared/protocol.js`. Confirm against how `AppContent.jsx:1` imports it.)
-2. **Mechanical replacement** — swap each of the 18 string literals for its `EVENTS.*` constant. Use `git grep -n "socket.emit('[a-z-]"` to re-verify zero remain after.
-3. **Do not** reformat surrounding lines — keep the diff minimal (§Guardrails 3).
-4. **Smoke test in two browser tabs**: drag, lock (verify outline appears in peer's color), eraser-split, delete, multi-select move, paste, cursor-move. All must propagate to the peer.
-
-### Verification gate (paste output before claiming done)
-```bash
-# Must print 0:
-git grep -nE "socket\.(emit|on|off)\(['\"][a-z-]+['\"]" client/src/ | grep -v shared/protocol.js | wc -l
-npm --prefix client run lint
-npm --prefix client run build
-```
+1. **Preserve the legitimate historical content** but move it under a clearly-labeled heading `## Historical: Original Modularization (pre-2026)` so it's not mistaken for recent work. The server-handler splits, `CanvasSelection`/`CanvasRenderer`/`DiceEffects` decomposition, grid snapping, ruler, clipboard, etc. are real history — keep them, just date and label them.
+2. **Rewrite the two stale "Verification & Testing Results" sections** (there are two, both with outdated bundle hashes/sizes). Replace with a single current section reporting the verified numbers from this plan's final run.
+3. **Write a new top section** `## App.jsx Decomposition — Stages 0–7 + Remediation` with:
+   - Accurate counts: `App.jsx` 2,750 → 134; `AppContent.jsx` created at 1,264 → reduced to 449 by remediation.
+   - The `shared/protocol.js` introduction and the three-file-protocol rule.
+   - The state/hook extraction map (`state/*`, `app/hooks/*`, `lib/*`).
+   - An honest accounting: Stage 7 *claimed* full protocol rewiring but left 18 hardcoded emits (fixed by remediation Stage 7.5); Stage 8 slimmed AppContent.
+4. **Add a "Remediation" subsection** documenting RW1–RW5 outcomes: the grep showing 0 hardcoded emits, the coverage table, the new historyStore/splitPath tests, the STRUCTURE.md fix.
+5. **Remove** every reference to "4,200 lines" and "600 lines". Verify with: `grep -nE "4,?200|600 lines" .agents/walkthrough.md` → must be empty.
 
 ### Exit criteria
-- Grep for hardcoded emits in `client/src/` returns **0**.
-- Two-browser smoke test passes for drag/lock/erase/delete/paste/cursor.
+- `grep -nE "4,?200|600 lines" .agents/walkthrough.md` returns nothing.
+- Every numeric claim (line counts, bundle sizes, test counts, coverage %) is reproducible from the codebase or git history at the time of writing.
+- The remediation workstream outcomes are recorded with the actual verification output pasted.
 
 ---
 
-# WS2 — Replace Existence-Only Tests with Behavioral Tests
+# RW2 — Behavioral Tests for `historyStore`
 
-**Severity:** 🔴 High · **Risk:** Medium (logic is subtle) · **Files touched:** test files only
+**Severity:** 🔴 High · **Risk:** Medium (logic is subtle, may surface latent bugs) · **Files touched:** `client/src/state/__tests__/historyStore.test.js` (new), possibly `stores.test.js` (remove the mock-out)
 
 ### Problem
-`stores.test.js` runs 14 tests, all `expect(X).toBeDefined()`. The 6 hook tests are the same. These confirm files import — they will not catch a regression in undo/redo, paste-offset, or lock cleanup. The 28/28 number gives false confidence.
+`historyStore.js` (367 lines) contains the most complex client logic in the codebase: a `handleUndo`/`handleRedo` pair each dispatching over **5 action types** (`create`, `delete`, `transform`, `erase`, `reorder`), a 50-action cap, empty-stack guards, and cross-tab switching. The coverage report **does not list it at all** — it is not imported by any test. The existing `stores.test.js` (lines 94–102) actively **mocks it out** rather than testing it. `state/` branch coverage is 28.84%, far below the 60% target. This is the single highest-value test gap.
 
-### Strategy: tier the test effort by risk
+### The history action contract (transcribed from source for test correctness)
+| `action.type` | Fields | Undo emits | Redo emits |
+|---|---|---|---|
+| `create` | `elements[]`, `tabId` | `ELEMENT_DELETE` (the created ids) | `ELEMENT_CREATE` (each element) |
+| `delete` | `elements[]`, `tabId` | `ELEMENT_CREATE` (each element) | `ELEMENT_DELETE` (the ids) |
+| `transform` | `elementsBefore[]`, `elementsAfter[]`, `tabId` | `ELEMENT_UPDATE` batch from `elementsBefore` | `ELEMENT_UPDATE` batch from `elementsAfter` |
+| `erase` | `elementsBefore[]`, `elementsAfter[]`, `tabId` | `ELEMENT_DELETE` `elementsAfter`, then `ELEMENT_CREATE` `elementsBefore` | `ELEMENT_DELETE` `elementsBefore`, then `ELEMENT_CREATE` `elementsAfter` |
+| `reorder` | `orderedIdsBefore[]`, `orderedIdsAfter[]`, `tabId` | `ELEMENTS_REORDER` `orderedIdsBefore` | `ELEMENTS_REORDER` `orderedIdsAfter` |
 
-**Tier A — Pure functions (highest value, easiest):** test actual input→output.
-| Target | File | Test cases |
-|--------|------|-----------|
-| `mergeElement` | `lib/mergeElement.js` | (already has 4 tests — **augment**: nested `properties` merge, undefined `updates`, idempotency) |
-| `locksArrayToMap` | `lib/locks.js` | (has 2 tests — **augment**: empty array, duplicate keys, last-wins semantics) |
-| `splitPathElement` | `components/canvas/CanvasSelection.js` | **NEW**: eraser crossing a stroke → 2 children with correct bounding boxes; no crossing → unchanged; edge cases (endpoint hit, tangent) |
-| `getElementAtCoords` / `getHoveredElement` | `CanvasSelection.js` | **NEW**: rotated rectangle hit/miss; z-order (topmost wins); circle uses normalized distance |
-| `getGroupBoundingBox` | `CanvasSelection.js` | **NEW**: rotated children → correct axis-aligned bbox |
-| Quaternion ops (`qMultiply`, `qLerp`, `getRotationToAlignNormal`) | `components/dice/DiceMath.js` | **NEW**: identity mult, associativity, slerp endpoints, face alignment |
+### Strategy — reuse the proven React-mock pattern
+`stores.test.js` already establishes a working pattern: mock `react` (useState/useRef/useCallback/useMemo/useEffect/createContext/useContext/createElement), mock `lib/socket.js`, and mock the sibling stores (`selectionStore`, `canvasStore`). Import the provider *after* the mocks are defined, then drive the callbacks captured from the provider's context value. Use this exact pattern for `historyStore.test.js`.
 
-**Tier B — Store reducers (the highest-risk untested logic):**
-| Target | Test cases |
-|--------|-----------|
-| `historyStore.handleUndo` / `handleRedo` | Push a `create` action → undo deletes it → redo recreates with identical properties. Repeat for `delete`, `transform`, `erase`, `reorder` action types. Verify the 50-action cap evicts oldest. Verify empty-stack undo is a no-op. |
-| `clipboardStore.handlePaste` | Paste offset increments by `+20` on consecutive pastes; resets to `20` after a copy; new element IDs are regenerated (not cloned). |
-| `canvasStore` lock-map transforms | `setLocks` from array form → object form; `setElements` scoped to active tab; switching `activeTabId` does not bleed elements between tabs. |
-| `selectionStore` render-sync block | The `prevSelectedElementIds`/`prevElements` sync-during-render pattern must not fire when selection is unchanged (regression guard for the subtle pattern flagged in `REFACTOR_PLAN.md` risks). |
+### Required test cases
+1. **Empty-stack no-op**: `handleUndo()` with empty `history` emits nothing; `handleRedo()` with empty `redoStack` emits nothing.
+2. **`create` round-trip**: push a `create` action → `handleUndo` emits `ELEMENT_DELETE` with the element ids and calls `setTabs` to remove them → `handleRedo` emits `ELEMENT_CREATE` per element and restores them. Assert exact emitted event names and payloads via the socket mock.
+3. **`delete` round-trip**: mirror of create — undo restores, redo re-deletes.
+4. **`transform` round-trip**: undo emits an `ELEMENT_UPDATE` batch whose updates equal `elementsBefore`; redo emits a batch equal to `elementsAfter`. Verify the `setTabs` mapper restores the correct pre/post element objects (deep-equal, since source uses `JSON.parse(JSON.stringify(...))`).
+5. **`erase` round-trip**: undo emits `ELEMENT_DELETE` for `elementsAfter` ids then `ELEMENT_CREATE` for each `elementsBefore`; redo does the inverse. This is the most complex branch — assert the **order** of emits.
+6. **`reorder` round-trip**: undo emits `ELEMENTS_REORDER` with `orderedIdsBefore`; redo with `orderedIdsAfter`. Verify the `setTabs` mapper reconstructs the element array in the emitted order.
+7. **50-action cap**: push 52 distinct actions → assert `history.length === 50` and the two oldest were evicted (FIFO). Assert `redoStack` is cleared on each push.
+8. **Cross-tab switch**: push an action with `tabId: 'tab-other'` while `activeTabId` is `'tab-default'` → undo calls `setActiveTabId('tab-other')` and emits `TAB_SWITCH`. (Guard: confirm the source reads `activeTabId` from `useCanvasStore`, lines 15/38/195.)
 
-**Tier C — Replace, don't keep, the existence tests:**
-- Delete the 14 `expect(X).toBeDefined()` tests in `stores.test.js` and the 6 in the hook tests.
-- If keeping a module-load sanity check is desired, consolidate into **one** test per file: `expect(() => render(<Providers><App/></Providers>)).not.toThrow()` style, not 14 trivial ones.
-
-### Testing harness notes
-- Use `@testing-library/react` `renderHook` for hook tests and `render` for provider trees.
-- For `historyStore`/`clipboardStore`, the tests need the providers mounted — use a small `withProviders(wrapper)` helper.
-- Mock the socket singleton (`lib/socket.js`) in hook tests with `vi.mock`.
-- The pure-function tests (Tier A) need **no** React or socket — keep them isolated and fast.
+### Implementation notes
+- The socket mock's `emit` callback must invoke the supplied callback with `{ success: true }` so the `if (res && res.success)` branches execute (otherwise `setTabs` is never called and coverage stays low). Pattern: `emit: vi.fn((event, data, cb) => cb && cb({ success: true }))`.
+- The `canvasStore` mock must expose `setTabs` as a `vi.fn()` so the `prev.map(...)` reducers can be asserted — pass a mutable `tabs` array and assert the post-call shape.
+- **If a test reveals a latent bug** (e.g. the cap evicts the wrong end, or a `setTabs` reducer misorders): **fix the source, do not weaken the test.** Document the bug + fix in the walkthrough. This is the whole point of writing the test.
+- After the suite lands, remove the now-redundant `historyStore` mock from `stores.test.js` only if doing so doesn't break the `clipboardStore` test that depends on it (verify before deleting).
 
 ### Verification gate
 ```bash
 npm --prefix client run test -- --coverage
 ```
-Target: **≥70% statements / ≥60% branches** on `state/`, `lib/`, `components/canvas/CanvasSelection.js`, `components/dice/DiceMath.js`. Report the actual coverage numbers in the walkthrough.
+Target: `historyStore.js` listed with **≥70% stmts / ≥60% branches**; `state/` overall branch coverage **≥60%**. Paste the coverage table into the walkthrough.
 
 ### Exit criteria
-- Existence-only tests removed or consolidated to one-per-file.
-- Behavioral tests added for all Tier A and Tier B targets.
-- Coverage thresholds met (paste the coverage table).
+- `historyStore.js` appears in the coverage report at/above target.
+- All 8 required test cases present and passing.
+- No regression in existing 32 tests.
 
 ---
 
-# WS3 — Rewrite `walkthrough.md` to Reflect Reality
+# RW3 — Add a Positive-Split `splitPathElement` Test
 
-**Severity:** 🟡 Medium · **Risk:** None (docs only) · **Files touched:** `.agents/walkthrough.md`
+**Severity:** 🟡 Medium · **Risk:** Low · **Files touched:** `client/src/components/canvas/__tests__/CanvasSelection.test.js`
 
 ### Problem
-The current `walkthrough.md` is ~70% a re-paste of the **2024** modularization (server handler splits, `CanvasSelection`/`CanvasRenderer`/`DiceEffects` decomposition). For the Stages 0–7 refactor specifically it claims:
-- "Simplified `App.jsx` from **4,200 lines** to ~600 lines" — **both numbers wrong** (actual: ~2,750 → 134).
-- Omits that Stage 7 left 18 hardcoded emits (now fixed by WS1).
-- Omits that `AppContent.jsx` became a 1,264-line megacomponent (now fixed by WS4).
-- Calls 28/28 tests meaningful without disclosing that 20 are existence-only (now fixed by WS2).
+The existing test at line 60–79 is titled *"splits path at eraser points correctly"* but asserts `expect(result.length).toBe(0)`. **Important nuance verified against the source:** for *those specific inputs* the empty result is actually correct — the eraser at center `(150,150)` (local `(0,0)`, radius 10) erases only the middle point of a 3-point path, leaving two 1-point fragments which are each `< 2` and discarded. So the assertion isn't *wrong*, but (a) the name is misleading (it documents a no-split case as a split case), and (b) **there is no test anywhere that exercises an actual successful split** — the function's entire purpose. A regression that broke splitting would pass this suite.
 
 ### Steps
-1. **Preserve the historical 2024 section** but move it under a clearly-labeled `## Historical: Original Modularization (pre-refactor)` heading so it's not mistaken for recent work.
-2. **Write a new top section** `## Refactor Stages 0–7 (2026-06) + Remediation` with:
-   - Accurate line counts: `App.jsx` 2,750 → 134; `AppContent.jsx` created at 1,264 → reduced to <500 by remediation.
-   - Honest accounting of what each stage delivered vs. what it claimed.
-   - A "Remediation follow-up" subsection documenting G1–G5 and how each was closed, with the verification evidence (grep counts, coverage numbers, build output).
-3. **Include the actual verification output** from WS1/WS2/WS4 (paste the green lint/build/test + the `git grep` zero-count line + the coverage table).
-4. Cross-link to `REFACTOR_PLAN.md` and `REMEDIATION_PLAN.md`.
+1. **Rename the existing test** to honestly describe what it checks, e.g. *"returns empty array when eraser leaves only sub-2-point fragments"*.
+2. **Add a positive-split test** with inputs engineered to leave two ≥2-point fragments:
+   - Path with 5+ points spanning a wide horizontal range, e.g. normalized `[(0,0.5),(0.25,0.5),(0.5,0.5),(0.75,0.5),(1,0.5)]` on a `200×100` element at `(100,100)`.
+   - Eraser at the center point only (radius small enough to clip the middle point but leave ≥2 points on each side).
+   - Assert `result.length >= 2`; assert each child has `type: 'path'`, `properties.points.length >= 2`, and that the children's geometry reconstructs to the expected split (left fragment then right fragment). Use `toBeCloseTo` on the computed x/y since the function `Math.round`s outputs.
+3. **Add an edge case**: eraser that misses entirely → `result.length === 1` (the path returned unchanged as a single chunk) and the child's points equal the input points. This pins the no-op-return path at `CanvasSelection.js:168-170` vs the normal return.
+
+### Implementation notes
+- Trace the math by hand before writing assertions (the plan author already traced the existing case above to confirm `[]` is correct). Local coords are `-w/2 + p.x*w`, `-h/2 + p.y*h`; eraser center local is `getLocalCoords(ex,ey,pathEl)`.
+- The function regenerates IDs with `Date.now()` + `Math.random()` — assert on shape and counts, not on exact id strings.
 
 ### Exit criteria
-- Every numeric claim in `walkthrough.md` is reproducible from the codebase or git history.
-- No reference to "4,200 lines" or "600 lines".
-- The remediation workstream outcomes are recorded with evidence.
+- A passing test exists where `splitPathElement` returns ≥2 child path elements with correct geometry.
+- `splitPathElement` branch coverage on `CanvasSelection.js` increases (the `chunks.length >= 1` happy path at line 172+ is currently uncovered).
 
 ---
 
-# WS4 — Slim `AppContent.jsx` (Stage 8)
+# RW4 — Document `useSelectionActions.js` in `STRUCTURE.md`
 
-**Severity:** 🟡 Medium · **Risk:** Medium (touches the main render tree) · **Files touched:** `AppContent.jsx`, new/updated stores
+**Severity:** 🟡 Medium · **Risk:** None · **Files touched:** `STRUCTURE.md`
 
 ### Problem
-`AppContent.jsx` (1,264 lines) still owns business state that belongs in stores:
-- `useState`: `showSavesModal` (L46), `activeVirtualDimensions` (L96), `activeTool` (L99), `penColor` (L100), `penSize` (L101), `eraserSize` (L102), `showCursorNames` (L104).
-- `useRef`: `nameRef`, `colorRef`, `roomIdRef`, `joinedRef` (L205–208), `activeTabIdRef` (L218), `inspectorLockRef`, `originalInspectorElementsRef` (L278–279).
-
-This is the new bottleneck — the exact problem the refactor was meant to solve.
-
-### Target architecture
-```
-state/uiStore.js           ← add: activeTool, penColor, penSize, eraserSize,
-                              showCursorNames, activeVirtualDimensions, showSavesModal
-                              (everything tool/canvas-preference related)
-state/selectionStore.js    ← add: inspectorLockRef, originalInspectorElementsRef
-                              (these are selection-transform scratch state)
-state/canvasStore.js       ← activeTabIdRef already belongs here (it mirrors activeTabId);
-                              replace the ref with the store value + a derivation
-```
-`nameRef`/`colorRef`/`roomIdRef`/`joinedRef` are lobby/session scratch — leave in `App.jsx` (where the lobby already lives) or move to a new `state/sessionStore.js` only if they're read in `AppContent`. Verify before moving.
-
-### Steps (incremental, one concern per commit)
-1. **Inventory**: for each piece of state, grep all readers/writers in `AppContent.jsx` and its children. Record the list in the commit message.
-2. **Move tool state** (`activeTool`, `penColor`, `penSize`, `eraserSize`) → `uiStore`. This is the cleanest cluster.
-3. **Move canvas-preference state** (`showCursorNames`, `activeVirtualDimensions`, `showSavesModal`) → `uiStore`.
-4. **Move inspector scratch** (`inspectorLockRef`, `originalInspectorElementsRef`) → `selectionStore`.
-5. **Resolve `activeTabIdRef`** — it duplicates `canvasStore.activeTabId`. Determine why the ref exists (likely a stale-closure workaround) and replace it with the store value if safe; if the ref is load-bearing, document why in a comment.
-6. **After each move**: run lint + build + tests + the two-browser smoke test for the affected feature.
-
-### Exit criteria
-- `AppContent.jsx` is **< 500 lines**.
-- It contains **no** `useState`/`useRef` for business state (only layout composition + hook delegation).
-- Tool switching, pen drawing, eraser, cursor-name toggle, inspector transform, save modal all still work in a two-browser session.
-
----
-
-# WS5 — Housekeeping
-
-**Severity:** 🟢 Low · **Risk:** None · **Files touched:** repo root, `agent.md`, `STRUCTURE.md`
+`client/src/app/hooks/useSelectionActions.js` was created during Stage 8 and is **load-bearing** — imported and invoked at `AppContent.jsx:17,130`. But it has **0 mentions in `STRUCTURE.md`** (verified by grep). This violates agent.md §Arch 6: *"New files must be documented in `STRUCTURE.md` in the same change."* The architectural map no longer matches the code.
 
 ### Steps
-1. **Delete the `nul` file** — it's a Windows artifact (likely from an accidental `> nul` redirect). Confirm it's not referenced anywhere first: `git grep -n "\bnul\b"` should return nothing meaningful.
-2. **Add `nul` to `.gitignore`** as a one-line guard in case it recurs on Windows. (Pattern: `/nul`.)
-3. **Document the `agent.md` edit history** — commit `b8d5ac5` modified `agent.md` mid-refactor to add `.agents/` publish instructions. Add a one-line note at the top of agent.md's Workflows section: *"Change log: artifact-publishing workflow added in `b8d5ac5`; all other edits must be flagged before applying (§Guardrails 1)."* This makes the self-edit visible rather than buried.
-4. **Verify `STRUCTURE.md` documents every file** added by the refactor (`app/`, `app/hooks/*`, `state/*`, `lib/*`, `shared/protocol.js`). Per §Arch 6, an undocumented file is a violation. Cross-check against `git ls-files client/src/app client/src/state client/src/lib shared/`.
+1. Open `STRUCTURE.md` and locate the `/client/src/app/hooks/` section (it already lists `useSocketConnection`, `useElementEvents`, `useTabs`, etc.).
+2. Add a one-line entry for `useSelectionActions.js` in the same style as its siblings. First read the file's own JSDoc to describe it accurately — based on its call site (`useSelectionActions(currentUser)` in AppContent) and the Stage 8 commit, it centralizes selection/transform actions (inspector transforms, lock toggling, delete) previously inline in AppContent. Confirm the exact responsibility from the source before writing the line.
+3. Cross-check the full hook list on disk against `STRUCTURE.md` so no other hook is missed:
+   ```
+   useDiceEvents useDiceTick useElementActions useElementEvents useKeyboardShortcuts
+   useSaveEvents useSelectionActions useSocketConnection useTabEvents useTabs
+   useUserEvents useZenModeShortcut
+   ```
+   Each must appear at least once.
 
 ### Exit criteria
-- `git status` shows only intentional changes (no `nul`).
-- `STRUCTURE.md` lists every tracked file in the new directories.
+- `grep -c "useSelectionActions" STRUCTURE.md` returns ≥1.
+- Every hook file on disk has a corresponding `STRUCTURE.md` mention (run the cross-check above; no hook missing).
 
 ---
 
-## ✅ Final Verification (run after all workstreams merge)
+# RW5 — Housekeeping: Delete `nul`, Restore Clean Lint
+
+**Severity:** 🟢 Low · **Risk:** None · **Files touched:** repo root, `client/eslint.config.js`
+
+### Problem
+Two minor loose ends:
+1. The `nul` file (105 bytes, a Windows artifact) still exists on disk. It's gitignored (so it won't pollute commits), but the prior plan said to delete it.
+2. Running `npm run test -- --coverage` generates `coverage/`, and `npm run lint` then warns: *"Unused eslint-disable directive"* against `coverage/block-navigation.js`. The ESLint config's `globalIgnores` only excludes `dist`.
+
+### Steps
+1. **Confirm `nul` is safe to delete**: `git ls-files nul` returns empty (it's untracked), and `git grep -w nul` should find no code references to it. Then delete it: `rm nul` (or the Windows equivalent). Verify `git status` is clean afterward.
+2. **Add `coverage` to ESLint ignores**: in `client/eslint.config.js`, change `globalIgnores(['dist'])` → `globalIgnores(['dist', 'coverage'])`. This restores `npm run lint` to zero warnings after a coverage run.
+
+### Verification gate
+```bash
+npm --prefix client run test -- --coverage   # generates coverage/
+npm --prefix client run lint                 # must report 0 warnings
+git status                                   # clean, nul gone
+```
+
+### Exit criteria
+- `nul` no longer on disk; `git status` clean.
+- `npm run lint` reports **0 errors, 0 warnings** immediately after a coverage run.
+
+---
+
+## ✅ Final Verification (run after all workstreams merge, paste into walkthrough)
 
 ```bash
 # 1. Protocol completeness — expect 0
 git grep -nE "socket\.(emit|on|off)\(['\"][a-z-]+['\"]" client/src/ | grep -v shared/protocol.js | wc -l
 
-# 2. Standard gates
+# 2. Walkthrough integrity — expect empty
+grep -nE "4,?200|600 lines" .agents/walkthrough.md
+
+# 3. STRUCTURE completeness — expect every hook listed >=1
+for h in useDiceEvents useDiceTick useElementActions useElementEvents useKeyboardShortcuts \
+         useSaveEvents useSelectionActions useSocketConnection useTabEvents useTabs \
+         useUserEvents useZenModeShortcut; do echo "$h: $(grep -c $h STRUCTURE.md)"; done
+
+# 4. Standard gates
 npm --prefix client run lint
 npm --prefix client run build
 npm --prefix client run test -- --coverage
 
-# 3. AppContent size — expect < 500
-wc -l client/src/app/AppContent.jsx
-
-# 4. Clean tree
+# 5. Clean tree
 git status
 ```
-
-All four must pass. Paste the output into the rewritten `walkthrough.md`.
+Targets: (1)=0, (2)=empty, (3)=every hook ≥1, (4)=all green with `state/` branch ≥60%, (5)=clean. Paste the output into the rewritten `walkthrough.md`.
 
 ---
 
@@ -253,19 +234,19 @@ All four must pass. Paste the output into the rewritten `walkthrough.md`.
 
 | Risk | Mitigation |
 |------|------------|
-| WS1 mechanical replacement introduces a typo'd constant that silently breaks an event. | The grep check + two-browser smoke test will catch it; constants are imported, so a typo is a compile error, not a silent runtime miss. |
-| WS2 behavioral tests for `historyStore` reveal a latent bug in the undo/redo logic. | **Good** — that's the point. Fix the bug, don't weaken the test. Document in walkthrough. |
-| WS4 moving `activeTabIdRef` breaks a stale-closure workaround the refactor introduced. | Step 5 is explicitly "determine why the ref exists" before removing; if load-bearing, keep it with a comment rather than force-removing. |
-| Workstreams drift from the `[BLOCKING]` rules mid-execution. | This plan is governed by the same `agent.md` rules. Each workstream's verification gate is a blocking checkpoint. |
-| Parallel WS1/WS4/WS5 work conflicts on `STRUCTURE.md`. | Merge WS5's `STRUCTURE.md` update last, after the file lists stabilize. |
+| RW2 surfaces a latent bug in undo/redo (e.g. wrong eviction end, misordered erase emits). | **Desired outcome.** Fix the source per the documented contract; do not weaken the test. Record bug+fix in walkthrough. |
+| The React-mock pattern in `stores.test.js` is brittle and the new `historyStore.test.js` won't mount. | Copy the *exact* working mock shape from `stores.test.js:9-44` (useState/useRef/useCallback/useMemo/useEffect/createContext/useContext/createElement). The pattern is proven; don't improvise a new one. |
+| RW1 history rewrite deletes useful context. | Preserve all historical sections under a dated heading; only the false line-count claim and stale verification blocks are replaced. |
+| `splitPathElement` test author mis-traces the math and writes a failing assertion. | The plan traces the existing case (→`[]`) and prescribes specific 5-point inputs for the positive case; trace by hand before asserting, use `toBeCloseTo` on rounded outputs. |
+| Lint-warning fix in RW5 is the only edit to `eslint.config.js` — keep it minimal. | One-token change (`'dist'` → `'dist', 'coverage'`); no reformatting. |
 
 ---
 
 ## 🗓️ Suggested Execution
 
-- **One developer/agent session per workstream.** WS1 and WS4 are the only ones with real logic risk; WS5 and WS3 are mechanical/doc.
-- **Merge order:** WS5 → WS1 → WS4 → WS2 → WS3.
+- **One developer/agent session per workstream.** RW1 (docs) and RW5 (housekeeping) are trivial; RW2 (historyStore tests) is the only one with real logic risk.
+- **Merge order:** RW5 → RW4 → RW3 → RW2 → RW1.
 - **Each workstream = one commit** with the verification output in the message body.
 - **No workstream is "done" until its verification gate passes and the output is pasted.**
 
-This closes every gap from the review and leaves the refactor at the standard the original plan and `agent.md` rules demand.
+This closes every residual gap from the second review and brings the refactor to the standard the original `REFACTOR_PLAN.md` and `agent.md` rules demand.
