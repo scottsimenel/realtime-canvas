@@ -20,8 +20,8 @@
 - `[x]` 2.3 Integrate `uiStore` and `diceStore` into `App.jsx`
 
 ## 📦 Stage 3 — Extract `historyStore`, `selectionStore`, `clipboardStore`
-- `[ ]` 3.1 Extract undo/redo state: `state/historyStore.js`
-- `[ ]` 3.2 Extract selection state: `state/selectionStore.js`
-- `[ ]` 3.3 Extract clipboard state: `state/clipboardStore.js`
-- `[ ]` 3.4 Extract keyboard shortcuts hook: `app/hooks/useKeyboardShortcuts.js`
-- `[ ]` 3.5 Integrate Stage 3 stores and shortcuts into `App.jsx`
+- `[x]` 3.1 Extract undo/redo state: `state/historyStore.js`
+- `[x]` 3.2 Extract selection state: `state/selectionStore.js`
+- `[x]` 3.3 Extract clipboard state: `state/clipboardStore.js`
+- `[x]` 3.4 Extract keyboard shortcuts hook: `app/hooks/useKeyboardShortcuts.js`
+- `[x]` 3.5 Integrate Stage 3 stores and shortcuts into `App.jsx`
