@@ -1,8 +1,9 @@
+import { EVENTS } from '../../shared/protocol.js';
 export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle save creation.
    */
-  socket.on('save-create', (data, callback) => {
+  socket.on(EVENTS.SAVE_CREATE, (data, callback) => {
     const { name } = data || {};
     try {
       const save = registry.saveState(name);
@@ -20,7 +21,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle save listing.
    */
-  socket.on('save-list', (callback) => {
+  socket.on(EVENTS.SAVE_LIST, (callback) => {
     try {
       const saves = registry.listSaves();
       if (typeof callback === 'function') {
@@ -37,7 +38,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle loading a save.
    */
-  socket.on('save-load', (data, callback) => {
+  socket.on(EVENTS.SAVE_LOAD, (data, callback) => {
     const { saveId } = data || {};
     if (!saveId) {
       if (typeof callback === 'function') {
@@ -62,7 +63,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
         const room = socket.room || DEFAULT_ROOM;
         
         // Broadcast newly loaded state to all users in the room
-        io.to(room).emit('room-state-loaded', {
+        io.to(room).emit(EVENTS.ROOM_STATE_LOADED, {
           tabs: tabsList,
           assets: assetsList
         });
@@ -86,7 +87,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle deleting a save.
    */
-  socket.on('save-delete', (data, callback) => {
+  socket.on(EVENTS.SAVE_DELETE, (data, callback) => {
     const { saveId } = data || {};
     if (!saveId) {
       if (typeof callback === 'function') {

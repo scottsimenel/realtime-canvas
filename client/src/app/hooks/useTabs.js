@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useCallback } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { useCanvasStore } from '../../state/canvasStore.js';
@@ -20,7 +21,7 @@ export function useTabs(setUsers) {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
-    socket.emit('tab-switch', { tabId }, (res) => {
+    socket.emit(EVENTS.TAB_SWITCH, { tabId }, (res) => {
       if (res && res.success) {
         setActiveTabId(tabId);
         setUsers((prev) =>
@@ -37,7 +38,7 @@ export function useTabs(setUsers) {
     const createdTabId = newTabId();
     const newName = `Canvas ${tabs.length + 1}`;
 
-    socket.emit('tab-create', { tabId: createdTabId, name: newName }, (res) => {
+    socket.emit(EVENTS.TAB_CREATE, { tabId: createdTabId, name: newName }, (res) => {
       if (res && res.success && res.tab) {
         const formattedTab = {
           ...res.tab,
@@ -55,7 +56,7 @@ export function useTabs(setUsers) {
 
     if (tabs.length <= 1) return;
 
-    socket.emit('tab-delete', { tabId }, (res) => {
+    socket.emit(EVENTS.TAB_DELETE, { tabId }, (res) => {
       if (res && res.success) {
         setTabs((prev) => prev.filter((t) => t.id !== tabId));
         if (res.users) {
@@ -80,7 +81,7 @@ export function useTabs(setUsers) {
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
-    socket.emit('tab-rename', { tabId, name: trimmedName }, (res) => {
+    socket.emit(EVENTS.TAB_RENAME, { tabId, name: trimmedName }, (res) => {
       if (res && res.success) {
         setTabs((prev) =>
           prev.map((t) => (t.id === tabId ? { ...t, name: trimmedName } : t))

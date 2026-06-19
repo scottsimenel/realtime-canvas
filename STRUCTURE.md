@@ -51,10 +51,25 @@ graph TD
 *   `/client/src/state/`: Modular context stores mapping states.
     *   `uiStore.js`: Layout panel visibility state triggers and toggles.
     *   `diceStore.js`: Mixed dice roller bag totals, animations data, and roll triggers.
+    *   `canvasStore.js`: Collaborative tabs, elements, locks, and room settings state.
+    *   `selectionStore.js`: Selected elements, inspector focus, and dimension inputs.
+    *   `historyStore.js`: Undo/redo stacks and history push actions.
+    *   `clipboardStore.js`: Copy, cut, and paste element operations.
+    *   `uploadStore.js`: Assets registry, hidden assets, and upload progress/errors.
 *   `/client/src/app/`: Layout providers and custom state hooks.
-    *   `AppProviders.jsx`: Root provider chaining State Contexts.
-    *   `hooks/useDiceTick.js`: Sets up a 60ms ticker for dice tumble animations.
-    *   `hooks/useZenModeShortcut.js`: Registers the keydown keyboard shortcut `\` for Zen Mode.
+    *   `AppProviders.jsx`: Root provider chaining all state contexts (Ui -> Dice -> Upload -> Canvas -> Selection -> History -> Clipboard).
+    *   `hooks/`:
+        *   `useDiceTick.js`: Sets up a 60ms ticker for dice tumble animations.
+        *   `useZenModeShortcut.js`: Registers the keydown keyboard shortcut `\` for Zen Mode.
+        *   `useKeyboardShortcuts.js`: Registers undo, redo, copy, cut, and paste global key commands.
+        *   `useTabs.js`: Collaborative tab CRUD triggers.
+        *   `useElementActions.js`: Spawning shapes/images, reordering layers, and drag-and-drop helpers.
+        *   `useSocketConnection.js`: Socket connection state and automatic room rejoin handler.
+        *   `useUserEvents.js`: Listens to user join/leave, renaming, recoloring, and cursor movements.
+        *   `useElementEvents.js`: Listens to element locks, creates, updates, and deletes.
+        *   `useTabEvents.js`: Listens to tab creation, deletion, and renaming.
+        *   `useDiceEvents.js`: Listens to dice roll broadcasts.
+        *   `useSaveEvents.js`: Listens to room state loading and handles save CRUD requests.
 *   `/client/src/components/common/`:
     *   `DieIcon.jsx`: Renders scalable vector SVG representations for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
     *   `TabButton.jsx`: Render tab capsules in the workspace header supporting double-click renaming, custom delete controls, and inline active user indicators.

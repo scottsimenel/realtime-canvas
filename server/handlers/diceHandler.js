@@ -1,9 +1,10 @@
+import { EVENTS } from '../../shared/protocol.js';
 export function registerDiceHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle collaborative dice rolling.
    * Generates random values for mixed dice groups and d20 (with advantage/disadvantage), then broadcasts.
    */
-  socket.on('dice-roll', (data) => {
+  socket.on(EVENTS.DICE_ROLL, (data) => {
     const { d20, dice } = data || {};
     const room = socket.room || DEFAULT_ROOM;
 
@@ -94,6 +95,6 @@ export function registerDiceHandlers(io, socket, registry, DEFAULT_ROOM) {
       totalSum
     };
 
-    io.to(room).emit('dice-rolled', payload);
+    io.to(room).emit(EVENTS.DICE_ROLLED, payload);
   });
 }

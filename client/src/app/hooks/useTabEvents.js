@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useEffect } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { locksArrayToMap } from '../../lib/locks.js';
@@ -47,14 +48,14 @@ export function useTabEvents({ setUsers }) {
       );
     };
 
-    s.on('tab-created', onTabCreated);
-    s.on('tab-deleted', onTabDeleted);
-    s.on('tab-renamed', onTabRenamed);
+    s.on(EVENTS.TAB_CREATED, onTabCreated);
+    s.on(EVENTS.TAB_DELETED, onTabDeleted);
+    s.on(EVENTS.TAB_RENAMED, onTabRenamed);
 
     return () => {
-      s.off('tab-created', onTabCreated);
-      s.off('tab-deleted', onTabDeleted);
-      s.off('tab-renamed', onTabRenamed);
+      s.off(EVENTS.TAB_CREATED, onTabCreated);
+      s.off(EVENTS.TAB_DELETED, onTabDeleted);
+      s.off(EVENTS.TAB_RENAMED, onTabRenamed);
     };
   }, [setTabs, setActiveTabId, setSelectedElementIds, setUsers]);
 }

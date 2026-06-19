@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useCallback } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { newElementId } from '../../lib/ids.js';
@@ -46,7 +47,7 @@ export function useElementActions() {
 
       setElements((prev) => [...prev, element]);
 
-      socket.emit('element-create', { element, tabId: activeTabId }, (response) => {
+      socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: activeTabId }, (response) => {
         if (!response || !response.success) {
           // Rollback
           setElements((prev) => prev.filter((el) => el.id !== id));
@@ -87,7 +88,7 @@ export function useElementActions() {
 
         setElements((prev) => [...prev, element]);
 
-        socket.emit('element-create', { element, tabId: activeTabId }, (response) => {
+        socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: activeTabId }, (response) => {
           if (!response || !response.success) {
             // Rollback
             setElements((prev) => prev.filter((el) => el.id !== id));
@@ -148,7 +149,7 @@ export function useElementActions() {
 
       const socket = getSocket();
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabId });
+        socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: next.map((el) => el.id), tabId: activeTabId });
       }
 
       pushHistoryAction({
@@ -194,7 +195,7 @@ export function useElementActions() {
 
       const socket = getSocket();
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabId });
+        socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: next.map((el) => el.id), tabId: activeTabId });
       }
 
       pushHistoryAction({
@@ -249,7 +250,7 @@ export function useElementActions() {
 
       const socket = getSocket();
       if (socket && socket.connected) {
-        socket.emit('elements-reorder', { orderedIds: next.map((el) => el.id), tabId: activeTabId });
+        socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: next.map((el) => el.id), tabId: activeTabId });
       }
 
       pushHistoryAction({

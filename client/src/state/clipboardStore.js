@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../shared/protocol.js';
 import { createContext, useContext, useRef, useCallback, createElement, useMemo } from 'react';
 import { getSocket } from '../lib/socket.js';
 import { newElementId } from '../lib/ids.js';
@@ -52,7 +53,7 @@ export function ClipboardProvider({
     clipboardRef.current = elementsToCut;
     pasteOffsetRef.current = 20;
 
-    socket.emit('element-delete', { elementIds: unlockedIds, tabId: activeTabId }, (res) => {
+    socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockedIds, tabId: activeTabId }, (res) => {
       if (res && res.success) {
         setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
         setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
@@ -87,7 +88,7 @@ export function ClipboardProvider({
     setSelectedElementIds(newElements.map((el) => el.id));
 
     newElements.forEach((element) => {
-      socket.emit('element-create', { element, tabId: activeTabId }, (res) => {
+      socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: activeTabId }, (res) => {
         if (!res || !res.success) {
           console.error('Failed to create pasted element:', res?.error);
         }

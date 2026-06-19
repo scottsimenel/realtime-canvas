@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../shared/protocol.js';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Canvas from '../components/canvas/Canvas.jsx';
 import DiceEffects from '../components/dice/DiceEffects.jsx';
@@ -187,7 +188,7 @@ export default function AppContent({
             : t
         )
       );
-      socket.emit('room-settings-update', { updates, tabId: activeTabId }, (res) => {
+      socket.emit(EVENTS.ROOM_SETTINGS_UPDATE, { updates, tabId: activeTabId }, (res) => {
         if (res && res.success && res.roomSettings) {
           setTabs((prev) =>
             prev.map((t) =>
@@ -234,7 +235,7 @@ export default function AppContent({
     if (!socket || !socket.connected) return;
     if (!newName.trim()) return;
 
-    socket.emit('user-rename', { name: newName.trim() }, (res) => {
+    socket.emit(EVENTS.USER_RENAME, { name: newName.trim() }, (res) => {
       if (res && res.success) {
         nameRef.current = newName.trim();
       } else {
@@ -261,7 +262,7 @@ export default function AppContent({
     );
     colorRef.current = newColor;
 
-    socket.emit('user-recolor', { color: newColor }, (res) => {
+    socket.emit(EVENTS.USER_RECOLOR, { color: newColor }, (res) => {
       if (res && res.success) {
         // Optimistic update succeeded
       } else {
@@ -293,7 +294,7 @@ export default function AppContent({
       .filter(Boolean)
       .map((el) => JSON.parse(JSON.stringify(el)));
 
-    socket.emit('element-lock', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
+    socket.emit(EVENTS.ELEMENT_LOCK, { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
         inspectorLockRef.current = true;
         setIsInspectorFocused(true);
@@ -314,7 +315,7 @@ export default function AppContent({
     const socket = socketRef.current;
     if (socket && socket.connected) {
       const activeIds = selectedElementIds.filter((id) => locks[id] === currentUser?.id);
-      socket.emit('element-unlock', { elementIds: activeIds, tabId: activeTabIdRef.current });
+      socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: activeIds, tabId: activeTabIdRef.current });
       setLocks((prev) => {
         const next = { ...prev };
         activeIds.forEach((id) => {
@@ -385,7 +386,7 @@ export default function AppContent({
         })
       );
 
-      socket.emit('element-update', { batch, tabId: activeTabIdRef.current });
+      socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: activeTabIdRef.current });
     },
     [selectedElementIds, elements, locks, currentUser, setTabs, socketRef]
   );
@@ -424,7 +425,7 @@ export default function AppContent({
         locked: nextLocked,
       },
     };
-    socket.emit('element-update', {
+    socket.emit(EVENTS.ELEMENT_UPDATE, {
       batch: [{ elementId, updates }],
       tabId: activeTabIdRef.current,
     });
@@ -448,7 +449,7 @@ export default function AppContent({
       .filter(Boolean)
       .map((el) => JSON.parse(JSON.stringify(el)));
 
-    socket.emit('element-delete', { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
+    socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockedIds, tabId: activeTabIdRef.current }, (res) => {
       if (res && res.success) {
         setTabs((prev) =>
           prev.map((t) => {
@@ -490,7 +491,7 @@ export default function AppContent({
         .filter(Boolean)
         .map((el) => JSON.parse(JSON.stringify(el)));
 
-      socket.emit('element-delete', { elementIds: unlockableDrawingIds, tabId: activeTabIdRef.current }, (res) => {
+      socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockableDrawingIds, tabId: activeTabIdRef.current }, (res) => {
         if (res && res.success) {
           setTabs((prev) =>
             prev.map((t) => {

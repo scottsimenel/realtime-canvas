@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useEffect } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { mergeElement } from '../../lib/mergeElement.js';
@@ -140,26 +141,26 @@ export function useElementEvents() {
       );
     };
 
-    s.on('element-locked', onElementLocked);
-    s.on('element-unlocked', onElementUnlocked);
-    s.on('element-updated', onElementUpdated);
-    s.on('element-updated-batch', onElementUpdatedBatch);
-    s.on('element-created', onElementCreated);
-    s.on('element-deleted', onElementDeleted);
-    s.on('asset-created', onAssetCreated);
-    s.on('elements-reordered', onElementsReordered);
-    s.on('room-settings-updated', onRoomSettingsUpdated);
+    s.on(EVENTS.ELEMENT_LOCKED, onElementLocked);
+    s.on(EVENTS.ELEMENT_UNLOCKED, onElementUnlocked);
+    s.on(EVENTS.ELEMENT_UPDATED, onElementUpdated);
+    s.on(EVENTS.ELEMENT_UPDATED_BATCH, onElementUpdatedBatch);
+    s.on(EVENTS.ELEMENT_CREATED, onElementCreated);
+    s.on(EVENTS.ELEMENT_DELETED, onElementDeleted);
+    s.on(EVENTS.ASSET_CREATED, onAssetCreated);
+    s.on(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
+    s.on(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
 
     return () => {
-      s.off('element-locked', onElementLocked);
-      s.off('element-unlocked', onElementUnlocked);
-      s.off('element-updated', onElementUpdated);
-      s.off('element-updated-batch', onElementUpdatedBatch);
-      s.off('element-created', onElementCreated);
-      s.off('element-deleted', onElementDeleted);
-      s.off('asset-created', onAssetCreated);
-      s.off('elements-reordered', onElementsReordered);
-      s.off('room-settings-updated', onRoomSettingsUpdated);
+      s.off(EVENTS.ELEMENT_LOCKED, onElementLocked);
+      s.off(EVENTS.ELEMENT_UNLOCKED, onElementUnlocked);
+      s.off(EVENTS.ELEMENT_UPDATED, onElementUpdated);
+      s.off(EVENTS.ELEMENT_UPDATED_BATCH, onElementUpdatedBatch);
+      s.off(EVENTS.ELEMENT_CREATED, onElementCreated);
+      s.off(EVENTS.ELEMENT_DELETED, onElementDeleted);
+      s.off(EVENTS.ASSET_CREATED, onAssetCreated);
+      s.off(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
+      s.off(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
     };
   }, [setTabs, setSelectedElementIds, setAssets]);
 }

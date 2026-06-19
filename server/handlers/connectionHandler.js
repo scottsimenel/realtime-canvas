@@ -1,9 +1,10 @@
+import { EVENTS } from '../../shared/protocol.js';
 export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle user joining a room.
    * Registers user, returns current canvas state, and notifies other users.
    */
-  socket.on('join-room', (data, callback) => {
+  socket.on(EVENTS.JOIN_ROOM, (data, callback) => {
     const { name, color, roomId } = data || {};
     const room = roomId || DEFAULT_ROOM;
 
@@ -31,14 +32,14 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     }
 
     // Broadcast user joined notification to everyone else in the room
-    socket.to(room).emit('user-joined', currentUser);
+    socket.to(room).emit(EVENTS.USER_JOINED, currentUser);
   });
 
   /**
    * Handle real-time cursor movements.
    * Updates user position and broadcasts it to other users in the room.
    */
-  socket.on('cursor-move', (data) => {
+  socket.on(EVENTS.CURSOR_MOVE, (data) => {
     const { x, y } = data || {};
     if (typeof x !== 'number' || typeof y !== 'number') return;
 
@@ -46,7 +47,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     if (user) {
       const room = socket.room || DEFAULT_ROOM;
       // Broadcast cursor updates efficiently (excluding the sender)
-      socket.to(room).emit('cursor-update', {
+      socket.to(room).emit(EVENTS.CURSOR_UPDATE, {
         userId: socket.id,
         x: user.x,
         y: user.y
@@ -57,7 +58,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle user renaming.
    */
-  socket.on('user-rename', (data, callback) => {
+  socket.on(EVENTS.USER_RENAME, (data, callback) => {
     const { name } = data || {};
     if (!name || typeof name !== 'string' || !name.trim()) {
       if (typeof callback === 'function') callback({ success: false, error: 'Name is required' });
@@ -67,7 +68,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     const updatedUser = registry.renameUser(socket.id, name.trim());
     if (updatedUser) {
       const room = socket.room || DEFAULT_ROOM;
-      io.to(room).emit('user-renamed', { userId: socket.id, name: updatedUser.name });
+      io.to(room).emit(EVENTS.USER_RENAMED, { userId: socket.id, name: updatedUser.name });
       if (typeof callback === 'function') callback({ success: true, user: updatedUser });
     } else {
       if (typeof callback === 'function') callback({ success: false, error: 'User not found' });
@@ -77,7 +78,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle user recoloring.
    */
-  socket.on('user-recolor', (data, callback) => {
+  socket.on(EVENTS.USER_RECOLOR, (data, callback) => {
     const { color } = data || {};
     if (!color || typeof color !== 'string' || !color.trim()) {
       console.warn(`[recolor] Invalid color received from socket ${socket.id}:`, color);
@@ -90,7 +91,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     if (updatedUser) {
       console.log(`[recolor] Successfully updated registry user ${updatedUser.name} (${socket.id}) color to: ${updatedUser.color}`);
       const room = socket.room || DEFAULT_ROOM;
-      io.to(room).emit('user-recolored', { userId: socket.id, color: updatedUser.color });
+      io.to(room).emit(EVENTS.USER_RECOLORED, { userId: socket.id, color: updatedUser.color });
       if (typeof callback === 'function') callback({ success: true, user: updatedUser });
     } else {
       console.error(`[recolor] User not found in registry for socket ${socket.id}`);
@@ -102,7 +103,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
    * Handle user disconnection.
    * Clean up registry entries (user cursor and held locks) and notify other clients.
    */
-  socket.on('disconnect', () => {
+  socket.on(EVENTS.DISCONNECT, () => {
     console.log(`Socket disconnected: ${socket.id}`);
     const room = socket.room || DEFAULT_ROOM;
 
@@ -110,12 +111,12 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     const { releasedLocks } = registry.disconnectUser(socket.id);
 
     // Broadcast user departure
-    socket.to(room).emit('user-left', { userId: socket.id });
+    socket.to(room).emit(EVENTS.USER_LEFT, { userId: socket.id });
 
     // Notify other clients about any locks that were released due to disconnect
     if (releasedLocks && releasedLocks.length > 0) {
       releasedLocks.forEach(({ elementId, tabId }) => {
-        io.to(room).emit('element-unlocked', { elementId, tabId });
+        io.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId, tabId });
       });
     }
   });

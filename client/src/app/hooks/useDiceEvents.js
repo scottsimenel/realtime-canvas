@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { useDiceStore } from '../../state/diceStore.js';
+import { EVENTS } from '../../../../shared/protocol.js';
 
 /**
  * Hook to listen to dice roll broadcast socket events and update dice state store.
@@ -26,10 +27,10 @@ export function useDiceEvents() {
       }, 5000);
     };
 
-    s.on('dice-rolled', onDiceRolled);
+    s.on(EVENTS.DICE_ROLLED, onDiceRolled);
 
     return () => {
-      s.off('dice-rolled', onDiceRolled);
+      s.off(EVENTS.DICE_ROLLED, onDiceRolled);
     };
   }, [setActiveRolls, setRollHistory]);
 }

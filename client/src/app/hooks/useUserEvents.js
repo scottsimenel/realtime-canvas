@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useEffect } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { useCanvasStore } from '../../state/canvasStore.js';
@@ -75,20 +76,20 @@ export function useUserEvents({ setUsers, setCurrentUser }) {
       );
     };
 
-    s.on('user-joined', onUserJoined);
-    s.on('user-renamed', onUserRenamed);
-    s.on('user-recolored', onUserRecolored);
-    s.on('user-left', onUserLeft);
-    s.on('cursor-update', onCursorUpdate);
-    s.on('tab-switched', onTabSwitched);
+    s.on(EVENTS.USER_JOINED, onUserJoined);
+    s.on(EVENTS.USER_RENAMED, onUserRenamed);
+    s.on(EVENTS.USER_RECOLORED, onUserRecolored);
+    s.on(EVENTS.USER_LEFT, onUserLeft);
+    s.on(EVENTS.CURSOR_UPDATE, onCursorUpdate);
+    s.on(EVENTS.TAB_SWITCHED, onTabSwitched);
 
     return () => {
-      s.off('user-joined', onUserJoined);
-      s.off('user-renamed', onUserRenamed);
-      s.off('user-recolored', onUserRecolored);
-      s.off('user-left', onUserLeft);
-      s.off('cursor-update', onCursorUpdate);
-      s.off('tab-switched', onTabSwitched);
+      s.off(EVENTS.USER_JOINED, onUserJoined);
+      s.off(EVENTS.USER_RENAMED, onUserRenamed);
+      s.off(EVENTS.USER_RECOLORED, onUserRecolored);
+      s.off(EVENTS.USER_LEFT, onUserLeft);
+      s.off(EVENTS.CURSOR_UPDATE, onCursorUpdate);
+      s.off(EVENTS.TAB_SWITCHED, onTabSwitched);
     };
   }, [setUsers, setCurrentUser, setTabs, setRollHistory, setActiveRolls]);
 }

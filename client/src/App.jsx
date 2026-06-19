@@ -6,6 +6,7 @@ import { getSocket } from './lib/socket.js';
 import { locksArrayToMap } from './lib/locks.js';
 import { useZenModeShortcut } from './app/hooks/useZenModeShortcut.js';
 import { useCanvasStore } from './state/canvasStore.js';
+import { EVENTS } from '../../shared/protocol.js';
 
 export default function App() {
   // Connection states
@@ -42,12 +43,12 @@ export default function App() {
     const onConnect = () => setConnected(true);
     const onDisconnect = () => setConnected(false);
 
-    s.on('connect', onConnect);
-    s.on('disconnect', onDisconnect);
+    s.on(EVENTS.CONNECT, onConnect);
+    s.on(EVENTS.DISCONNECT, onDisconnect);
 
     return () => {
-      s.off('connect', onConnect);
-      s.off('disconnect', onDisconnect);
+      s.off(EVENTS.CONNECT, onConnect);
+      s.off(EVENTS.DISCONNECT, onDisconnect);
     };
   }, []);
 
@@ -59,7 +60,7 @@ export default function App() {
       const socket = socketRef.current;
       if (socket && socket.connected) {
         socket.emit(
-          'join-room',
+          EVENTS.JOIN_ROOM,
           {
             name: nameInput,
             color: colorInput,
@@ -81,7 +82,7 @@ export default function App() {
               setActiveTabId(targetTabId);
 
               if (targetTabId !== 'tab-default') {
-                socket.emit('tab-switch', { tabId: targetTabId });
+                socket.emit(EVENTS.TAB_SWITCH, { tabId: targetTabId });
               }
 
               setCurrentUser({

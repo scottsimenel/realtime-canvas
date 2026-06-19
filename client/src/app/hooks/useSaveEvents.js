@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useEffect, useState, useCallback } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { locksArrayToMap } from '../../lib/locks.js';
@@ -21,7 +22,7 @@ export function useSaveEvents() {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
-    socket.emit('save-list', (res) => {
+    socket.emit(EVENTS.SAVE_LIST, (res) => {
       if (res && res.success) {
         setSaves(res.saves || []);
       } else {
@@ -34,7 +35,7 @@ export function useSaveEvents() {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
-    socket.emit('save-create', { name }, (res) => {
+    socket.emit(EVENTS.SAVE_CREATE, { name }, (res) => {
       if (res && res.success) {
         fetchSaves();
       } else {
@@ -51,7 +52,7 @@ export function useSaveEvents() {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
-    socket.emit('save-load', { saveId }, (res) => {
+    socket.emit(EVENTS.SAVE_LOAD, { saveId }, (res) => {
       if (res && res.success) {
         if (onLoadSuccess) onLoadSuccess();
       } else {
@@ -68,7 +69,7 @@ export function useSaveEvents() {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
-    socket.emit('save-delete', { saveId }, (res) => {
+    socket.emit(EVENTS.SAVE_DELETE, { saveId }, (res) => {
       if (res && res.success) {
         fetchSaves();
       } else {
@@ -100,10 +101,10 @@ export function useSaveEvents() {
       setSelectedElementIds([]);
     };
 
-    s.on('room-state-loaded', onRoomStateLoaded);
+    s.on(EVENTS.ROOM_STATE_LOADED, onRoomStateLoaded);
 
     return () => {
-      s.off('room-state-loaded', onRoomStateLoaded);
+      s.off(EVENTS.ROOM_STATE_LOADED, onRoomStateLoaded);
     };
   }, [setTabs, setAssets, setActiveTabId, setHistory, setRedoStack, setSelectedElementIds]);
 

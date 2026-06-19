@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../shared/protocol.js';
 import { createContext, useContext, useState, useCallback, useMemo, createElement } from 'react';
 import { SOCKET_URL, getSocket } from '../lib/socket.js';
 import { newAssetId } from '../lib/ids.js';
@@ -91,7 +92,7 @@ export function UploadProvider({ children }) {
 
           const socket = getSocket();
           if (socket && socket.connected) {
-            socket.emit('asset-create', { asset: newAsset }, (res) => {
+            socket.emit(EVENTS.ASSET_CREATE, { asset: newAsset }, (res) => {
               if (res && res.success) {
                 setAssets((prev) => [...prev.filter((a) => a.id !== res.asset.id), res.asset]);
               }

@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../shared/protocol.js';
 import { createContext, useContext, useState, useCallback, createElement } from 'react';
 import { getSocket } from '../lib/socket.js';
 import { useSelectionStore } from './selectionStore.js';
@@ -36,13 +37,13 @@ export function HistoryProvider({ children }) {
 
     if (activeTabId !== targetTabId) {
       setActiveTabId(targetTabId);
-      socket.emit('tab-switch', { tabId: targetTabId });
+      socket.emit(EVENTS.TAB_SWITCH, { tabId: targetTabId });
     }
 
     switch (action.type) {
       case 'create': {
         const elementIds = action.elements.map((el) => el.id);
-        socket.emit('element-delete', { elementIds, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_DELETE, { elementIds, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) =>
@@ -61,7 +62,7 @@ export function HistoryProvider({ children }) {
       }
       case 'delete': {
         action.elements.forEach((element) => {
-          socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+          socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
             if (res && res.success) {
               setTabs((prev) =>
                 prev.map((t) =>
@@ -91,7 +92,7 @@ export function HistoryProvider({ children }) {
             },
           };
         });
-        socket.emit('element-update', { batch, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) =>
@@ -115,7 +116,7 @@ export function HistoryProvider({ children }) {
       }
       case 'erase': {
         const toDeleteIds = action.elementsAfter.map((el) => el.id);
-        socket.emit('element-delete', { elementIds: toDeleteIds, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: toDeleteIds, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) => {
@@ -128,7 +129,7 @@ export function HistoryProvider({ children }) {
             );
 
             action.elementsBefore.forEach((element) => {
-              socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+              socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
                 if (res && res.success) {
                   setTabs((prev) =>
                     prev.map((t) =>
@@ -148,7 +149,7 @@ export function HistoryProvider({ children }) {
         break;
       }
       case 'reorder': {
-        socket.emit('elements-reorder', { orderedIds: action.orderedIdsBefore, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: action.orderedIdsBefore, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) => {
@@ -193,13 +194,13 @@ export function HistoryProvider({ children }) {
 
     if (activeTabId !== targetTabId) {
       setActiveTabId(targetTabId);
-      socket.emit('tab-switch', { tabId: targetTabId });
+      socket.emit(EVENTS.TAB_SWITCH, { tabId: targetTabId });
     }
 
     switch (action.type) {
       case 'create': {
         action.elements.forEach((element) => {
-          socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+          socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
             if (res && res.success) {
               setTabs((prev) =>
                 prev.map((t) =>
@@ -218,7 +219,7 @@ export function HistoryProvider({ children }) {
       }
       case 'delete': {
         const elementIds = action.elements.map((el) => el.id);
-        socket.emit('element-delete', { elementIds, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_DELETE, { elementIds, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) =>
@@ -248,7 +249,7 @@ export function HistoryProvider({ children }) {
             },
           };
         });
-        socket.emit('element-update', { batch, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) =>
@@ -272,7 +273,7 @@ export function HistoryProvider({ children }) {
       }
       case 'erase': {
         const toDeleteIds = action.elementsBefore.map((el) => el.id);
-        socket.emit('element-delete', { elementIds: toDeleteIds, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: toDeleteIds, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) => {
@@ -285,7 +286,7 @@ export function HistoryProvider({ children }) {
             );
 
             action.elementsAfter.forEach((element) => {
-              socket.emit('element-create', { element, tabId: targetTabId }, (res) => {
+              socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
                 if (res && res.success) {
                   setTabs((prev) =>
                     prev.map((t) =>
@@ -305,7 +306,7 @@ export function HistoryProvider({ children }) {
         break;
       }
       case 'reorder': {
-        socket.emit('elements-reorder', { orderedIds: action.orderedIdsAfter, tabId: targetTabId }, (res) => {
+        socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: action.orderedIdsAfter, tabId: targetTabId }, (res) => {
           if (res && res.success) {
             setTabs((prev) =>
               prev.map((t) => {

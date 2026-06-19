@@ -46,7 +46,7 @@
 - `[x]` 6.7 Integrate and run all hooks in `AppContent.jsx`
 
 ## 📦 Stage 7 — Rewire to `shared/protocol.js` and slim `App.jsx`
-- `[ ]` 7.1 Replace hardcoded socket events with imports from `shared/protocol.js`
-- `[ ]` 7.2 Reduce `App.jsx` to layout composition only (< 400 lines)
-- `[ ]` 7.3 Update `STRUCTURE.md` to reflect the final tree
+- `[x]` 7.1 Replace hardcoded socket events with imports from `shared/protocol.js`
+- `[x]` 7.2 Reduce `App.jsx` to layout composition only (< 400 lines)
+- `[x]` 7.3 Update `STRUCTURE.md` to reflect the final tree
 

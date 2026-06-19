@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../shared/protocol.js';
 import { createContext, useContext, useState, useEffect, useCallback, createElement } from 'react';
 import { getSocket } from '../lib/socket.js';
 import { useDiceTick } from '../app/hooks/useDiceTick.js';
@@ -60,7 +61,7 @@ export function DiceProvider({ children }) {
       }))
       .filter((g) => g.count > 0);
 
-    socket.emit('dice-roll', {
+    socket.emit(EVENTS.DICE_ROLL, {
       d20: {
         count: d20Count,
         mode: d20Mode

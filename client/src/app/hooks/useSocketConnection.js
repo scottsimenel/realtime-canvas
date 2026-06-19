@@ -1,3 +1,4 @@
+import { EVENTS } from '../../../../shared/protocol.js';
 import { useEffect, useRef } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { locksArrayToMap } from '../../lib/locks.js';
@@ -36,8 +37,7 @@ export function useSocketConnection({
     const onConnect = () => {
       setConnected(true);
       if (joinedRef.current) {
-        s.emit(
-          'join-room',
+        s.emit(EVENTS.JOIN_ROOM,
           {
             name: userRef.current?.name || '',
             color: userRef.current?.color || '',
@@ -60,7 +60,7 @@ export function useSocketConnection({
               setActiveTabId(targetTabId);
 
               if (targetTabId !== 'tab-default') {
-                s.emit('tab-switch', { tabId: targetTabId });
+                s.emit(EVENTS.TAB_SWITCH, { tabId: targetTabId });
               }
 
               setCurrentUser({
@@ -78,16 +78,16 @@ export function useSocketConnection({
       setConnected(false);
     };
 
-    s.on('connect', onConnect);
-    s.on('disconnect', onDisconnect);
+    s.on(EVENTS.CONNECT, onConnect);
+    s.on(EVENTS.DISCONNECT, onDisconnect);
 
     if (s.connected) {
       onConnect();
     }
 
     return () => {
-      s.off('connect', onConnect);
-      s.off('disconnect', onDisconnect);
+      s.off(EVENTS.CONNECT, onConnect);
+      s.off(EVENTS.DISCONNECT, onDisconnect);
     };
   }, [setConnected, setTabs, setUsers, setAssets, setActiveTabId, setCurrentUser]);
 }
