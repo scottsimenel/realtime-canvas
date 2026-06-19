@@ -36,3 +36,17 @@
 - `[x]` 5.2 Extract upload handlers (`handleImageUpload`, `isUploading`, `uploadError`) into `state/uploadStore.js`
 - `[x]` 5.3 Extract spawn and layer actions into `app/hooks/useElementActions.js`
 
+## 📦 Stage 6 — Extract socket event hooks (the listener tangle)
+- `[x]` 6.1 Extract socket connection / rejoin to `hooks/useSocketConnection.js`
+- `[x]` 6.2 Extract collaborative user events to `hooks/useUserEvents.js`
+- `[x]` 6.3 Extract element event listeners to `hooks/useElementEvents.js`
+- `[x]` 6.4 Extract tab event listeners to `hooks/useTabEvents.js`
+- `[x]` 6.5 Extract dice roll event listeners to `hooks/useDiceEvents.js`
+- `[x]` 6.6 Extract save events/CRUD to `hooks/useSaveEvents.js`
+- `[x]` 6.7 Integrate and run all hooks in `AppContent.jsx`
+
+## 📦 Stage 7 — Rewire to `shared/protocol.js` and slim `App.jsx`
+- `[ ]` 7.1 Replace hardcoded socket events with imports from `shared/protocol.js`
+- `[ ]` 7.2 Reduce `App.jsx` to layout composition only (< 400 lines)
+- `[ ]` 7.3 Update `STRUCTURE.md` to reflect the final tree
+

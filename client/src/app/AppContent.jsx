@@ -10,9 +10,14 @@ import DieIcon from '../components/common/DieIcon.jsx';
 import SavesModal from '../components/saves/SavesModal.jsx';
 import { getSocket } from '../lib/socket.js';
 import { getFullUrl } from '../lib/url.js';
-import { locksArrayToMap } from '../lib/locks.js';
 import { useUploadStore } from '../state/uploadStore.js';
 import { useElementActions } from './hooks/useElementActions.js';
+import { useSocketConnection } from './hooks/useSocketConnection.js';
+import { useUserEvents } from './hooks/useUserEvents.js';
+import { useElementEvents } from './hooks/useElementEvents.js';
+import { useTabEvents } from './hooks/useTabEvents.js';
+import { useDiceEvents } from './hooks/useDiceEvents.js';
+import { useSaveEvents } from './hooks/useSaveEvents.js';
 import { mergeElement } from '../lib/mergeElement.js';
 import { useUiStore } from '../state/uiStore.js';
 import { useDiceStore } from '../state/diceStore.js';
@@ -38,9 +43,29 @@ export default function AppContent({
   roomIdInput
 }) {
   const [showSavesModal, setShowSavesModal] = useState(false);
-  const [saves, setSaves] = useState([]);
+
   const {
-    setAssets,
+    saves,
+    fetchSaves,
+    handleCreateSave,
+    handleLoadSave,
+    handleDeleteSave
+  } = useSaveEvents();
+
+  useSocketConnection({
+    joined,
+    currentUser,
+    roomIdInput,
+    setConnected,
+    setUsers,
+    setCurrentUser
+  });
+
+  useUserEvents({ setUsers, setCurrentUser });
+  useElementEvents();
+  useTabEvents({ setUsers });
+  useDiceEvents();
+  const {
     hiddenAssetUrls,
     setHiddenAssetUrls,
     showHiddenMode,
@@ -98,9 +123,7 @@ export default function AppContent({
     redoStack,
     pushHistoryAction,
     handleUndo,
-    handleRedo,
-    setHistory,
-    setRedoStack
+    handleRedo
   } = useHistoryStore();
 
   // Register keyboard shortcuts hook
@@ -140,7 +163,6 @@ export default function AppContent({
     tabs,
     setTabs,
     activeTabId,
-    setActiveTabId,
     elements,
     locks,
     setLocks,
@@ -248,65 +270,7 @@ export default function AppContent({
     });
   }, [setCurrentUser, setUsers, setActiveRolls, setRollHistory, socketRef]);
 
-  const fetchSaves = useCallback(() => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
 
-    socket.emit('save-list', (res) => {
-      if (res && res.success) {
-        setSaves(res.saves || []);
-      } else {
-        console.error('Failed to fetch saves:', res?.error);
-      }
-    });
-  }, [socketRef]);
-
-  const handleCreateSave = useCallback((name) => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
-
-    socket.emit('save-create', { name }, (res) => {
-      if (res && res.success) {
-        fetchSaves();
-      } else {
-        alert(`Failed to create save: ${res?.error || 'Unknown error'}`);
-      }
-    });
-  }, [fetchSaves, socketRef]);
-
-  const handleLoadSave = useCallback((saveId) => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
-
-    if (!confirm('Are you sure you want to load this save? This will overwrite the current canvas state for all connected users.')) {
-      return;
-    }
-
-    socket.emit('save-load', { saveId }, (res) => {
-      if (res && res.success) {
-        setShowSavesModal(false);
-      } else {
-        alert(`Failed to load save: ${res?.error || 'Unknown error'}`);
-      }
-    });
-  }, [socketRef]);
-
-  const handleDeleteSave = useCallback((saveId) => {
-    const socket = socketRef.current;
-    if (!socket || !socket.connected) return;
-
-    if (!confirm('Are you sure you want to delete this save?')) {
-      return;
-    }
-
-    socket.emit('save-delete', { saveId }, (res) => {
-      if (res && res.success) {
-        fetchSaves();
-      } else {
-        alert(`Failed to delete save: ${res?.error || 'Unknown error'}`);
-      }
-    });
-  }, [fetchSaves, socketRef]);
 
 
 
@@ -556,334 +520,7 @@ export default function AppContent({
   useEffect(() => {
     const s = getSocket();
     socketRef.current = s;
-
-    const onConnect = () => {
-      setConnected(true);
-      if (joinedRef.current) {
-        s.emit(
-          'join-room',
-          {
-            name: nameRef.current,
-            color: colorRef.current,
-            roomId: roomIdRef.current,
-          },
-          (res) => {
-            if (res && res.success) {
-              const formattedTabs = (res.tabs || []).map((tab) => ({
-                ...tab,
-                locks: locksArrayToMap(tab.locks),
-              }));
-              setTabs(formattedTabs);
-              setUsers(res.users || []);
-              setAssets(res.assets || []);
-
-              let targetTabId = activeTabIdRef.current;
-              if (!formattedTabs.some((t) => t.id === targetTabId)) {
-                targetTabId = res.activeTabId || 'tab-default';
-              }
-              setActiveTabId(targetTabId);
-
-              if (targetTabId !== 'tab-default') {
-                s.emit('tab-switch', { tabId: targetTabId });
-              }
-
-              setCurrentUser({
-                id: s.id,
-                name: nameRef.current,
-                color: colorRef.current,
-              });
-            }
-          }
-        );
-      }
-    };
-
-    const onDisconnect = () => {
-      setConnected(false);
-    };
-
-    s.on('connect', onConnect);
-    s.on('disconnect', onDisconnect);
-
-    s.on('user-joined', (user) => {
-      setUsers((prev) => [...prev.filter((u) => u.id !== user.id), user]);
-    });
-
-    s.on('user-renamed', ({ userId, name }) => {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, name } : u))
-      );
-      if (userId === s.id) {
-        setCurrentUser((prev) => (prev ? { ...prev, name } : null));
-      }
-      setRollHistory((prev) =>
-        prev.map((r) => (r.userId === userId ? { ...r, userName: name } : r))
-      );
-      setActiveRolls((prev) =>
-        prev.map((r) => (r.userId === userId ? { ...r, userName: name } : r))
-      );
-    });
-
-    s.on('user-recolored', ({ userId, color }) => {
-      if (userId !== s.id) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === userId ? { ...u, color } : u))
-        );
-      }
-      setRollHistory((prev) =>
-        prev.map((r) => (r.userId === userId ? { ...r, userColor: color } : r))
-      );
-      setActiveRolls((prev) =>
-        prev.map((r) => (r.userId === userId ? { ...r, userColor: color } : r))
-      );
-    });
-
-    s.on('user-left', ({ userId }) => {
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      setTabs((prev) =>
-        prev.map((tab) => {
-          const nextLocks = { ...tab.locks };
-          let changed = false;
-          Object.keys(nextLocks).forEach((key) => {
-            if (nextLocks[key] === userId) {
-              delete nextLocks[key];
-              changed = true;
-            }
-          });
-          return changed ? { ...tab, locks: nextLocks } : tab;
-        })
-      );
-    });
-
-    s.on('cursor-update', ({ userId, x, y }) => {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, x, y } : u))
-      );
-    });
-
-    s.on('element-locked', ({ elementId, userId, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === targetTabId
-            ? { ...t, locks: { ...t.locks, [elementId]: userId } }
-            : t
-        )
-      );
-    });
-
-    s.on('element-unlocked', ({ elementId, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          const nextLocks = { ...t.locks };
-          delete nextLocks[elementId];
-          return { ...t, locks: nextLocks };
-        })
-      );
-    });
-
-    s.on('element-updated', ({ elementId, updates, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          return {
-            ...t,
-            elements: t.elements.map((el) =>
-              el.id === elementId ? mergeElement(el, updates) : el
-            ),
-          };
-        })
-      );
-    });
-
-    s.on('element-updated-batch', ({ batch, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          return {
-            ...t,
-            elements: t.elements.map((el) => {
-              const match = batch.find((item) => item.elementId === el.id);
-              return match ? mergeElement(el, match.updates) : el;
-            }),
-          };
-        })
-      );
-    });
-
-    s.on('element-created', ({ element, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          return {
-            ...t,
-            elements: [...t.elements.filter((el) => el.id !== element.id), element],
-          };
-        })
-      );
-    });
-
-    s.on('element-deleted', ({ elementId, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          const nextLocks = { ...t.locks };
-          delete nextLocks[elementId];
-          return {
-            ...t,
-            elements: t.elements.filter((el) => el.id !== elementId),
-            locks: nextLocks,
-          };
-        })
-      );
-      setSelectedElementIds((prev) => prev.filter((id) => id !== elementId));
-    });
-
-    s.on('asset-created', ({ asset }) => {
-      setAssets((prev) => [...prev.filter((a) => a.id !== asset.id), asset]);
-    });
-
-    s.on('elements-reordered', ({ orderedIds, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id !== targetTabId) return t;
-          const elementMap = new Map(t.elements.map((el) => [el.id, el]));
-          const sorted = [];
-          orderedIds.forEach((id) => {
-            if (elementMap.has(id)) {
-              sorted.push(elementMap.get(id));
-            }
-          });
-          t.elements.forEach((el) => {
-            if (!orderedIds.includes(el.id)) {
-              sorted.push(el);
-            }
-          });
-          return {
-            ...t,
-            elements: sorted,
-          };
-        })
-      );
-    });
-
-    s.on('room-settings-updated', ({ roomSettings: updatedSettings, tabId }) => {
-      const targetTabId = tabId || 'tab-default';
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === targetTabId
-            ? { ...t, roomSettings: updatedSettings }
-            : t
-        )
-      );
-    });
-
-    s.on('tab-created', ({ tab }) => {
-      setTabs((prev) => {
-        if (prev.some((t) => t.id === tab.id)) return prev;
-        return [
-          ...prev,
-          {
-            ...tab,
-            locks: locksArrayToMap(tab.locks),
-          },
-        ];
-      });
-    });
-
-    s.on('tab-deleted', ({ tabId, fallbackTabId, users: updatedUsers }) => {
-      setTabs((prev) => prev.filter((t) => t.id !== tabId));
-      if (updatedUsers) {
-        setUsers(updatedUsers);
-      }
-      setActiveTabId((currentActiveTabId) => {
-        if (currentActiveTabId === tabId) {
-          setSelectedElementIds([]);
-          return fallbackTabId;
-        }
-        return currentActiveTabId;
-      });
-    });
-
-    s.on('tab-renamed', ({ tabId, name }) => {
-      setTabs((prev) =>
-        prev.map((t) => (t.id === tabId ? { ...t, name } : t))
-      );
-    });
-
-    s.on('dice-rolled', (roll) => {
-      setActiveRolls((prev) => [...prev, { ...roll, status: 'rolling' }]);
-
-      setTimeout(() => {
-        setActiveRolls((prev) =>
-          prev.map((r) => (r.rollId === roll.rollId ? { ...r, status: 'resolved' } : r))
-        );
-        setRollHistory((prev) => [roll, ...prev].slice(0, 15));
-      }, 1500);
-
-      setTimeout(() => {
-        setActiveRolls((prev) => prev.filter((r) => r.rollId !== roll.rollId));
-      }, 5000);
-    });
-
-    s.on('tab-switched', ({ userId, tabId }) => {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, activeTabId: tabId } : u))
-      );
-    });
-
-    s.on('room-state-loaded', ({ tabs, assets }) => {
-      const formattedTabs = (tabs || []).map((tab) => ({
-        ...tab,
-        locks: locksArrayToMap(tab.locks),
-      }));
-      setTabs(formattedTabs);
-      setAssets(assets || []);
-      
-      setActiveTabId((prev) => {
-        if (formattedTabs.some((t) => t.id === prev)) {
-          return prev;
-        }
-        return formattedTabs.length > 0 ? formattedTabs[0].id : 'tab-default';
-      });
-
-      setHistory([]);
-      setRedoStack([]);
-      setSelectedElementIds([]);
-    });
-
-    return () => {
-      s.off('connect', onConnect);
-      s.off('disconnect', onDisconnect);
-      s.off('user-joined');
-      s.off('user-renamed');
-      s.off('user-recolored');
-      s.off('user-left');
-      s.off('cursor-update');
-      s.off('tab-switched');
-      s.off('element-locked');
-      s.off('element-unlocked');
-      s.off('element-updated');
-      s.off('element-updated-batch');
-      s.off('element-created');
-      s.off('element-deleted');
-      s.off('asset-created');
-      s.off('elements-reordered');
-      s.off('room-settings-updated');
-      s.off('tab-created');
-      s.off('tab-deleted');
-      s.off('tab-renamed');
-      s.off('dice-rolled');
-      s.off('room-state-loaded');
-    };
-  }, [setActiveRolls, setRollHistory, setTabs, setUsers, setAssets, setCurrentUser, setActiveTabId, setLocks, setSelectedElementIds, setHistory, setRedoStack, socketRef, activeTabId, setConnected]);
+  }, [socketRef]);
 
   return (
     <div className={`flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full ${shakeClass}`}>

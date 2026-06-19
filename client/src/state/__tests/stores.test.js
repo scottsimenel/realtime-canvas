@@ -7,6 +7,12 @@ import { ClipboardProvider, useClipboardStore } from '../clipboardStore.js';
 import { CanvasProvider, useCanvasStore } from '../canvasStore.js';
 import { UploadProvider, useUploadStore } from '../uploadStore.js';
 import { useElementActions } from '../../app/hooks/useElementActions.js';
+import { useSocketConnection } from '../../app/hooks/useSocketConnection.js';
+import { useUserEvents } from '../../app/hooks/useUserEvents.js';
+import { useElementEvents } from '../../app/hooks/useElementEvents.js';
+import { useTabEvents } from '../../app/hooks/useTabEvents.js';
+import { useDiceEvents } from '../../app/hooks/useDiceEvents.js';
+import { useSaveEvents } from '../../app/hooks/useSaveEvents.js';
 
 describe('State stores export check', () => {
   test('UiProvider and useUiStore are defined', () => {
@@ -46,5 +52,29 @@ describe('State stores export check', () => {
 
   test('useElementActions is defined', () => {
     expect(useElementActions).toBeDefined();
+  });
+
+  test('useSocketConnection is defined', () => {
+    expect(useSocketConnection).toBeDefined();
+  });
+
+  test('useUserEvents is defined', () => {
+    expect(useUserEvents).toBeDefined();
+  });
+
+  test('useElementEvents is defined', () => {
+    expect(useElementEvents).toBeDefined();
+  });
+
+  test('useTabEvents is defined', () => {
+    expect(useTabEvents).toBeDefined();
+  });
+
+  test('useDiceEvents is defined', () => {
+    expect(useDiceEvents).toBeDefined();
+  });
+
+  test('useSaveEvents is defined', () => {
+    expect(useSaveEvents).toBeDefined();
   });
 });
