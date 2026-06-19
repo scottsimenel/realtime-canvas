@@ -1,6 +1,6 @@
 # Refactor Remediation Plan v2 — Closing the Residual Gaps
 
-**Status:** Proposed
+**Status:** Implemented
 **Supersedes:** the previous `REMEDIATION_PLAN.md` (its WS1/WS4/WS5 landed; this plan closes what remains)
 **Originates from:** Review of commits `41d01e9`–`ccdc13e` (the WS1–WS5 remediation pass)
 

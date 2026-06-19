@@ -1,6 +1,6 @@
 # App.jsx Decomposition — Staged Refactor Plan
 
-**Status:** Proposed
+**Status:** Implemented
 **Owner:** Architecture
 **Target file:** `client/src/App.jsx` (~2,750 lines → goal: < 400 lines)
 
