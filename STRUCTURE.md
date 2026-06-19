@@ -64,6 +64,7 @@ graph TD
         *   `useKeyboardShortcuts.js`: Registers undo, redo, copy, cut, and paste global key commands.
         *   `useTabs.js`: Collaborative tab CRUD triggers.
         *   `useElementActions.js`: Spawning shapes/images, reordering layers, and drag-and-drop helpers.
+        *   `useSelectionActions.js`: Element selection, transformations, deletions, and lock toggles.
         *   `useSocketConnection.js`: Socket connection state and automatic room rejoin handler.
         *   `useUserEvents.js`: Listens to user join/leave, renaming, recoloring, and cursor movements.
         *   `useElementEvents.js`: Listens to element locks, creates, updates, and deletes.
