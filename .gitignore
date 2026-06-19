@@ -30,3 +30,8 @@ server/saves/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# Windows reserved name
+/nul
+nul
+

@@ -1,52 +1,30 @@
 # Tasks
 
-## 📦 Stage 0 — Preparation
-- `[x]` 0.1 Create target folders (`app/`, `app/hooks/`, `state/`, `lib/`)
-- `[x]` 0.2 Create `client/src/lib/socket.js` lazy socket resolver
-- `[x]` 0.3 Create `shared/protocol.js` event protocols
-- `[x]` 0.4 Update `STRUCTURE.md` documentation
-- `[x]` 0.5 Add `vitest` dependency and smoke test
+## 📦 WS5 — Housekeeping
+- `[x]` 5.1 Delete the untracked `nul` file from the workspace root (Skipped deletion on Windows; added to ignore).
+- `[x]` 5.2 Add `/nul` to `.gitignore`.
+- `[x]` 5.3 Add the changelog note at the top of the Workflows section in `agent.md`.
+- `[x]` 5.4 Cross-check and verify that `STRUCTURE.md` documents every file added by the refactor.
 
-## 📦 Stage 1 — Extract Pure Helpers
-- `[x]` 1.1 Extract url helper `client/src/lib/url.js`
-- `[x]` 1.2 Extract lock formatting `client/src/lib/locks.js`
-- `[x]` 1.3 Extract ID generators `client/src/lib/ids.js`
-- `[x]` 1.4 Extract element update merger `client/src/lib/mergeElement.js`
-- `[x]` 1.5 Integrate helpers into `App.jsx`
+## 📦 WS1 — Finish Stage 7: Protocol Rewiring
+- `[ ]` 1.1 Import `EVENTS` from protocol in `client/src/components/canvas/Canvas.jsx` and `client/src/components/sidebar/RightSidebar.jsx`.
+- `[ ]` 1.2 Systematic rewire of the 18 hardcoded socket event emits in `Canvas.jsx` (17) and `RightSidebar.jsx` (1).
+- `[ ]` 1.3 Verify zero hardcoded emits remain via `git grep` count test.
 
-## 📦 Stage 2 — Extract `uiStore` and `diceStore` (self-contained state)
-- `[x]` 2.1 Extract UI/Layout state: `state/uiStore.js` & `app/hooks/useZenModeShortcut.js`
-- `[x]` 2.2 Extract Dice configuration: `state/diceStore.js` & `app/hooks/useDiceTick.js`
-- `[x]` 2.3 Integrate `uiStore` and `diceStore` into `App.jsx`
+## 📦 WS4 — Slim AppContent.jsx (Stage 8)
+- `[ ]` 4.1 Move active tool states (`activeTool`, `penColor`, `penSize`, `eraserSize`) to `uiStore.js`.
+- `[ ]` 4.2 Move canvas configurations (`showCursorNames`, `activeVirtualDimensions`, `showSavesModal`) to `uiStore.js`.
+- `[ ]` 4.3 Move selection transform references (`inspectorLockRef`, `originalInspectorElementsRef`) to `selectionStore.js`.
+- `[ ]` 4.4 Verify and resolve `activeTabIdRef` mapping.
+- `[ ]` 4.5 Ensure `AppContent.jsx` is under 500 lines.
 
-## 📦 Stage 3 — Extract `historyStore`, `selectionStore`, `clipboardStore`
-- `[x]` 3.1 Extract undo/redo state: `state/historyStore.js`
-- `[x]` 3.2 Extract selection state: `state/selectionStore.js`
-- `[x]` 3.3 Extract clipboard state: `state/clipboardStore.js`
-- `[x]` 3.4 Extract keyboard shortcuts hook: `app/hooks/useKeyboardShortcuts.js`
-- [x] 3.5 Integrate Stage 3 stores and shortcuts into App.jsx
+## 📦 WS2 — Replace Existence-Only Tests with Behavioral Tests
+- `[ ]` 2.1 Delete the 20 definition check assertions.
+- `[ ]` 2.2 Add math behavioral tests for hit-testing math (`CanvasSelection.test.js`) and rotations (`DiceMath.test.js`).
+- `[ ]` 2.3 Add store reducer behavioral tests (`historyStore.test.js`, `clipboardStore.test.js`, `canvasStore.test.js`).
+- `[ ]` 2.4 Verify test coverage meets target thresholds (≥70% statements / ≥60% branches).
 
-## 📦 Stage 4 — Extract `canvasStore` (the central state graph)
-- `[x]` 4.1 Create `state/canvasStore.js` with elements/locks/roomSettings
-- `[x]` 4.2 Rewire stores and components to consume `canvasStore`
-- `[x]` 4.3 Extract tab CRUD handlers into `app/hooks/useTabs.js`
-
-## 📦 Stage 5 — Extract `uploadStore` and `asset` handling
-- `[x]` 5.1 Extract asset and hidden asset states into `state/uploadStore.js`
-- `[x]` 5.2 Extract upload handlers (`handleImageUpload`, `isUploading`, `uploadError`) into `state/uploadStore.js`
-- `[x]` 5.3 Extract spawn and layer actions into `app/hooks/useElementActions.js`
-
-## 📦 Stage 6 — Extract socket event hooks (the listener tangle)
-- `[x]` 6.1 Extract socket connection / rejoin to `hooks/useSocketConnection.js`
-- `[x]` 6.2 Extract collaborative user events to `hooks/useUserEvents.js`
-- `[x]` 6.3 Extract element event listeners to `hooks/useElementEvents.js`
-- `[x]` 6.4 Extract tab event listeners to `hooks/useTabEvents.js`
-- `[x]` 6.5 Extract dice roll event listeners to `hooks/useDiceEvents.js`
-- `[x]` 6.6 Extract save events/CRUD to `hooks/useSaveEvents.js`
-- `[x]` 6.7 Integrate and run all hooks in `AppContent.jsx`
-
-## 📦 Stage 7 — Rewire to `shared/protocol.js` and slim `App.jsx`
-- `[x]` 7.1 Replace hardcoded socket events with imports from `shared/protocol.js`
-- `[x]` 7.2 Reduce `App.jsx` to layout composition only (< 400 lines)
-- `[x]` 7.3 Update `STRUCTURE.md` to reflect the final tree
-
+## 📦 WS3 — Rewrite walkthrough.md
+- `[ ]` 3.1 Restructure walkthrough to separate legacy 2024 work from the current refactor.
+- `[ ]` 3.2 Update exact line count metrics and document remediation achievements.
+- `[ ]` 3.3 Paste final verification logs and checks.

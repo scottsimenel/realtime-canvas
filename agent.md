@@ -88,6 +88,8 @@ Maintain modular, decoupled design patterns to make it easy for AI agents to ana
 
 ## 🔄 Antigravity Development Workflows
 
+*Change log: artifact-publishing workflow added in `b8d5ac5`; all other edits must be flagged before applying (§Guardrails 1).*
+
 When working in an agentic environment (such as Antigravity), adhere to the following planning and verification pipeline:
 
 ### 1. Planning Mode (`implementation_plan.md`)
