@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, createElement } from 'react';
+import { createContext, useContext, useState, useRef, createElement } from 'react';
 import { useCanvasStore } from './canvasStore.js';
 
 const SelectionContext = createContext(null);
@@ -14,6 +14,9 @@ export function SelectionProvider({ children }) {
   const [inputHeight, setInputHeight] = useState('');
   const [inputRotation, setInputRotation] = useState('');
   const [isInspectorFocused, setIsInspectorFocused] = useState(false);
+
+  const inspectorLockRef = useRef(false);
+  const originalInspectorElementsRef = useRef([]);
 
   const [prevSelectedElementIds, setPrevSelectedElementIds] = useState([]);
   const [prevElements, setPrevElements] = useState([]);
@@ -63,9 +66,12 @@ export function SelectionProvider({ children }) {
     inputRotation,
     setInputRotation,
     isInspectorFocused,
-    setIsInspectorFocused
+    setIsInspectorFocused,
+    inspectorLockRef,
+    originalInspectorElementsRef
   };
 
+  // eslint-disable-next-line react-hooks/refs
   return createElement(SelectionContext.Provider, { value }, children);
 }
 
@@ -80,3 +86,4 @@ export function useSelectionStore() {
   }
   return context;
 }
+

@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, useCallback, createElement } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, createElement } from 'react';
 
 const UiContext = createContext(null);
 
 /**
  * UI State Store Provider.
- * Manages panel visibility, collapse state, and Zen Mode.
+ * Manages panel visibility, collapse state, Zen Mode, active tools, and save/cursor configurations.
  */
 export function UiProvider({ children }) {
   const [showHeader, setShowHeader] = useState(true);
@@ -15,6 +15,31 @@ export function UiProvider({ children }) {
   const [showDiceRoller, setShowDiceRoller] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+
+  // States for collaborative drawing tool and configs
+  const [showSavesModal, setShowSavesModal] = useState(false);
+  const [activeVirtualDimensions, setActiveVirtualDimensions] = useState({ width: 1920, height: 1080 });
+  const [activeTool, setActiveTool] = useState('select'); // 'select', 'pan', 'pen', 'eraser', 'measure'
+  const [penColor, setPenColor] = useState('#3b82f6');
+  const [penSize, setPenSize] = useState(4);
+  const [eraserSize, setEraserSize] = useState(20);
+
+  const [showCursorNames, setShowCursorNames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('canvas_show_cursor_names');
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvas_show_cursor_names', JSON.stringify(showCursorNames));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [showCursorNames]);
 
   const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
 
@@ -58,7 +83,21 @@ export function UiProvider({ children }) {
     setRightPanelCollapsed,
     isZenMode,
     handleToggleZenMode,
-    handleCanvasInteraction
+    handleCanvasInteraction,
+    showSavesModal,
+    setShowSavesModal,
+    activeVirtualDimensions,
+    setActiveVirtualDimensions,
+    activeTool,
+    setActiveTool,
+    penColor,
+    setPenColor,
+    penSize,
+    setPenSize,
+    eraserSize,
+    setEraserSize,
+    showCursorNames,
+    setShowCursorNames
   };
 
   return createElement(UiContext.Provider, { value }, children);
@@ -75,3 +114,4 @@ export function useUiStore() {
   }
   return context;
 }
+
