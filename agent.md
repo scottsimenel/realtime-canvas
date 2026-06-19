@@ -94,11 +94,12 @@ When working in an agentic environment (such as Antigravity), adhere to the foll
 - **Rule**: For any complex architectural changes or multi-file edits, the agent must run in planning mode.
 - **Workflow**:
   1. Research the codebase using read-only tools.
-  2. Create or update `implementation_plan.md` in the artifacts folder detailing the proposed changes, file impact, and verification criteria.
-  3. Pause and request explicit user review. Do not make code modifications until approved.
+  2. Create or update `implementation_plan.md` in the system-designated artifacts folder (`<appDataDir>\brain\<conversation-id>`).
+  3. **Publish to Workspace**: Copy/publish the artifact to the workspace `.agents/` directory (`.agents/implementation_plan.md`) so it is public and accessible in Explorer and to other coding agents.
+  4. Pause and request explicit user review. Do not make code modifications until approved.
 
 ### 2. Task Checklist (`task.md`)
-- **Rule**: Once the plan is approved, create or update `task.md` in the artifacts directory to track implementation progress as a living TODO list. Mark items as `[/]` (in progress) or `[x]` (complete).
+- **Rule**: Once the plan is approved, create or update `task.md` in the system artifacts directory and copy/sync it to the workspace `.agents/task.md` to track implementation progress as a living, public TODO list. Mark items as `[/]` (in progress) or `[x]` (complete).
 
 ### 3. Verification Loop  **[BLOCKING]**
 - **Rule**: No task may be declared complete, fixed, or passing without evidence. Before claiming success you must run, and paste the actual output of:
@@ -110,7 +111,7 @@ When working in an agentic environment (such as Antigravity), adhere to the foll
 - **Rule**: Address warnings, not just errors — lint warnings accumulate into the kind of noise that hides real bugs over time.
 
 ### 4. Walkthrough Summary (`walkthrough.md`)
-- **Rule**: After successful verification, document all changes, additions, and test results in `walkthrough.md` to establish a clear audit log of the task achievements.
+- **Rule**: After successful verification, document all changes, additions, and test results in `walkthrough.md` in both the system artifacts directory and the workspace `.agents/walkthrough.md` to establish a clear audit log of the task achievements.
 
 ---
 
