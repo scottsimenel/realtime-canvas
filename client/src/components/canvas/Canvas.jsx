@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { EVENTS } from '../../../../shared/protocol.js';
 import {
   getHandleAtCoords,
   checkEraserIntersectsPath,
@@ -341,7 +342,7 @@ export default function Canvas({
     if (!socket || !socket.connected) return;
     const now = Date.now();
     if (now - lastCursorEmitRef.current > 30) {
-      socket.emit('cursor-move', { x, y });
+      socket.emit(EVENTS.CURSOR_MOVE, { x, y });
       lastCursorEmitRef.current = now;
     }
   };
@@ -370,7 +371,7 @@ export default function Canvas({
             .filter(Boolean)
             .map((el) => JSON.parse(JSON.stringify(el)));
 
-          socket.emit('element-delete', { elementIds: unlockedIds, tabId }, (response) => {
+          socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockedIds, tabId }, (response) => {
             if (response && response.success) {
               setElements((prev) => prev.filter((el) => !unlockedIds.includes(el.id)));
               setSelectedElementIds((prev) => prev.filter((id) => !unlockedIds.includes(id)));
@@ -446,14 +447,14 @@ export default function Canvas({
         tempDrawingPathRef.current = null;
       }
       if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds.length > 0) {
-        socket.emit('element-unlock', { elementIds: dragStateRef.current.lockedIds, tabId });
+        socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: dragStateRef.current.lockedIds, tabId });
         setLocks((prev) => {
           const next = { ...prev };
           dragStateRef.current.lockedIds.forEach((id) => delete next[id]);
           return next;
         });
       } else if (dragStateRef.current && dragStateRef.current.hasLock) {
-        socket.emit('element-unlock', { elementId: dragStateRef.current.elementId, tabId });
+        socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: dragStateRef.current.elementId, tabId });
         setLocks((prev) => {
           const next = { ...prev };
           delete next[dragStateRef.current.elementId];
@@ -725,9 +726,9 @@ export default function Canvas({
               prev.filter((id) => !toDeleteIds.includes(id))
             );
 
-            socket.emit('element-delete', { elementIds: toDeleteIds, tabId });
+            socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: toDeleteIds, tabId });
             toCreateElements.forEach((newEl) => {
-              socket.emit('element-create', { element: newEl, tabId });
+              socket.emit(EVENTS.ELEMENT_CREATE, { element: newEl, tabId });
             });
 
             deletedIds.push(...toDeleteIds);
@@ -759,7 +760,7 @@ export default function Canvas({
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
-          socket.emit('element-lock', { elementIds: targetIds, tabId }, (response) => {
+          socket.emit(EVENTS.ELEMENT_LOCK, { elementIds: targetIds, tabId }, (response) => {
             if (response && response.success && response.lockedIds) {
               if (dragStateRef.current) {
                 dragStateRef.current.lockedIds = response.lockedIds;
@@ -803,7 +804,7 @@ export default function Canvas({
               originalElements: [JSON.parse(JSON.stringify(activeElement))],
             };
 
-            socket.emit('element-lock', { elementId: activeElement.id, tabId }, (response) => {
+            socket.emit(EVENTS.ELEMENT_LOCK, { elementId: activeElement.id, tabId }, (response) => {
               if (response && response.success) {
                 if (dragStateRef.current && dragStateRef.current.elementId === activeElement.id) {
                   dragStateRef.current.hasLock = true;
@@ -854,7 +855,7 @@ export default function Canvas({
           };
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
-          socket.emit('element-lock', { elementIds: targetIds, tabId }, (response) => {
+          socket.emit(EVENTS.ELEMENT_LOCK, { elementIds: targetIds, tabId }, (response) => {
             if (response && response.success && response.lockedIds) {
               if (dragStateRef.current) {
                 dragStateRef.current.lockedIds = response.lockedIds;
@@ -883,7 +884,7 @@ export default function Canvas({
         originalElements: [JSON.parse(JSON.stringify(element))],
       };
 
-      socket.emit('element-lock', { elementId: element.id, tabId }, (response) => {
+      socket.emit(EVENTS.ELEMENT_LOCK, { elementId: element.id, tabId }, (response) => {
         if (response && response.success) {
           if (dragStateRef.current && dragStateRef.current.elementId === element.id) {
             dragStateRef.current.hasLock = true;
@@ -967,9 +968,9 @@ export default function Canvas({
               );
 
               if (socket && socket.connected) {
-                socket.emit('element-delete', { elementIds: toDeleteIds, tabId });
+                socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: toDeleteIds, tabId });
                 toCreateElements.forEach((newEl) => {
-                  socket.emit('element-create', { element: newEl, tabId });
+                  socket.emit(EVENTS.ELEMENT_CREATE, { element: newEl, tabId });
                 });
               }
 
@@ -1231,10 +1232,10 @@ export default function Canvas({
               return drag.lockedIds.includes(item.elementId) || !locks[item.elementId] || locks[item.elementId] === currentUser?.id;
             });
             if (unlockedBatch.length > 0) {
-              socket.emit('element-update', { batch: unlockedBatch, tabId });
+              socket.emit(EVENTS.ELEMENT_UPDATE, { batch: unlockedBatch, tabId });
             }
           } else if (drag.hasLock) {
-            socket.emit('element-update', {
+            socket.emit(EVENTS.ELEMENT_UPDATE, {
               elementId: drag.elementId,
               updates: updatesBatch[0].updates,
               tabId,
@@ -1302,7 +1303,7 @@ export default function Canvas({
 
           const socket = socketRef.current;
           if (socket && socket.connected) {
-            socket.emit('element-create', { element, tabId });
+            socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId });
           }
 
           if (pushHistoryAction) {
@@ -1383,7 +1384,7 @@ export default function Canvas({
         if (activeIds.length > 0) {
           const socket = socketRef.current;
           if (socket && socket.connected) {
-            socket.emit('element-unlock', { elementIds: activeIds, tabId });
+            socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: activeIds, tabId });
           }
           setLocks((prev) => {
             const next = { ...prev };
@@ -1413,7 +1414,7 @@ export default function Canvas({
       } else if (drag.hasLock || drag.mode === 'move') {
         const socket = socketRef.current;
         if (socket && socket.connected && drag.hasLock) {
-          socket.emit('element-unlock', { elementId: drag.elementId, tabId });
+          socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: drag.elementId, tabId });
         }
         setLocks((prev) => {
           const next = { ...prev };

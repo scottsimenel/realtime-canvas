@@ -1,4 +1,5 @@
 import InspectorWidget from './InspectorWidget.jsx';
+import { EVENTS } from '../../../../shared/protocol.js';
 
 export default function RightSidebar({
   showRightSidebar,
@@ -209,7 +210,7 @@ export default function RightSidebar({
                         const socket = socketRef.current;
                         if (socket && socket.connected) {
                           const elementToDelete = JSON.parse(JSON.stringify(el));
-                          socket.emit('element-delete', { elementId: el.id }, (response) => {
+                          socket.emit(EVENTS.ELEMENT_DELETE, { elementId: el.id }, (response) => {
                             if (response && response.success) {
                               setElements((prev) => prev.filter((item) => item.id !== el.id));
                               setSelectedElementIds((prev) => prev.filter((id) => id !== el.id));

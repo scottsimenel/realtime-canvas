@@ -7,9 +7,9 @@
 - `[x]` 5.4 Cross-check and verify that `STRUCTURE.md` documents every file added by the refactor.
 
 ## 📦 WS1 — Finish Stage 7: Protocol Rewiring
-- `[ ]` 1.1 Import `EVENTS` from protocol in `client/src/components/canvas/Canvas.jsx` and `client/src/components/sidebar/RightSidebar.jsx`.
-- `[ ]` 1.2 Systematic rewire of the 18 hardcoded socket event emits in `Canvas.jsx` (17) and `RightSidebar.jsx` (1).
-- `[ ]` 1.3 Verify zero hardcoded emits remain via `git grep` count test.
+- `[x]` 1.1 Import `EVENTS` from protocol in `client/src/components/canvas/Canvas.jsx` and `client/src/components/sidebar/RightSidebar.jsx`.
+- `[x]` 1.2 Systematic rewire of the 18 hardcoded socket event emits in `Canvas.jsx` (17) and `RightSidebar.jsx` (1).
+- `[x]` 1.3 Verify zero hardcoded emits remain via `git grep` count test.
 
 ## 📦 WS4 — Slim AppContent.jsx (Stage 8)
 - `[ ]` 4.1 Move active tool states (`activeTool`, `penColor`, `penSize`, `eraserSize`) to `uiStore.js`.
