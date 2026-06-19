@@ -57,7 +57,7 @@ describe('CanvasSelection math', () => {
     expect(checkEraserIntersectsPath(0, 0, 10, pathEl)).toBe(false);
   });
 
-  test('splitPathElement splits path at eraser points correctly', () => {
+  test('returns empty array when eraser leaves only sub-2-point fragments', () => {
     const pathEl = {
       x: 100,
       y: 100,
@@ -76,6 +76,58 @@ describe('CanvasSelection math', () => {
     };
     const result = splitPathElement(150, 150, 10, pathEl);
     expect(result.length).toBe(0);
+  });
+
+  test('splits a 5-point path into multiple valid sub-paths when erased in the middle', () => {
+    const pathEl = {
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      properties: {
+        points: [
+          { x: 0.0, y: 0.5 },
+          { x: 0.2, y: 0.5 },
+          { x: 0.5, y: 0.5 },
+          { x: 0.8, y: 0.5 },
+          { x: 1.0, y: 0.5 }
+        ],
+        stroke: '#000000',
+        strokeWidth: 4,
+        rotation: 0
+      }
+    };
+    // Eraser at center (150, 150), radius 5 (0.05 * 100).
+    // The middle point (0.5, 0.5) is at local (0,0), which is within radius 5.
+    // The other points are at local (-50, 0), (-30, 0), (30, 0), (50, 0), which are outside radius 5.
+    // This should result in two chunks: [P0, P1] and [P3, P4].
+    const result = splitPathElement(150, 150, 5, pathEl);
+    expect(result.length).toBe(2);
+    expect(result[0].properties.points.length).toBe(2);
+    expect(result[1].properties.points.length).toBe(2);
+  });
+
+  test('returns a single element matching the original path if the eraser does not intersect', () => {
+    const pathEl = {
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      properties: {
+        points: [
+          { x: 0.0, y: 0.5 },
+          { x: 0.5, y: 0.5 },
+          { x: 1.0, y: 0.5 }
+        ],
+        stroke: '#000000',
+        strokeWidth: 4,
+        rotation: 0
+      }
+    };
+    // Eraser completely away at (0, 0)
+    const result = splitPathElement(0, 0, 5, pathEl);
+    expect(result.length).toBe(1);
+    expect(result[0].properties.points.length).toBe(3);
   });
 
   test('getElementAtCoords hits correct shapes', () => {
