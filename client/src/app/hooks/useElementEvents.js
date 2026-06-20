@@ -12,7 +12,7 @@ import { useUploadStore } from '../../state/uploadStore.js';
 export function useElementEvents() {
   const { setTabs } = useCanvasStore();
   const { setSelectedElementIds } = useSelectionStore();
-  const { setAssets } = useUploadStore();
+  const { setAssets, setFolders } = useUploadStore();
 
   useEffect(() => {
     const s = getSocket();
@@ -113,6 +113,27 @@ export function useElementEvents() {
       setAssets((prev) => prev.map((a) => (a.id === asset.id ? asset : a)));
     };
 
+    const onFolderCreated = ({ folder }) => {
+      setFolders((prev) => [...prev.filter((f) => f.id !== folder.id), folder]);
+    };
+
+    const onFolderRenamed = ({ folder }) => {
+      setFolders((prev) => prev.map((f) => (f.id === folder.id ? folder : f)));
+    };
+
+    const onFolderDeleted = ({ folderId }) => {
+      setFolders((prev) => prev.filter((f) => f.id !== folderId));
+      setAssets((prev) =>
+        prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
+      );
+    };
+
+    const onAssetMoved = ({ assetId, folderId }) => {
+      setAssets((prev) =>
+        prev.map((a) => (a.id === assetId ? { ...a, folderId } : a))
+      );
+    };
+
     const onElementsReordered = ({ orderedIds, tabId }) => {
       const targetTabId = tabId || 'tab-default';
       setTabs((prev) =>
@@ -158,6 +179,10 @@ export function useElementEvents() {
     s.on(EVENTS.ASSET_CREATED, onAssetCreated);
     s.on(EVENTS.ASSET_DELETED, onAssetDeleted);
     s.on(EVENTS.ASSET_RENAMED, onAssetRenamed);
+    s.on(EVENTS.FOLDER_CREATED, onFolderCreated);
+    s.on(EVENTS.FOLDER_RENAMED, onFolderRenamed);
+    s.on(EVENTS.FOLDER_DELETED, onFolderDeleted);
+    s.on(EVENTS.ASSET_MOVED, onAssetMoved);
     s.on(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
     s.on(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
 
@@ -171,8 +196,12 @@ export function useElementEvents() {
       s.off(EVENTS.ASSET_CREATED, onAssetCreated);
       s.off(EVENTS.ASSET_DELETED, onAssetDeleted);
       s.off(EVENTS.ASSET_RENAMED, onAssetRenamed);
+      s.off(EVENTS.FOLDER_CREATED, onFolderCreated);
+      s.off(EVENTS.FOLDER_RENAMED, onFolderRenamed);
+      s.off(EVENTS.FOLDER_DELETED, onFolderDeleted);
+      s.off(EVENTS.ASSET_MOVED, onAssetMoved);
       s.off(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
       s.off(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
     };
-  }, [setTabs, setSelectedElementIds, setAssets]);
+  }, [setTabs, setSelectedElementIds, setAssets, setFolders]);
 }

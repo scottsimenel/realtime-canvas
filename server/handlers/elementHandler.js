@@ -300,6 +300,111 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
   });
 
   /**
+   * Handle folder creation.
+   */
+  socket.on(EVENTS.FOLDER_CREATE, (data, callback) => {
+    const { folder } = data || {};
+    if (!folder || !folder.id || !folder.name) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Invalid folder schema' });
+      return;
+    }
+
+    const createdFolder = registry.createFolder(folder);
+    const room = socket.room || DEFAULT_ROOM;
+
+    socket.to(room).emit(EVENTS.FOLDER_CREATED, {
+      folder: createdFolder,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, folder: createdFolder });
+    }
+  });
+
+  /**
+   * Handle folder renaming.
+   */
+  socket.on(EVENTS.FOLDER_RENAME, (data, callback) => {
+    const { folderId, name } = data || {};
+    if (!folderId || !name) {
+      if (typeof callback === 'function') callback({ success: false, error: 'folderId and name are required' });
+      return;
+    }
+
+    const updatedFolder = registry.renameFolder(folderId, name);
+    if (!updatedFolder) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Folder not found' });
+      return;
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    socket.to(room).emit(EVENTS.FOLDER_RENAMED, {
+      folder: updatedFolder,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, folder: updatedFolder });
+    }
+  });
+
+  /**
+   * Handle folder deletion.
+   */
+  socket.on(EVENTS.FOLDER_DELETE, (data, callback) => {
+    const { folderId } = data || {};
+    if (!folderId) {
+      if (typeof callback === 'function') callback({ success: false, error: 'folderId is required' });
+      return;
+    }
+
+    const success = registry.deleteFolder(folderId);
+    if (!success) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Folder not found' });
+      return;
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    socket.to(room).emit(EVENTS.FOLDER_DELETED, {
+      folderId,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, folderId });
+    }
+  });
+
+  /**
+   * Handle moving an asset to a folder.
+   */
+  socket.on(EVENTS.ASSET_MOVE, (data, callback) => {
+    const { assetId, folderId } = data || {};
+    if (!assetId) {
+      if (typeof callback === 'function') callback({ success: false, error: 'assetId is required' });
+      return;
+    }
+
+    const updatedAsset = registry.moveAsset(assetId, folderId);
+    if (!updatedAsset) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Asset not found' });
+      return;
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    socket.to(room).emit(EVENTS.ASSET_MOVED, {
+      assetId,
+      folderId: updatedAsset.folderId,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, asset: updatedAsset });
+    }
+  });
+
+  /**
    * Handle deletion of an element.
    */
   socket.on(EVENTS.ELEMENT_DELETE, (data, callback) => {

@@ -51,6 +51,12 @@ export class CanvasRegistry {
     this.assets = new Map();
 
     /**
+     * Map of custom folders, keyed by folder ID.
+     * @type {Map<string, Object>}
+     */
+    this.folders = new Map();
+
+    /**
      * Map of active canvas tabs, keyed by tab ID.
      * Each tab contains elements, locks, and roomSettings specific to that tab.
      * @type {Map<string, Object>}
@@ -119,6 +125,7 @@ export class CanvasRegistry {
     return {
       users: Array.from(this.users.values()),
       assets: Array.from(this.assets.values()),
+      folders: Array.from(this.folders.values()),
       tabs: tabsList,
       activeTabId: fallbackTabId
     };
@@ -253,7 +260,8 @@ export class CanvasRegistry {
     const newAsset = {
       id: asset.id,
       name: asset.name,
-      url: asset.url
+      url: asset.url,
+      folderId: asset.folderId || null
     };
     this.assets.set(asset.id, newAsset);
     return newAsset;
@@ -285,6 +293,73 @@ export class CanvasRegistry {
     const asset = this.assets.get(assetId);
     if (asset) {
       asset.name = newName;
+      return asset;
+    }
+    return null;
+  }
+
+  /**
+   * Creates a new custom folder.
+   * 
+   * @param {Object} folder - The folder details.
+   * @returns {Object} The saved folder.
+   */
+  createFolder(folder) {
+    const newFolder = {
+      id: folder.id,
+      name: folder.name
+    };
+    this.folders.set(folder.id, newFolder);
+    return newFolder;
+  }
+
+  /**
+   * Renames a custom folder.
+   * 
+   * @param {string} folderId - The ID of the folder to rename.
+   * @param {string} newName - The new name.
+   * @returns {Object|null} The updated folder details, or null if not found.
+   */
+  renameFolder(folderId, newName) {
+    const folder = this.folders.get(folderId);
+    if (folder) {
+      folder.name = newName;
+      return folder;
+    }
+    return null;
+  }
+
+  /**
+   * Deletes a folder and resets any assets inside to root.
+   * 
+   * @param {string} folderId - The ID of the folder to delete.
+   * @returns {boolean} True if successfully deleted.
+   */
+  deleteFolder(folderId) {
+    if (this.folders.has(folderId)) {
+      this.folders.delete(folderId);
+      // Reset folderId to null for all assets in this folder
+      for (const asset of this.assets.values()) {
+        if (asset.folderId === folderId) {
+          asset.folderId = null;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Moves an asset to a folder.
+   * 
+   * @param {string} assetId - The ID of the asset.
+   * @param {string|null} folderId - The ID of the target folder, or null for root.
+   * @returns {Object|null} The updated asset, or null if not found.
+   */
+  moveAsset(assetId, folderId) {
+    const asset = this.assets.get(assetId);
+    if (asset) {
+      asset.folderId = folderId || null;
       return asset;
     }
     return null;
@@ -624,7 +699,8 @@ export class CanvasRegistry {
       name: name || `Save - ${new Date().toLocaleString()}`,
       timestamp,
       tabs: serializedTabs,
-      assets: Array.from(this.assets.values())
+      assets: Array.from(this.assets.values()),
+      folders: Array.from(this.folders.values())
     };
     
     const filePath = path.join(savesDir, `${saveId}.json`);
@@ -718,7 +794,16 @@ export class CanvasRegistry {
       // Reconstruct assets Map
       this.assets.clear();
       (data.assets || []).forEach(asset => {
-        this.assets.set(asset.id, asset);
+        this.assets.set(asset.id, {
+          ...asset,
+          folderId: asset.folderId || null
+        });
+      });
+      
+      // Reconstruct folders Map
+      this.folders.clear();
+      (data.folders || []).forEach(folder => {
+        this.folders.set(folder.id, folder);
       });
       
       return true;

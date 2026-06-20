@@ -34,7 +34,7 @@ vi.mock('react', () => {
     useEffect: () => {},
     createContext: () => ({}),
     useContext: () => reactMockValueCapture.captured,
-    createElement: (type, props, children) => {
+    createElement: (type, props) => {
       if (props && props.value) {
         reactMockValueCapture.captured = props.value;
       }
@@ -54,6 +54,14 @@ const mockSocket = {
     if (callback) {
       if (event === 'asset-rename') {
         callback({ success: true, asset: { id: data.assetId, name: data.name, url: '/uploads/map.png' } });
+      } else if (event === 'folder-create') {
+        callback({ success: true, folder: data.folder });
+      } else if (event === 'folder-rename') {
+        callback({ success: true, folder: { id: data.folderId, name: data.name } });
+      } else if (event === 'folder-delete') {
+        callback({ success: true });
+      } else if (event === 'asset-move') {
+        callback({ success: true, asset: { id: data.assetId, folderId: data.folderId } });
       } else {
         callback({ success: true, assetId: data.assetId });
       }
@@ -147,6 +155,75 @@ describe('uploadStore behavioral unit tests', () => {
       expect.objectContaining({ assetId: 'custom_asset_1' }),
       expect.any(Function)
     );
+  });
+
+  test('Folder management actions: create, rename, delete, move', () => {
+    UploadProvider({ children: null });
+    let store = reactMockValueCapture.captured;
+
+    // 1. Create Folder
+    store.handleCreateFolder('New Test Folder');
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'folder-create',
+      expect.objectContaining({ folder: expect.objectContaining({ name: 'New Test Folder' }) }),
+      expect.any(Function)
+    );
+
+    // Verify folder was added to state
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.folders.length).toBe(1);
+    expect(store.folders[0].name).toBe('New Test Folder');
+    const folderId = store.folders[0].id;
+
+    // 2. Rename Folder
+    store.handleRenameFolder(folderId, 'Renamed Test Folder');
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'folder-rename',
+      expect.objectContaining({ folderId, name: 'Renamed Test Folder' }),
+      expect.any(Function)
+    );
+
+    // Verify folder was renamed
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.folders[0].name).toBe('Renamed Test Folder');
+
+    // 3. Move Asset to Folder
+    store.setAssets([{ id: 'asset_x', name: 'Asset X', url: '/uploads/x.png', folderId: null }]);
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+
+    store.handleMoveAsset('asset_x', folderId);
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'asset-move',
+      expect.objectContaining({ assetId: 'asset_x', folderId }),
+      expect.any(Function)
+    );
+
+    // Verify asset's folderId is updated
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.assets[0].folderId).toBe(folderId);
+
+    // 4. Delete Folder
+    store.handleDeleteFolder(folderId);
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'folder-delete',
+      expect.objectContaining({ folderId }),
+      expect.any(Function)
+    );
+
+    // Verify folder is deleted and assets in that folder have folderId reset to null
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.folders.length).toBe(0);
+    expect(store.assets[0].folderId).toBeNull();
   });
 
   test('useUploadStore throws error outside provider', () => {

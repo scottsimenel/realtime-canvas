@@ -135,3 +135,89 @@ We implemented the Collaborative Image & Asset Library Manager in both client an
    - Added permanent delete trash buttons (only for custom uploads) showing confirm dialogs before dispatching deletion requests.
 6. **Tests**:
    - Added dedicated behavioral test suite [uploadStore.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/__tests/uploadStore.test.js) verifying search filtering, presets vs uploads filters, renaming, and deleting trigger properly and dispatch the right websocket emits.
+
+---
+
+## 📁 Collaborative Folder Management for Assets
+
+We implemented collaborative folder management in the asset manager:
+
+1. **Protocol Events ([protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js))**:
+   - Added standard socket events: `FOLDER_CREATE`, `FOLDER_CREATED`, `FOLDER_RENAME`, `FOLDER_RENAMED`, `FOLDER_DELETE`, `FOLDER_DELETED`, `ASSET_MOVE`, and `ASSET_MOVED`.
+2. **Server-Side Registry ([registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js))**:
+   - Initialized `this.folders = new Map()` state tracking.
+   - Added serialization/deserialization to room JSON state for persistence saves (`saveState` and `loadState`).
+   - Implemented state mutations: `createFolder`, `renameFolder`, `deleteFolder` (resets asset folderId associations back to root/null), and `moveAsset`.
+3. **Server Handlers ([elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js))**:
+   - Listens to client folder operations and asset-moving events, updating registry state and broadcasting changes to all other room clients.
+4. **Client State Store ([uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js))**:
+   - Exposed `folders` state list, `handleCreateFolder`, `handleRenameFolder`, `handleDeleteFolder`, and `handleMoveAsset` actions.
+   - Initialized synchronization when joining rooms ([useSocketConnection.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useSocketConnection.js)), loading saved canvas states ([useSaveEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useSaveEvents.js)), and handling socket notifications ([useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js)).
+5. **Left Sidebar UI ([LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx))**:
+   - Added folder creation input inline.
+   - Rendered folder tree nodes dynamically (collapsible blocks, folder asset count indicators, inline rename & delete controls).
+   - Hooked up HTML5 Drag-and-Drop dropzones over folders to allow collaborative moving of uploads into folders, and a root dropzone to move items back to the root level.
+6. **Tests**:
+   - Added behavioral unit tests in [uploadStore.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/__tests/uploadStore.test.js) validating that calling create, rename, move, and delete dispatches the correct socket messages and updates state appropriately.
+
+---
+
+## 🔍 Verification & Testing Logs (Final validation)
+
+### 1. Build Verification
+Production bundler successfully compiled the codebase:
+```bash
+> client@0.0.0 build
+> vite build
+
+vite v6.4.2 building for production...
+✓ 109 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:   0.29 kB
+dist/assets/index-CWVzd4aB.css   70.64 kB │ gzip:  10.92 kB
+dist/assets/index-DJEVFH-E.js   963.59 kB │ gzip: 258.76 kB
+✓ built in 2.47s
+```
+
+### 2. Lint Check
+ESLint checks passed cleanly with zero warnings/errors:
+```bash
+> client@0.0.0 lint
+> eslint .
+
+(Completed with exit code 0)
+```
+
+### 3. Syntax Verification
+Server entry point verified cleanly:
+```bash
+> node --check server/server.js
+
+(Completed with exit code 0)
+```
+
+### 4. Unit Tests
+Vitest test suite passed all 52 tests successfully:
+```bash
+> client@0.0.0 test
+> vitest run
+
+ RUN  v4.1.9 C:/Users/Scott Simenel/.gemini/antigravity/scratch/realtime-canvas/client
+
+ ✓ src/lib/__tests/smoke.test.js (1 test)
+ ✓ src/lib/__tests/ids.test.js (4 tests)
+ ✓ src/lib/__tests/locks.test.js (2 tests)
+ ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests)
+ ✓ src/lib/__tests/mergeElement.test.js (4 tests)
+ ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests)
+ ✓ src/state/__tests/historyStore.test.js (11 tests)
+ ✓ src/state/__tests/uploadStore.test.js (3 tests)
+ ✓ src/state/__tests/stores.test.js (4 tests)
+ ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests)
+ ✓ src/lib/__tests/url.test.js (3 tests)
+
+ Test Files  11 passed (11)
+      Tests  52 passed (52)
+   Duration  413ms
+```

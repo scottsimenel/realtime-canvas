@@ -17,7 +17,7 @@ export function useSocketConnection({
   setCurrentUser
 }) {
   const { setTabs, activeTabId, setActiveTabId } = useCanvasStore();
-  const { setAssets } = useUploadStore();
+  const { setAssets, setFolders } = useUploadStore();
 
   const joinedRef = useRef(joined);
   const userRef = useRef(currentUser);
@@ -52,6 +52,7 @@ export function useSocketConnection({
               setTabs(formattedTabs);
               setUsers(res.users || []);
               setAssets(res.assets || []);
+              setFolders(res.folders || []);
 
               let targetTabId = activeTabIdRef.current;
               if (!formattedTabs.some((t) => t.id === targetTabId)) {
@@ -89,5 +90,5 @@ export function useSocketConnection({
       s.off(EVENTS.CONNECT, onConnect);
       s.off(EVENTS.DISCONNECT, onDisconnect);
     };
-  }, [setConnected, setTabs, setUsers, setAssets, setActiveTabId, setCurrentUser]);
+  }, [setConnected, setTabs, setUsers, setAssets, setFolders, setActiveTabId, setCurrentUser]);
 }

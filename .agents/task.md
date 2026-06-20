@@ -45,12 +45,12 @@
 - `[x]` 7.8 Run ESLint, tests, and build checks.
 
 ## 📦 WS8 — Collaborative Folder Management for Assets
-- `[ ]` 8.1 Register folder and move events in `shared/protocol.js`.
-- `[ ]` 8.2 Add folder Map and mutations in `server/registry.js` (including save/load serialization).
-- `[ ]` 8.3 Handle folder CRUD and move events in `server/handlers/elementHandler.js`.
-- `[ ]` 8.4 Add folder states and actions to `client/src/state/uploadStore.js` and initialize on join.
-- `[ ]` 8.5 Register folder broadcast sync listeners in `useElementEvents.js`.
-- `[ ]` 8.6 Redesign `LeftSidebar.jsx` images tab to support folders tree rendering, Collapsible views, and CRUD controls.
-- `[ ]` 8.7 Implement drag-to-move-assets-to-folders logic in `LeftSidebar.jsx` dropzones.
-- `[ ]` 8.8 Add folder unit tests in `uploadStore.test.js` and verify builds.
+- `[x]` 8.1 Register folder and move events in `shared/protocol.js`.
+- `[x]` 8.2 Add folder Map and mutations in `server/registry.js` (including save/load serialization).
+- `[x]` 8.3 Handle folder CRUD and move events in `server/handlers/elementHandler.js`.
+- `[x]` 8.4 Add folder states and actions to `client/src/state/uploadStore.js` and initialize on join.
+- `[x]` 8.5 Register folder broadcast sync listeners in `useElementEvents.js`.
+- `[x]` 8.6 Redesign `LeftSidebar.jsx` images tab to support folders tree rendering, Collapsible views, and CRUD controls.
+- `[x]` 8.7 Implement drag-to-move-assets-to-folders logic in `LeftSidebar.jsx` dropzones.
+- `[x]` 8.8 Add folder unit tests in `uploadStore.test.js` and verify builds.
 

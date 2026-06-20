@@ -26,6 +26,7 @@ export function UploadProvider({ children }) {
   const [uploadError, setUploadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'presets' | 'uploads'
+  const [folders, setFolders] = useState([]);
 
   const toggleHideAsset = useCallback((url) => {
     setHiddenAssetUrls((prev) => {
@@ -143,16 +144,84 @@ export function UploadProvider({ children }) {
     }
   }, []);
 
+  const handleCreateFolder = useCallback((name) => {
+    if (!name || !name.trim()) return;
+    const socket = getSocket();
+    const folderId = 'folder_' + Date.now();
+    const newFolder = { id: folderId, name: name.trim() };
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.FOLDER_CREATE, { folder: newFolder }, (res) => {
+        if (res && res.success && res.folder) {
+          setFolders((prev) => [...prev.filter((f) => f.id !== res.folder.id), res.folder]);
+        }
+      });
+    } else {
+      setFolders((prev) => [...prev, newFolder]);
+    }
+  }, []);
+
+  const handleRenameFolder = useCallback((folderId, name) => {
+    if (!name || !name.trim()) return;
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.FOLDER_RENAME, { folderId, name: name.trim() }, (res) => {
+        if (res && res.success && res.folder) {
+          setFolders((prev) => prev.map((f) => (f.id === folderId ? res.folder : f)));
+        }
+      });
+    } else {
+      setFolders((prev) =>
+        prev.map((f) => (f.id === folderId ? { ...f, name: name.trim() } : f))
+      );
+    }
+  }, []);
+
+  const handleDeleteFolder = useCallback((folderId) => {
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.FOLDER_DELETE, { folderId }, (res) => {
+        if (res && res.success) {
+          setFolders((prev) => prev.filter((f) => f.id !== folderId));
+          setAssets((prev) =>
+            prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
+          );
+        }
+      });
+    } else {
+      setFolders((prev) => prev.filter((f) => f.id !== folderId));
+      setAssets((prev) =>
+        prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
+      );
+    }
+  }, []);
+
+  const handleMoveAsset = useCallback((assetId, folderId) => {
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.ASSET_MOVE, { assetId, folderId }, (res) => {
+        if (res && res.success && res.asset) {
+          setAssets((prev) =>
+            prev.map((a) => (a.id === assetId ? { ...a, folderId: res.asset.folderId } : a))
+          );
+        }
+      });
+    } else {
+      setAssets((prev) =>
+        prev.map((a) => (a.id === assetId ? { ...a, folderId: folderId || null } : a))
+      );
+    }
+  }, []);
+
   const allImageAssets = useMemo(() => {
     const list = [];
     SAMPLE_IMAGES.forEach((item) => {
       const { name, url } = item || {};
       if (url && name) {
-        list.push({ id: `preset_${name}`, name, url, isPreset: true });
+        list.push({ id: `preset_${name}`, name, url, isPreset: true, folderId: null });
       }
     });
     assets.forEach((a) => {
-      list.push({ ...a, isPreset: false });
+      list.push({ ...a, isPreset: false, folderId: a.folderId || null });
     });
     return list;
   }, [assets]);
@@ -208,7 +277,13 @@ export function UploadProvider({ children }) {
     activeFilter,
     setActiveFilter,
     handleRenameAsset,
-    handleDeleteAsset
+    handleDeleteAsset,
+    folders,
+    setFolders,
+    handleCreateFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+    handleMoveAsset
   }), [
     assets,
     hiddenAssetUrls,
@@ -225,7 +300,12 @@ export function UploadProvider({ children }) {
     searchQuery,
     activeFilter,
     handleRenameAsset,
-    handleDeleteAsset
+    handleDeleteAsset,
+    folders,
+    handleCreateFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+    handleMoveAsset
   ]);
 
   return createElement(UploadContext.Provider, { value }, children);

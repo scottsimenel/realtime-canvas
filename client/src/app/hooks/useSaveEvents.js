@@ -12,7 +12,7 @@ import { useHistoryStore } from '../../state/historyStore.js';
  */
 export function useSaveEvents() {
   const { setTabs, setActiveTabId } = useCanvasStore();
-  const { setAssets } = useUploadStore();
+  const { setAssets, setFolders } = useUploadStore();
   const { setSelectedElementIds } = useSelectionStore();
   const { setHistory, setRedoStack } = useHistoryStore();
 
@@ -81,13 +81,14 @@ export function useSaveEvents() {
   useEffect(() => {
     const s = getSocket();
 
-    const onRoomStateLoaded = ({ tabs, assets }) => {
+    const onRoomStateLoaded = ({ tabs, assets, folders }) => {
       const formattedTabs = (tabs || []).map((tab) => ({
         ...tab,
         locks: locksArrayToMap(tab.locks),
       }));
       setTabs(formattedTabs);
       setAssets(assets || []);
+      setFolders(folders || []);
 
       setActiveTabId((prev) => {
         if (formattedTabs.some((t) => t.id === prev)) {
@@ -106,7 +107,7 @@ export function useSaveEvents() {
     return () => {
       s.off(EVENTS.ROOM_STATE_LOADED, onRoomStateLoaded);
     };
-  }, [setTabs, setAssets, setActiveTabId, setHistory, setRedoStack, setSelectedElementIds]);
+  }, [setTabs, setAssets, setFolders, setActiveTabId, setHistory, setRedoStack, setSelectedElementIds]);
 
   return {
     saves,

@@ -40,8 +40,19 @@ export default function LeftSidebar({
     activeFilter,
     setActiveFilter,
     handleRenameAsset,
-    handleDeleteAsset
+    handleDeleteAsset,
+    folders,
+    handleCreateFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+    handleMoveAsset
   } = useUploadStore();
+
+  const [showNewFolderForm, setShowNewFolderForm] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState([]);
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
 
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [editingAssetName, setEditingAssetName] = useState('');
@@ -59,6 +70,178 @@ export default function LeftSidebar({
     }
     setEditingAssetId(null);
   };
+
+  const startEditingFolder = (e, folder) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const saveFolderRename = (folderId) => {
+    if (editingFolderName.trim() && editingFolderName.trim() !== '') {
+      handleRenameFolder(folderId, editingFolderName.trim());
+    }
+    setEditingFolderId(null);
+  };
+
+  const toggleFolderCollapsed = (folderId) => {
+    setCollapsedFolderIds((prev) =>
+      prev.includes(folderId) ? prev.filter((id) => id !== folderId) : [...prev, folderId]
+    );
+  };
+
+  const handleDragOverFolder = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('bg-sky-500/10', 'border-sky-500/30');
+  };
+
+  const handleDragLeaveFolder = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-sky-500/10', 'border-sky-500/30');
+  };
+
+  const handleDropOnFolder = (e, folderId) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-sky-500/10', 'border-sky-500/30');
+    try {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (!textData) return;
+      const data = JSON.parse(textData);
+      if (data && data.url) {
+        const match = visibleAssets.find((a) => a.url === data.url && !a.isPreset);
+        if (match) {
+          handleMoveAsset(match.id, folderId);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDropOnRoot = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('bg-slate-900/50', 'border-slate-800');
+    try {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (!textData) return;
+      const data = JSON.parse(textData);
+      if (data && data.url) {
+        const match = visibleAssets.find((a) => a.url === data.url && !a.isPreset);
+        if (match) {
+          handleMoveAsset(match.id, null);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const renderAssetCard = (img) => (
+    <div
+      key={img.id}
+      draggable="true"
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ url: img.url, type: 'image' }));
+      }}
+      className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition cursor-grab active:cursor-grabbing"
+    >
+      <button
+        type="button"
+        onClick={() => handleSpawnImage(img.url)}
+        className="w-full h-full text-left p-0 bg-transparent border-0 cursor-pointer"
+      >
+        <img
+          src={getFullUrl(img.url)}
+          alt={img.name}
+          className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300 pointer-events-none"
+        />
+        {editingAssetId === img.id ? (
+          <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
+            <input
+              type="text"
+              value={editingAssetName}
+              onChange={(e) => setEditingAssetName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  saveAssetRename(img.id);
+                } else if (e.key === 'Escape') {
+                  setEditingAssetId(null);
+                }
+              }}
+              onBlur={() => saveAssetRename(img.id)}
+              autoFocus
+              className="w-full text-[10px] bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        ) : (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end justify-between p-2 pointer-events-none">
+            <span className="text-[10px] font-bold text-slate-300 group-hover:text-white transition truncate max-w-[75%]">
+              {img.name}
+            </span>
+            {!img.isPreset && (
+              <button
+                type="button"
+                onClick={(e) => startEditingAsset(e, img)}
+                className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
+                title="Rename Image"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
+        className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-lg border text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center active:scale-95 transition cursor-pointer z-10 ${
+          roomSettings.backgroundImageUrl === img.url
+            ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
+            : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:text-sky-400'
+        }`}
+        title="Set as Canvas Background"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a6 6 0 018.486 0l5.16 5.159m-16.5 0h16.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => toggleHideAsset(img.url)}
+        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
+        title="Hide Image"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.893 7.893L21 21m-4.228-4.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+        </svg>
+      </button>
+
+      {!img.isPreset && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (confirm(`Are you sure you want to permanently delete "${img.name}"? This will delete it for all users and remove it from the server.`)) {
+              handleDeleteAsset(img.id);
+            }
+          }}
+          className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
+          title="Delete Permanently"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
 
   const [spawnShapeType, setSpawnShapeType] = useState('rectangle');
   const [spawnFillColor, setSpawnFillColor] = useState('#3b82f6');
@@ -440,7 +623,179 @@ export default function LeftSidebar({
                 </div>
               </div>
 
+              {/* Create Folder Section */}
+              {!showHiddenMode && (
+                <div className="space-y-2 border-t border-slate-900 pt-2 pb-1">
+                  {showNewFolderForm ? (
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-2">
+                      <input
+                        type="text"
+                        placeholder="Folder name..."
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleCreateFolder(newFolderName);
+                            setNewFolderName('');
+                            setShowNewFolderForm(false);
+                          } else if (e.key === 'Escape') {
+                            setShowNewFolderForm(false);
+                          }
+                        }}
+                        className="w-full text-xs bg-slate-900 border border-slate-850 text-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:border-sky-500"
+                        autoFocus
+                      />
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowNewFolderForm(false)}
+                          className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-350 transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleCreateFolder(newFolderName);
+                            setNewFolderName('');
+                            setShowNewFolderForm(false);
+                          }}
+                          className="px-2.5 py-1 text-[10px] font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 border border-sky-500/30 rounded-lg transition cursor-pointer"
+                        >
+                          Create
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewFolderForm(true)}
+                        className="text-[10px] font-bold text-sky-400 hover:text-sky-350 transition cursor-pointer flex items-center gap-1 select-none"
+                      >
+                        📁+ New Folder
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="max-h-72 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
+                {/* Collapsible Folders List */}
+                {!showHiddenMode && folders.map((folder) => {
+                  const folderAssets = visibleAssets.filter((a) => a.folderId === folder.id);
+                  const isCollapsed = collapsedFolderIds.includes(folder.id);
+                  return (
+                    <div
+                      key={folder.id}
+                      onDragOver={handleDragOverFolder}
+                      onDragLeave={handleDragLeaveFolder}
+                      onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                      className="border border-slate-900/60 rounded-xl overflow-hidden bg-slate-950/20 transition duration-150"
+                    >
+                      {/* Folder Header */}
+                      <div
+                        onClick={() => toggleFolderCollapsed(folder.id)}
+                        className="flex items-center justify-between p-2 bg-slate-950/40 hover:bg-slate-950/70 transition cursor-pointer select-none border-b border-slate-900/40"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            {isCollapsed ? '▶' : '▼'}
+                          </span>
+                          <span className="text-xs shrink-0">📁</span>
+                          {editingFolderId === folder.id ? (
+                            <input
+                              type="text"
+                              value={editingFolderName}
+                              onChange={(e) => setEditingFolderName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  saveFolderRename(folder.id);
+                                } else if (e.key === 'Escape') {
+                                  setEditingFolderId(null);
+                                }
+                              }}
+                              onBlur={() => saveFolderRename(folder.id)}
+                              autoFocus
+                              className="text-xs bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400 truncate max-w-[130px]">
+                              {folder.name}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-600 font-bold">
+                            ({folderAssets.length})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 pointer-events-auto">
+                          <button
+                            type="button"
+                            onClick={(e) => startEditingFolder(e, folder)}
+                            className="text-slate-500 hover:text-slate-300 transition cursor-pointer"
+                            title="Rename Folder"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete folder "${folder.name}"? Assets inside will remain in the library.`)) {
+                                handleDeleteFolder(folder.id);
+                              }
+                            }}
+                            className="text-slate-500 hover:text-rose-500 transition cursor-pointer"
+                            title="Delete Folder"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Folder Content Grid */}
+                      {!isCollapsed && (
+                        <div className="p-2.5">
+                          {folderAssets.length === 0 ? (
+                            <p className="text-[10px] text-slate-600 text-center py-2.5 italic">
+                              Drag custom uploads here.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2.5">
+                              {folderAssets.map((img) => renderAssetCard(img))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Root / Uncategorized Dropzone Header */}
+                {!showHiddenMode && folders.length > 0 && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('bg-slate-900/50', 'border-slate-800');
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('bg-slate-900/50', 'border-slate-800');
+                    }}
+                    onDrop={handleDropOnRoot}
+                    className="border border-dashed border-slate-900 p-2 rounded-xl text-center select-none text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-950/10 transition"
+                  >
+                    📥 Drop here to move back to Root Library
+                  </div>
+                )}
+
+                {/* Root / Flat Assets list */}
                 {showHiddenMode ? (
                   hiddenAssets.length === 0 ? (
                     <p className="text-xs text-slate-600 text-center py-4 italic">No hidden images.</p>
@@ -517,7 +872,7 @@ export default function LeftSidebar({
                                   handleDeleteAsset(img.id);
                                 }
                               }}
-                              className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-450 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
+                              className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
                               title="Delete Permanently"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -529,121 +884,27 @@ export default function LeftSidebar({
                       ))}
                     </div>
                   )
-                ) : (
-                  visibleAssets.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-5 bg-slate-950/20 border border-dashed border-slate-800 rounded-xl animate-in zoom-in-95 duration-200">
-                      No visible images. Upload below or restore hidden.
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {visibleAssets.map((img) => (
-                        <div
-                          key={img.id}
-                          draggable="true"
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('text/plain', JSON.stringify({ url: img.url, type: 'image' }));
-                          }}
-                          className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition cursor-grab active:cursor-grabbing"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleSpawnImage(img.url)}
-                            className="w-full h-full text-left p-0 bg-transparent border-0 cursor-pointer"
-                          >
-                            <img
-                              src={getFullUrl(img.url)}
-                              alt={img.name}
-                              className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300 pointer-events-none"
-                            />
-                            {editingAssetId === img.id ? (
-                              <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
-                                <input
-                                  type="text"
-                                  value={editingAssetName}
-                                  onChange={(e) => setEditingAssetName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      saveAssetRename(img.id);
-                                    } else if (e.key === 'Escape') {
-                                      setEditingAssetId(null);
-                                    }
-                                  }}
-                                  onBlur={() => saveAssetRename(img.id)}
-                                  autoFocus
-                                  className="w-full text-[10px] bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                            ) : (
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end justify-between p-2 pointer-events-none">
-                                <span className="text-[10px] font-bold text-slate-300 group-hover:text-white transition truncate max-w-[75%]">
-                                  {img.name}
-                                </span>
-                                {!img.isPreset && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => startEditingAsset(e, img)}
-                                    className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
-                                    title="Rename Image"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                                    </svg>
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </button>
+                ) : (() => {
+                    const rootAssets = folders.length > 0
+                      ? visibleAssets.filter((a) => !a.folderId)
+                      : visibleAssets;
 
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
-                            className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-lg border text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center active:scale-95 transition cursor-pointer z-10 ${
-                              roomSettings.backgroundImageUrl === img.url
-                                ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
-                                : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:text-sky-400'
-                            }`}
-                            title="Set as Canvas Background"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a6 6 0 018.486 0l5.16 5.159m-16.5 0h16.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => toggleHideAsset(img.url)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
-                            title="Hide Image"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.893 7.893L21 21m-4.228-4.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-                            </svg>
-                          </button>
-
-                          {!img.isPreset && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                if (confirm(`Are you sure you want to permanently delete "${img.name}"? This will delete it for all users and remove it from the server.`)) {
-                                  handleDeleteAsset(img.id);
-                                }
-                              }}
-                              className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-450 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
-                              title="Delete Permanently"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )
-                )}
+                    return rootAssets.length === 0 ? (
+                      folders.length > 0 ? (
+                        <p className="text-[10px] text-slate-600 text-center py-2.5 italic">
+                          No uncategorized root assets.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500 text-center py-5 bg-slate-950/20 border border-dashed border-slate-800 rounded-xl animate-in zoom-in-95 duration-200">
+                          No visible images. Upload below or restore hidden.
+                        </p>
+                      )
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {rootAssets.map((img) => renderAssetCard(img))}
+                      </div>
+                    );
+                  })()}
               </div>
 
               {hiddenAssetUrls.length > 0 && (
