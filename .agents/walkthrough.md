@@ -1,6 +1,6 @@
 # Walkthrough: Realtime Canvas Refactor & Layer Manager Implementation
 
-This document serves as the comprehensive verification walkthrough of the Realtime Canvas codebase refactoring, Stage 8 remediation achievements, and the implementation of the revamped Elements Layer Ordering Manager.
+This document serves as the comprehensive verification walkthrough of the Realtime Canvas codebase refactoring, Stage 8 remediation achievements, the implementation of the revamped Elements Layer Ordering Manager, and the tab-switch selection crash safety fix.
 
 ---
 
@@ -46,6 +46,14 @@ We implemented the revamped element layer ordering manager in the right sidebar 
 
 ---
 
+## 🐛 Tab-Switch Selection Crash Fix (`InspectorWidget.jsx`)
+
+* **Bug**: When a user switched tabs (canvases) with active selections or locked elements, the component state elements array updated immediately to the new tab's elements, while the selected element IDs update was scheduled asynchronously. This caused a temporary mismatch where `InspectorWidget` attempted to find the selected element in the new tab's list, returning `undefined` and throwing an `Uncaught TypeError: Cannot read properties of undefined (reading 'properties')` during render.
+* **Fix**: Added an early return check in `InspectorWidget.jsx` (`if (!selectedEl) return null;`) to safely avoid accessing properties of elements not present on the current active canvas tab.
+* **Tests**: Created a dedicated unit test suite `InspectorWidget.test.jsx` verifying that `InspectorWidget` returns `null` safely without throwing exceptions when the selected element ID is not found.
+
+---
+
 ## 🔍 Verification & Testing Logs
 
 ### 1. Build Verification
@@ -61,8 +69,8 @@ rendering chunks...
 computing gzip size...
 dist/index.html                   0.46 kB │ gzip:   0.29 kB
 dist/assets/index-rx7Uq1Qp.css   69.73 kB │ gzip:  10.81 kB
-dist/assets/index-0_wwYKNl.js   948.75 kB │ gzip: 255.85 kB
-✓ built in 2.40s
+dist/assets/index-BSr6qch7.js   948.77 kB │ gzip: 255.86 kB
+✓ built in 2.39s
 ```
 
 ### 2. Lint Check
@@ -82,18 +90,19 @@ Vitest test suite passed with coverage metrics comfortably exceeding target thre
 
  RUN  v4.1.9 C:/Users/Scott Simenel/.gemini/antigravity/scratch/realtime-canvas/client
 
- ✓ src/lib/__tests/smoke.test.js (1 test) 2ms
- ✓ src/lib/__tests/ids.test.js (4 tests) 4ms
+ ✓ src/lib/__tests/smoke.test.js (1 test) 3ms
  ✓ src/lib/__tests/locks.test.js (2 tests) 3ms
- ✓ src/lib/__tests/mergeElement.test.js (4 tests) 4ms
- ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests) 8ms
- ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests) 6ms
- ✓ src/state/__tests/historyStore.test.js (11 tests) 12ms
- ✓ src/state/__tests/stores.test.js (4 tests) 5ms
+ ✓ src/lib/__tests/ids.test.js (4 tests) 4ms
+ ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests) 6ms
+ ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests) 5ms
+ ✓ src/lib/__tests/mergeElement.test.js (4 tests) 6ms
+ ✓ src/state/__tests/stores.test.js (4 tests) 6ms
+ ✓ src/state/__tests/historyStore.test.js (11 tests) 14ms
  ✓ src/lib/__tests/url.test.js (3 tests) 3ms
+ ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests) 3ms
 
- Test Files  9 passed (9)
-      Tests  47 passed (47)
-   Start at  13:16:13
-   Duration  345ms (transform 438ms, setup 0ms, import 806ms, tests 46ms, environment 1ms)
+ Test Files  10 passed (10)
+      Tests  49 passed (49)
+   Start at  13:19:19
+   Duration  426ms (transform 694ms, setup 0ms, import 1.14s, tests 52ms, environment 1ms)
 ```

@@ -17,6 +17,7 @@ export default function InspectorWidget({
 }) {
   if (selectedElementIds.length === 0) return null;
   const selectedEl = elements.find((el) => el.id === selectedElementIds[0]);
+  if (!selectedEl) return null;
 
   const shapesSelected = elements.filter(
     (el) => selectedElementIds.includes(el.id) && ['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(el.type)
