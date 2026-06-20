@@ -43,3 +43,14 @@
 - `[x]` 7.6 Implement `onDragOver` and `onDrop` in `Canvas.jsx` to spawn assets.
 - `[x]` 7.7 Add search/filters controls, draggable items, and rename/delete buttons to `LeftSidebar.jsx`.
 - `[x]` 7.8 Run ESLint, tests, and build checks.
+
+## 📦 WS8 — Collaborative Folder Management for Assets
+- `[ ]` 8.1 Register folder and move events in `shared/protocol.js`.
+- `[ ]` 8.2 Add folder Map and mutations in `server/registry.js` (including save/load serialization).
+- `[ ]` 8.3 Handle folder CRUD and move events in `server/handlers/elementHandler.js`.
+- `[ ]` 8.4 Add folder states and actions to `client/src/state/uploadStore.js` and initialize on join.
+- `[ ]` 8.5 Register folder broadcast sync listeners in `useElementEvents.js`.
+- `[ ]` 8.6 Redesign `LeftSidebar.jsx` images tab to support folders tree rendering, Collapsible views, and CRUD controls.
+- `[ ]` 8.7 Implement drag-to-move-assets-to-folders logic in `LeftSidebar.jsx` dropzones.
+- `[ ]` 8.8 Add folder unit tests in `uploadStore.test.js` and verify builds.
+

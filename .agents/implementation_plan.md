@@ -1,63 +1,84 @@
-# Collaborative Image & Asset Library Manager Implementation Plan
+# Collaborative Image Library Folder Management Implementation Plan
 
-Implement collaborative image management enhancements (search, filtering, renaming, permanent disk deletion, and drag-and-drop spawning onto precise coordinates) in the client and server.
+Add collaborative folder organization for custom uploaded images and presets in the Left Sidebar asset manager, including socket sync events, database storage, drag-and-drop folder moves, and collapsible UI widgets.
 
 ## User Review Required
 
-We will modify `shared/protocol.js` to add new socket events. This is a three-file change committed together, complying with protocol drift rules.
+> [!IMPORTANT]
+> - We will modify `shared/protocol.js` to add folder events. Both backend and frontend will be updated in the same change to prevent protocol drift.
+> - Deleting a folder will automatically move all of its assets back to the root folder (no files will be deleted).
 
 ## Proposed Changes
 
-### Protocol definition
+### Protocol Definition
 
 #### [MODIFY] [protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js)
-- Add events `ASSET_DELETE`, `ASSET_DELETED`, `ASSET_RENAME`, `ASSET_RENAMED`.
+- Add events:
+  - `FOLDER_CREATE`, `FOLDER_CREATED`
+  - `FOLDER_RENAME`, `FOLDER_RENAMED`
+  - `FOLDER_DELETE`, `FOLDER_DELETED`
+  - `ASSET_MOVE`, `ASSET_MOVED`
 
-### Backend registry
+### Backend Registry & State
 
 #### [MODIFY] [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js)
-- Add `deleteAsset(assetId)` and `renameAsset(assetId, name)` methods to the `StateRegistry` class.
+- Maintain `this.folders = new Map()` in `CanvasRegistry`.
+- Update `joinRoom` to return `folders: Array.from(this.folders.values())`.
+- Add registry mutations:
+  - `createFolder(folder)`
+  - `renameFolder(folderId, name)`
+  - `deleteFolder(folderId)` (deletes folder and updates any referencing assets' `folderId` to `null`).
+  - `moveAsset(assetId, folderId)` (updates `folderId` on the asset).
+- Update `saveState` and `loadState` to serialize/deserialize the `folders` registry.
 
 ### Backend Handlers
 
 #### [MODIFY] [elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js)
-- Register `EVENTS.ASSET_DELETE` socket event. It deletes the asset from registry, deletes the physical upload file from disk, and broadcasts `EVENTS.ASSET_DELETED`.
-- Register `EVENTS.ASSET_RENAME` socket event. It renames the asset in registry and broadcasts `EVENTS.ASSET_RENAMED`.
+- Register socket event listeners:
+  - `EVENTS.FOLDER_CREATE` -> calls `createFolder` and broadcasts `EVENTS.FOLDER_CREATED`.
+  - `EVENTS.FOLDER_RENAME` -> calls `renameFolder` and broadcasts `EVENTS.FOLDER_RENAMED`.
+  - `EVENTS.FOLDER_DELETE` -> calls `deleteFolder` and broadcasts `EVENTS.FOLDER_DELETED`.
+  - `EVENTS.ASSET_MOVE` -> calls `moveAsset` and broadcasts `EVENTS.ASSET_MOVED`.
 
 ### Client State Store
 
 #### [MODIFY] [uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js)
-- Add local states `searchQuery` (string) and `activeFilter` (`'all' | 'presets' | 'uploads'`).
-- Update `visibleAssets` and `hiddenAssets` selectors to support `searchQuery` and `activeFilter`.
-- Implement client callbacks `handleRenameAsset(assetId, name)` and `handleDeleteAsset(assetId)` which emit corresponding socket events.
+- Add local state `folders` array.
+- Expose methods:
+  - `handleCreateFolder(name)`
+  - `handleRenameFolder(folderId, name)`
+  - `handleDeleteFolder(folderId)`
+  - `handleMoveAsset(assetId, folderId)`
+- Update room loading sequence to initialize the local `folders` state when `join-room` response is received.
 
 #### [MODIFY] [useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js)
-- Listen to `EVENTS.ASSET_DELETED` and remove the asset from `assets` state.
-- Listen to `EVENTS.ASSET_RENAMED` and update the asset name in `assets` state.
-
-### Client Viewport Interaction
-
-#### [MODIFY] [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx)
-- Add HTML5 `onDragOver` and `onDrop` event listeners to the canvas layout container.
-- When an asset is dropped, calculate the drop coordinate `(vx, vy)` based on zoom/pan viewport transform, and spawn the image at that location.
+- Add broadcast event listeners:
+  - `EVENTS.FOLDER_CREATED` -> appends the folder.
+  - `EVENTS.FOLDER_RENAMED` -> updates the folder name.
+  - `EVENTS.FOLDER_DELETED` -> removes the folder and resets asset references to `null`.
+  - `EVENTS.ASSET_MOVED` -> updates the asset's `folderId`.
 
 ### Client Sidebar View
 
 #### [MODIFY] [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx)
-- Add search input and quick category filter chips (`All`, `Presets`, `Uploads`) above the images list.
-- Allow dragging image cards by setting `draggable="true"` and defining `onDragStart`.
-- Add inline edit/rename rename input and a permanent deletion trash button (only visible for user-uploaded assets).
+- Render a new "Create Folder" button/form at the top of the images panel.
+- Implement collapsible folder drawer items:
+  - Show a folder icon, name, rename edit button, and delete folder button.
+  - Act as a dropzone: `onDragOver` prevents default and `onDrop` dispatches `handleMoveAsset(draggedAssetId, folder.id)`.
+  - Render nested assets that match the active filters, search, and belong to the folder.
+- Render a "Root Library" dropzone to allow dragging items back to the root folder.
+- Add local UI states to manage collapsed folder state (`collapsedFolderIds` array).
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `npm --prefix client run lint` to ensure zero warnings or errors.
-- Run `npm --prefix client run test -- --coverage --run` to verify all tests pass.
-- Run `npm --prefix client run build` to verify production build.
-- Add unit tests for `uploadStore` assets filtering, renaming, and deletion.
+- Run `npm --prefix client run lint` to ensure zero errors.
+- Run `npm --prefix client run test -- --coverage --run` to verify tests pass.
+- Run `npm --prefix client run build` to verify compiling is clean.
+- Update `uploadStore.test.js` to assert folder creation, renaming, deletion, and asset movement.
 
 ### Manual Verification
-- Upload files, verify search and filter chips update list in real-time.
-- Rename an asset and verify it updates for other users in the room.
-- Permanently delete an asset and verify the file is removed from server disk and other users' lists.
-- Drag an image from the sidebar and drop it onto the canvas, verifying it spawns at the correct cursor position.
+- Create a folder, rename it, and verify it updates for other clients in real time.
+- Drag an image card and drop it onto a folder header, verifying it moves inside.
+- Drag it back out to the "Root Library" dropzone.
+- Save the room state, restart the server, reload the save, and verify folder structures are fully restored.
