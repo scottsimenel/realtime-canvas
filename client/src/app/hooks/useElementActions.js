@@ -135,7 +135,15 @@ export function useElementActions() {
       const index = next.findIndex((el) => el.id === elementId);
       if (index === -1) return prev;
 
-      if (direction === 'forward' && index < next.length - 1) {
+      if (direction === 'front') {
+        const temp = next[index];
+        next.splice(index, 1);
+        next.push(temp);
+      } else if (direction === 'back') {
+        const temp = next[index];
+        next.splice(index, 1);
+        next.unshift(temp);
+      } else if (direction === 'forward' && index < next.length - 1) {
         const temp = next[index];
         next[index] = next[index + 1];
         next[index + 1] = temp;
@@ -173,7 +181,17 @@ export function useElementActions() {
         .filter((idx) => idx !== -1)
         .sort((a, b) => a - b);
 
-      if (direction === 'forward') {
+      if (direction === 'front') {
+        const unselected = next.filter((el) => !selectedElementIds.includes(el.id));
+        const selected = next.filter((el) => selectedElementIds.includes(el.id));
+        next.length = 0;
+        next.push(...unselected, ...selected);
+      } else if (direction === 'back') {
+        const unselected = next.filter((el) => !selectedElementIds.includes(el.id));
+        const selected = next.filter((el) => selectedElementIds.includes(el.id));
+        next.length = 0;
+        next.push(...selected, ...unselected);
+      } else if (direction === 'forward') {
         for (let i = selectedIndices.length - 1; i >= 0; i--) {
           const idx = selectedIndices[i];
           if (idx < next.length - 1) {
@@ -182,7 +200,7 @@ export function useElementActions() {
             next[idx + 1] = temp;
           }
         }
-      } else {
+      } else if (direction === 'backward') {
         for (let i = 0; i < selectedIndices.length; i++) {
           const idx = selectedIndices[i];
           if (idx > 0) {
@@ -191,6 +209,8 @@ export function useElementActions() {
             next[idx - 1] = temp;
           }
         }
+      } else {
+        return prev;
       }
 
       const socket = getSocket();

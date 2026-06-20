@@ -229,6 +229,14 @@ export default function InspectorWidget({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
+              onClick={() => adjustSelectedElementsLayer('front')}
+              className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              title="Bring to Front"
+            >
+              ⏫ Bring to Front
+            </button>
+            <button
+              type="button"
               onClick={() => adjustSelectedElementsLayer('forward')}
               className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               title="Bring Forward"
@@ -242,6 +250,14 @@ export default function InspectorWidget({
               title="Send Backward"
             >
               ▼ Send Backward
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustSelectedElementsLayer('back')}
+              className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              title="Send to Back"
+            >
+              ⏬ Send to Back
             </button>
           </div>
         </div>
