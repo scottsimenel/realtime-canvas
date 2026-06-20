@@ -114,9 +114,11 @@ export function UploadProvider({ children }) {
 
   const allImageAssets = useMemo(() => {
     const list = [];
-    SAMPLE_IMAGES.forEach((url) => {
-      const name = url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('.')) || url;
-      list.push({ id: `preset_${name}`, name, url, isPreset: true });
+    SAMPLE_IMAGES.forEach((item) => {
+      const { name, url } = item || {};
+      if (url && name) {
+        list.push({ id: `preset_${name}`, name, url, isPreset: true });
+      }
     });
     assets.forEach((a) => {
       list.push({ ...a, isPreset: false });
