@@ -4,6 +4,22 @@ Welcome! This document serves as the central contract for AI coding assistants (
 
 ---
 
+## 🚀 New Agent Onboarding Checklist
+
+When initializing a new session or starting a new task, you MUST execute these steps in order to align on codebase context and state:
+
+1. **Read Core Architecture Guides**:
+   * Read [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md) to understand modular file organization and component duties.
+   * Read [agent.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/agent.md) (this file) to align on guidelines, coding boundaries, and development workflows.
+2. **Trace Recent Context**:
+   * Read [.agents/walkthrough.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/.agents/walkthrough.md) to review recently implemented features, testing coverage states, and code changes.
+   * Read [.agents/task.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/.agents/task.md) to check current task progress, pending items, or completed checkmarks.
+3. **Verify Existing Code & Environment**:
+   * Run the test suite: `npm --prefix client run test -- --coverage --run` to inspect test pass rates and check coverage stats.
+   * Run linter checks: `npm --prefix client run lint` to ensure zero warnings or errors exist before making changes.
+
+---
+
 ## 🛠️ How to Apply This File Universally
 
 To leverage this rules system in any coding tool or IDE (Cursor, Windsurf, GitHub Copilot, Cline, etc.):
