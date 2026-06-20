@@ -131,6 +131,12 @@ When working in an agentic environment (such as Antigravity), adhere to the foll
 ### 4. Walkthrough Summary (`walkthrough.md`)
 - **Rule**: After successful verification, document all changes, additions, and test results in `walkthrough.md` in both the system artifacts directory and the workspace `.agents/walkthrough.md` to establish a clear audit log of the task achievements.
 
+### 5. Git Commit and Remote Push  **[BLOCKING]**
+- **Rule**: Actively commit changes and push them to the remote repository whenever a logical unit of work is completed or it makes sense to do so. Do not leave code changes uncommitted or unpushed for an extended period.
+
+### 6. Workspace Artifact Syncing  **[BLOCKING]**
+- **Rule**: Ensure that any artifacts and changes to artifacts that are only visible by the antigravity harness (located in `<appDataDir>\brain\<conversation-id>`) are also reflected on their publicly visible equivalents in the workspace `.agents/` directory immediately.
+
 ---
 
 ## 🛡️ Operational Guardrails for AI-Driven Development

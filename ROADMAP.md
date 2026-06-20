@@ -26,6 +26,21 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
   - Set a room-wide background image URL.
   - Toggle background image visibility.
   - Draw background under the grid lines (ensuring grid remains visible and clear).
+- [ ] **Feature 5: Initiative Tracker**
+  - Turn order tracker for combat/encounters.
+- [ ] **Feature 6: Full Character Sheet**
+  - Modeled after DND 5th edition (2014) rules, including resource management, stats, features, abilities, and items.
+
+---
+
+## 🐛 Bug Fixes & Feature Improvements
+
+- [ ] **Fix input clearing & formatting**: Fix text/numerical input elements to allow for clearing the box. Right now you are unable to clear it (it will show 0 and cannot be deleted to be empty), and additionally when 0 is displayed, you can only add numbers to the right of it (i.e. 010 for 10, 023 for 23).
+- [ ] **Auto-unlocking locked elements**: For element locking, there should be some automatic unlocking that occurs after some period of inactivity (e.g. 30 seconds after the last time a user interacted with an element). Additionally, elements should automatically unlock when a user switches canvases.
+- [ ] **Send to Front/Back ordering controls**: Element ordering should have some way to send an element all the way to the front or back of the entire priority stack.
+- [ ] **Representative bottom bar icons**: Clearer, more representative icons in the bottom bar to represent the different features and panels.
+- [ ] **Categorized image management system**: Improve the image management system, including the ability to delete images, and categorize/group images into categories (backgrounds, characters, NPCs, spoilers, etc.).
+- [ ] **Large-scale element ordering view**: Currently the ordering section for elements is small and hard to use when there are a large number of elements spawned (only a handful of elements are shown in the list scroll view but there may be 30+ elements active, making it hard to find specific elements and manage their ordering via dragging).
 
 ---
 
