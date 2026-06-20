@@ -103,6 +103,7 @@ export default function Canvas({
   pushHistoryAction,
   locateElementTrigger,
   setLocateElementTrigger,
+  handleSpawnImage,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -1488,6 +1489,23 @@ export default function Canvas({
     };
   };
 
+  const handleAssetDrop = (e) => {
+    e.preventDefault();
+    try {
+      const textData = e.dataTransfer.getData('text/plain');
+      if (!textData) return;
+      const data = JSON.parse(textData);
+      if (data && data.type === 'image' && data.url) {
+        const coords = getCanvasCoords(e);
+        if (handleSpawnImage) {
+          handleSpawnImage(data.url, coords.x, coords.y);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to handle asset drop:', err);
+    }
+  };
+
   const { scale, offsetX, offsetY } = getViewportTransform();
 
   const hoveredElement = hoveredElementId ? elements.find((el) => el.id === hoveredElementId) : null;
@@ -1529,6 +1547,8 @@ export default function Canvas({
       onPointerLeave={handlePointerLeave}
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleAssetDrop}
     >
       <canvas ref={canvasRef} className="absolute inset-0" />
 

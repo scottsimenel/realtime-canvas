@@ -33,3 +33,13 @@
 - `[x]` 6.3 Implement locating and viewport panning/centering in `Canvas.jsx` via `useEffect`.
 - `[x]` 6.4 Add `searchQuery` and `activeFilter` states, search input, filter chips, styled swatches, quick front/back shifting, and locate button to `RightSidebar.jsx`.
 - `[x]` 6.5 Verify linter, unit tests, and production build.
+
+## 📦 WS7 — Collaborative Image & Asset Library Manager
+- `[x]` 7.1 Add new events to `shared/protocol.js`.
+- `[x]` 7.2 Implement `deleteAsset` and `renameAsset` in `server/registry.js`.
+- `[x]` 7.3 Handle `ASSET_DELETE` and `ASSET_RENAME` in `server/handlers/elementHandler.js`.
+- `[x]` 7.4 Add search, filters, rename, and delete actions to `client/src/state/uploadStore.js`.
+- `[x]` 7.5 Register asset delete/rename broadcast listeners in `useElementEvents.js`.
+- `[x]` 7.6 Implement `onDragOver` and `onDrop` in `Canvas.jsx` to spawn assets.
+- `[x]` 7.7 Add search/filters controls, draggable items, and rename/delete buttons to `LeftSidebar.jsx`.
+- `[x]` 7.8 Run ESLint, tests, and build checks.

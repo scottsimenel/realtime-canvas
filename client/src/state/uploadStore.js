@@ -24,6 +24,8 @@ export function UploadProvider({ children }) {
   const [dragOverElementId, setDragOverElementId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'presets' | 'uploads'
 
   const toggleHideAsset = useCallback((url) => {
     setHiddenAssetUrls((prev) => {
@@ -112,6 +114,35 @@ export function UploadProvider({ children }) {
     }
   }, []);
 
+  const handleRenameAsset = useCallback((assetId, newName) => {
+    if (!newName || !newName.trim()) return;
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.ASSET_RENAME, { assetId, name: newName.trim() }, (res) => {
+        if (res && res.success && res.asset) {
+          setAssets((prev) => prev.map((a) => (a.id === assetId ? res.asset : a)));
+        }
+      });
+    } else {
+      setAssets((prev) =>
+        prev.map((a) => (a.id === assetId ? { ...a, name: newName.trim() } : a))
+      );
+    }
+  }, []);
+
+  const handleDeleteAsset = useCallback((assetId) => {
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.ASSET_DELETE, { assetId }, (res) => {
+        if (res && res.success) {
+          setAssets((prev) => prev.filter((a) => a.id !== assetId));
+        }
+      });
+    } else {
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+    }
+  }, []);
+
   const allImageAssets = useMemo(() => {
     const list = [];
     SAMPLE_IMAGES.forEach((item) => {
@@ -127,12 +158,30 @@ export function UploadProvider({ children }) {
   }, [assets]);
 
   const visibleAssets = useMemo(() => {
-    return allImageAssets.filter((a) => !hiddenAssetUrls.includes(a.url));
-  }, [allImageAssets, hiddenAssetUrls]);
+    return allImageAssets.filter((a) => {
+      if (hiddenAssetUrls.includes(a.url)) return false;
+      if (activeFilter === 'presets' && !a.isPreset) return false;
+      if (activeFilter === 'uploads' && a.isPreset) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        if (!a.name.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery]);
 
   const hiddenAssets = useMemo(() => {
-    return allImageAssets.filter((a) => hiddenAssetUrls.includes(a.url));
-  }, [allImageAssets, hiddenAssetUrls]);
+    return allImageAssets.filter((a) => {
+      if (!hiddenAssetUrls.includes(a.url)) return false;
+      if (activeFilter === 'presets' && !a.isPreset) return false;
+      if (activeFilter === 'uploads' && a.isPreset) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        if (!a.name.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery]);
 
   const value = useMemo(() => ({
     assets,
@@ -153,7 +202,13 @@ export function UploadProvider({ children }) {
     handleImageUpload,
     allImageAssets,
     visibleAssets,
-    hiddenAssets
+    hiddenAssets,
+    searchQuery,
+    setSearchQuery,
+    activeFilter,
+    setActiveFilter,
+    handleRenameAsset,
+    handleDeleteAsset
   }), [
     assets,
     hiddenAssetUrls,
@@ -166,7 +221,11 @@ export function UploadProvider({ children }) {
     handleImageUpload,
     allImageAssets,
     visibleAssets,
-    hiddenAssets
+    hiddenAssets,
+    searchQuery,
+    activeFilter,
+    handleRenameAsset,
+    handleDeleteAsset
   ]);
 
   return createElement(UploadContext.Provider, { value }, children);

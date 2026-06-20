@@ -1,4 +1,11 @@
 import { EVENTS } from '../../shared/protocol.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.resolve(__dirname, '..', 'public', 'uploads');
 
 export const lockTimeouts = new Map(); // key: "${tabId}:${elementId}" -> timeout
 
@@ -220,6 +227,75 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
 
     if (typeof callback === 'function') {
       callback({ success: true, asset: createdAsset });
+    }
+  });
+
+  /**
+   * Handle deletion of an image asset permanently from disk and database registry.
+   */
+  socket.on(EVENTS.ASSET_DELETE, (data, callback) => {
+    const { assetId } = data || {};
+    if (!assetId) {
+      if (typeof callback === 'function') callback({ success: false, error: 'No assetId provided' });
+      return;
+    }
+
+    const deletedAsset = registry.deleteAsset(assetId);
+    if (!deletedAsset) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Asset not found in registry' });
+      return;
+    }
+
+    // Attempt to delete physical file from disk
+    if (deletedAsset.url && deletedAsset.url.startsWith('/uploads/')) {
+      try {
+        const filename = path.basename(deletedAsset.url);
+        const filePath = path.join(uploadsDir, filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        console.error('Error deleting asset file from server:', err);
+      }
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    // Broadcast asset deletion to all other clients in the room
+    socket.to(room).emit(EVENTS.ASSET_DELETED, {
+      assetId,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, assetId });
+    }
+  });
+
+  /**
+   * Handle asset renaming.
+   */
+  socket.on(EVENTS.ASSET_RENAME, (data, callback) => {
+    const { assetId, name } = data || {};
+    if (!assetId || !name) {
+      if (typeof callback === 'function') callback({ success: false, error: 'assetId and name are required' });
+      return;
+    }
+
+    const updatedAsset = registry.renameAsset(assetId, name);
+    if (!updatedAsset) {
+      if (typeof callback === 'function') callback({ success: false, error: 'Asset not found in registry' });
+      return;
+    }
+
+    const room = socket.room || DEFAULT_ROOM;
+    // Broadcast renamed asset to all other clients in the room
+    socket.to(room).emit(EVENTS.ASSET_RENAMED, {
+      asset: updatedAsset,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, asset: updatedAsset });
     }
   });
 

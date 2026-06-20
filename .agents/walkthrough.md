@@ -100,9 +100,38 @@ Vitest test suite passed with coverage metrics comfortably exceeding target thre
  ✓ src/state/__tests/historyStore.test.js (11 tests) 14ms
  ✓ src/lib/__tests/url.test.js (3 tests) 3ms
  ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests) 3ms
+ ✓ src/state/__tests/uploadStore.test.js (2 tests) 2ms
 
- Test Files  10 passed (10)
-      Tests  49 passed (49)
-   Start at  13:19:19
-   Duration  426ms (transform 694ms, setup 0ms, import 1.14s, tests 52ms, environment 1ms)
+  Test Files  11 passed (11)
+       Tests  51 passed (51)
+    Start at  13:32:29
+    Duration  451ms (transform 778ms, setup 0ms, import 1.38s, tests 64ms, environment 1ms)
 ```
+
+---
+
+## 🖼️ Collaborative Image & Asset Library Manager
+
+We implemented the Collaborative Image & Asset Library Manager in both client and server:
+
+1. **Protocol & State Registry**:
+   - Registered standard socket events (`ASSET_DELETE`, `ASSET_DELETED`, `ASSET_RENAME`, `ASSET_RENAMED`) in [protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js).
+   - Added `deleteAsset(assetId)` and `renameAsset(assetId, name)` mutations to `CanvasRegistry` in [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js).
+2. **Server-Side Handlers ([elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js))**:
+   - Listens to `EVENTS.ASSET_DELETE`, deletes asset records, unlinks physical files from `uploadsDir` disk storage securely, and broadcasts `EVENTS.ASSET_DELETED` to other clients.
+   - Listens to `EVENTS.ASSET_RENAME`, updates name records, and broadcasts `EVENTS.ASSET_RENAMED`.
+3. **Client-Side Store ([uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js) & [useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js))**:
+   - Added states for fuzzy search (`searchQuery`) and preset vs upload filter chips (`activeFilter`).
+   - Integrated logic to filter visible and hidden assets dynamically using search/filter inputs.
+   - Added `handleRenameAsset` and `handleDeleteAsset` callbacks emitting socket calls.
+   - Listens to real-time asset rename and delete broadcast notifications to sync user panels instantly.
+4. **Drag-and-Drop Spawning ([Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx) & [useElementActions.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementActions.js))**:
+   - Updated `handleSpawnImage` to accept optional `customX` and `customY` target coordinates, placing the image center at the drop cursor.
+   - Registered HTML5 `onDragOver` and `onDrop` events on the canvas outer wrapper, transforming screen cursor drops to virtual coordinates to spawn images precisely.
+5. **Left Sidebar UI ([LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx))**:
+   - Added search input field and filtering chips at the top of the Images panel.
+   - Made image list cards draggable (`draggable="true"`).
+   - Added inline rename input editors toggled by a pencil icon.
+   - Added permanent delete trash buttons (only for custom uploads) showing confirm dialogs before dispatching deletion requests.
+6. **Tests**:
+   - Added dedicated behavioral test suite [uploadStore.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/__tests/uploadStore.test.js) verifying search filtering, presets vs uploads filters, renaming, and deleting trigger properly and dispatch the right websocket emits.

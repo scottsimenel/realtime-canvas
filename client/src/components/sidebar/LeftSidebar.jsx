@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SAMPLE_IMAGES } from '../../constants.js';
 import ActiveUsersWidget from './ActiveUsersWidget.jsx';
+import { useUploadStore } from '../../state/uploadStore.js';
 
 export default function LeftSidebar({
   showLeftSidebar,
@@ -33,6 +34,32 @@ export default function LeftSidebar({
   handleRecolorUser,
   getFullUrl,
 }) {
+  const {
+    searchQuery,
+    setSearchQuery,
+    activeFilter,
+    setActiveFilter,
+    handleRenameAsset,
+    handleDeleteAsset
+  } = useUploadStore();
+
+  const [editingAssetId, setEditingAssetId] = useState(null);
+  const [editingAssetName, setEditingAssetName] = useState('');
+
+  const startEditingAsset = (e, img) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setEditingAssetId(img.id);
+    setEditingAssetName(img.name);
+  };
+
+  const saveAssetRename = (assetId) => {
+    if (editingAssetName.trim() && editingAssetName.trim() !== '') {
+      handleRenameAsset(assetId, editingAssetName.trim());
+    }
+    setEditingAssetId(null);
+  };
+
   const [spawnShapeType, setSpawnShapeType] = useState('rectangle');
   const [spawnFillColor, setSpawnFillColor] = useState('#3b82f6');
   const [spawnFillOpacity, setSpawnFillOpacity] = useState(1);
@@ -372,8 +399,46 @@ export default function LeftSidebar({
               <p className="text-xs text-slate-500 leading-relaxed">
                 {showHiddenMode 
                   ? 'Click eye to restore image to active panel.' 
-                  : 'Click thumbnail to spawn image on board.'}
+                  : 'Click thumbnail to spawn image or drag to board.'}
               </p>
+
+              <div className="space-y-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="🔍 Search library..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-355 placeholder-slate-600 focus:outline-none focus:border-slate-700 transition"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1.5 text-slate-450 hover:text-slate-200 cursor-pointer text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex gap-1.5 select-none">
+                  {['all', 'presets', 'uploads'].map((filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setActiveFilter(filter)}
+                      className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wider border transition cursor-pointer ${
+                        activeFilter === filter
+                          ? 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+                          : 'bg-slate-950/40 border-slate-900 text-slate-500 hover:bg-slate-900 hover:text-slate-400'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="max-h-72 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
                 {showHiddenMode ? (
@@ -389,18 +454,51 @@ export default function LeftSidebar({
                           <img
                             src={getFullUrl(img.url)}
                             alt={img.name}
-                            className="w-full h-full object-cover opacity-30 grayscale"
+                            className="w-full h-full object-cover opacity-30 grayscale pointer-events-none"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex items-end p-2">
-                            <span className="text-[10px] font-bold text-rose-350 truncate pr-6">
-                              {img.name}
-                            </span>
-                          </div>
+                          {editingAssetId === img.id ? (
+                            <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
+                              <input
+                                type="text"
+                                value={editingAssetName}
+                                onChange={(e) => setEditingAssetName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    saveAssetRename(img.id);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingAssetId(null);
+                                  }
+                                }}
+                                onBlur={() => saveAssetRename(img.id)}
+                                autoFocus
+                                className="w-full text-[10px] bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          ) : (
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex items-end justify-between p-2 pointer-events-none">
+                              <span className="text-[10px] font-bold text-rose-350 truncate max-w-[75%]">
+                                {img.name}
+                              </span>
+                              {!img.isPreset && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => startEditingAsset(e, img)}
+                                  className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
+                                  title="Rename Image"
+                                >
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          )}
                           
                           <button
                             type="button"
                             onClick={() => toggleHideAsset(img.url)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-400 hover:scale-105 active:scale-95 transition cursor-pointer"
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-400 hover:scale-105 active:scale-95 transition cursor-pointer z-10"
                             title="Restore Image"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -408,6 +506,25 @@ export default function LeftSidebar({
                               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                           </button>
+
+                          {!img.isPreset && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (confirm(`Are you sure you want to permanently delete "${img.name}"? This will delete it for all users and remove it from the server.`)) {
+                                  handleDeleteAsset(img.id);
+                                }
+                              }}
+                              className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-450 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
+                              title="Delete Permanently"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -422,7 +539,11 @@ export default function LeftSidebar({
                       {visibleAssets.map((img) => (
                         <div
                           key={img.id}
-                          className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition"
+                          draggable="true"
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', JSON.stringify({ url: img.url, type: 'image' }));
+                          }}
+                          className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition cursor-grab active:cursor-grabbing"
                         >
                           <button
                             type="button"
@@ -432,13 +553,46 @@ export default function LeftSidebar({
                             <img
                               src={getFullUrl(img.url)}
                               alt={img.name}
-                              className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300"
+                              className="w-full h-full object-cover opacity-60 group-hover:opacity-85 transition duration-300 pointer-events-none"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end p-2 pointer-events-none">
-                              <span className="text-[10px] font-bold text-slate-300 group-hover:text-white transition truncate pr-6">
-                                {img.name}
-                              </span>
-                            </div>
+                            {editingAssetId === img.id ? (
+                              <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
+                                <input
+                                  type="text"
+                                  value={editingAssetName}
+                                  onChange={(e) => setEditingAssetName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      saveAssetRename(img.id);
+                                    } else if (e.key === 'Escape') {
+                                      setEditingAssetId(null);
+                                    }
+                                  }}
+                                  onBlur={() => saveAssetRename(img.id)}
+                                  autoFocus
+                                  className="w-full text-[10px] bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            ) : (
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent flex items-end justify-between p-2 pointer-events-none">
+                                <span className="text-[10px] font-bold text-slate-300 group-hover:text-white transition truncate max-w-[75%]">
+                                  {img.name}
+                                </span>
+                                {!img.isPreset && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => startEditingAsset(e, img)}
+                                    className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
+                                    title="Rename Image"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </button>
 
                           <button
@@ -459,7 +613,7 @@ export default function LeftSidebar({
                           <button
                             type="button"
                             onClick={() => toggleHideAsset(img.url)}
-                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-450 active:scale-95 transition cursor-pointer z-10"
+                            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
                             title="Hide Image"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -468,9 +622,22 @@ export default function LeftSidebar({
                           </button>
 
                           {!img.isPreset && (
-                            <span className="absolute bottom-1.5 right-1.5 text-[8px] font-bold bg-sky-500/85 text-white px-1.5 py-0.5 rounded-md select-none pointer-events-none shadow-sm">
-                              User
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (confirm(`Are you sure you want to permanently delete "${img.name}"? This will delete it for all users and remove it from the server.`)) {
+                                  handleDeleteAsset(img.id);
+                                }
+                              }}
+                              className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-450 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
+                              title="Delete Permanently"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
                           )}
                         </div>
                       ))}

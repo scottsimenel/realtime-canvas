@@ -260,6 +260,37 @@ export class CanvasRegistry {
   }
 
   /**
+   * Deletes a custom asset.
+   * 
+   * @param {string} assetId - The ID of the asset to delete.
+   * @returns {Object|null} The deleted asset details, or null if not found.
+   */
+  deleteAsset(assetId) {
+    const asset = this.assets.get(assetId);
+    if (asset) {
+      this.assets.delete(assetId);
+      return asset;
+    }
+    return null;
+  }
+
+  /**
+   * Renames a custom asset.
+   * 
+   * @param {string} assetId - The ID of the asset to rename.
+   * @param {string} newName - The new name.
+   * @returns {Object|null} The updated asset details, or null if not found.
+   */
+  renameAsset(assetId, newName) {
+    const asset = this.assets.get(assetId);
+    if (asset) {
+      asset.name = newName;
+      return asset;
+    }
+    return null;
+  }
+
+  /**
    * Updates a user's cursor coordinates.
    * 
    * @param {string} userId - The socket ID of the user.

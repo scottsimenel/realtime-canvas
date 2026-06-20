@@ -105,6 +105,14 @@ export function useElementEvents() {
       setAssets((prev) => [...prev.filter((a) => a.id !== asset.id), asset]);
     };
 
+    const onAssetDeleted = ({ assetId }) => {
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+    };
+
+    const onAssetRenamed = ({ asset }) => {
+      setAssets((prev) => prev.map((a) => (a.id === asset.id ? asset : a)));
+    };
+
     const onElementsReordered = ({ orderedIds, tabId }) => {
       const targetTabId = tabId || 'tab-default';
       setTabs((prev) =>
@@ -148,6 +156,8 @@ export function useElementEvents() {
     s.on(EVENTS.ELEMENT_CREATED, onElementCreated);
     s.on(EVENTS.ELEMENT_DELETED, onElementDeleted);
     s.on(EVENTS.ASSET_CREATED, onAssetCreated);
+    s.on(EVENTS.ASSET_DELETED, onAssetDeleted);
+    s.on(EVENTS.ASSET_RENAMED, onAssetRenamed);
     s.on(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
     s.on(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
 
@@ -159,6 +169,8 @@ export function useElementEvents() {
       s.off(EVENTS.ELEMENT_CREATED, onElementCreated);
       s.off(EVENTS.ELEMENT_DELETED, onElementDeleted);
       s.off(EVENTS.ASSET_CREATED, onAssetCreated);
+      s.off(EVENTS.ASSET_DELETED, onAssetDeleted);
+      s.off(EVENTS.ASSET_RENAMED, onAssetRenamed);
       s.off(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
       s.off(EVENTS.ROOM_SETTINGS_UPDATED, onRoomSettingsUpdated);
     };

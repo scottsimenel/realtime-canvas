@@ -365,6 +365,7 @@ export default function AppContent({
               pushHistoryAction={pushHistoryAction}
               locateElementTrigger={locateElementTrigger}
               setLocateElementTrigger={setLocateElementTrigger}
+              handleSpawnImage={handleSpawnImage}
             />
           </div>
         </main>

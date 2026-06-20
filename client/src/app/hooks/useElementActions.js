@@ -65,7 +65,7 @@ export function useElementActions() {
   );
 
   const handleSpawnImage = useCallback(
-    (url) => {
+    (url, customX, customY) => {
       const socket = getSocket();
       if (!socket || !socket.connected) return;
 
@@ -74,11 +74,21 @@ export function useElementActions() {
 
       const spawnWithDimensions = (w, h) => {
         const id = newElementId();
+        let spawnX, spawnY;
+
+        if (customX !== undefined && customY !== undefined) {
+          spawnX = customX - w / 2;
+          spawnY = customY - h / 2;
+        } else {
+          spawnX = Math.floor(Math.random() * 200) + 120;
+          spawnY = Math.floor(Math.random() * 200) + 120;
+        }
+
         const element = {
           id,
           type: 'image',
-          x: Math.floor(Math.random() * 200) + 120,
-          y: Math.floor(Math.random() * 200) + 120,
+          x: spawnX,
+          y: spawnY,
           width: w,
           height: h,
           properties: {

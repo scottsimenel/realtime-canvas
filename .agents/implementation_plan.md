@@ -1,52 +1,63 @@
-# Revamped Elements Layer Ordering Manager
+# Collaborative Image & Asset Library Manager Implementation Plan
 
-Revamp the elements layer ordering manager in the right sidebar (`RightSidebar.jsx`) to improve usability in dense canvas environments.
+Implement collaborative image management enhancements (search, filtering, renaming, permanent disk deletion, and drag-and-drop spawning onto precise coordinates) in the client and server.
 
 ## User Review Required
 
-No new external packages or dependencies will be introduced. Emojis and standard Tailwind styling will be used.
+We will modify `shared/protocol.js` to add new socket events. This is a three-file change committed together, complying with protocol drift rules.
 
 ## Proposed Changes
 
-### Client Sidebar Component
+### Protocol definition
 
-#### [MODIFY] [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx)
-- Add `searchQuery` (string) and `activeFilter` (`'all' | 'selected' | 'images' | 'shapes'`) states.
-- Increase layer list viewport height constraint from `max-h-80` to `max-h-[450px]`.
-- Add search input and category filter chips at the top of the layers list.
-- Import `getFullUrl` from `../../lib/url.js` to render thumbnail images for image elements.
-- Render styled color swatches for shape/path elements using their exact fill or stroke color.
-- Add quick ordering buttons `⏫` (Bring to Front) and `⏬` (Send to Back) next to forward/backward shift buttons.
-- Add Locate/Focus eye button `👁️` that selects the element and triggers `setLocateElementTrigger`.
+#### [MODIFY] [protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js)
+- Add events `ASSET_DELETE`, `ASSET_DELETED`, `ASSET_RENAME`, `ASSET_RENAMED`.
 
-### Client Core State
+### Backend registry
 
-#### [MODIFY] [uiStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uiStore.js)
-- Add `locateElementTrigger` (string/null) state.
-- Export `locateElementTrigger` and `setLocateElementTrigger` in `UiContext`.
+#### [MODIFY] [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js)
+- Add `deleteAsset(assetId)` and `renameAsset(assetId, name)` methods to the `StateRegistry` class.
 
-### Client App Orchestrator
+### Backend Handlers
 
-#### [MODIFY] [AppContent.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/AppContent.jsx)
-- Destructure `locateElementTrigger` and `setLocateElementTrigger` from `useUiStore`.
-- Pass `setLocateElementTrigger` prop to `RightSidebar`.
-- Pass `locateElementTrigger` and `setLocateElementTrigger` props to `Canvas`.
+#### [MODIFY] [elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js)
+- Register `EVENTS.ASSET_DELETE` socket event. It deletes the asset from registry, deletes the physical upload file from disk, and broadcasts `EVENTS.ASSET_DELETED`.
+- Register `EVENTS.ASSET_RENAME` socket event. It renames the asset in registry and broadcasts `EVENTS.ASSET_RENAMED`.
 
-### Client Canvas Viewport
+### Client State Store
+
+#### [MODIFY] [uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js)
+- Add local states `searchQuery` (string) and `activeFilter` (`'all' | 'presets' | 'uploads'`).
+- Update `visibleAssets` and `hiddenAssets` selectors to support `searchQuery` and `activeFilter`.
+- Implement client callbacks `handleRenameAsset(assetId, name)` and `handleDeleteAsset(assetId)` which emit corresponding socket events.
+
+#### [MODIFY] [useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js)
+- Listen to `EVENTS.ASSET_DELETED` and remove the asset from `assets` state.
+- Listen to `EVENTS.ASSET_RENAMED` and update the asset name in `assets` state.
+
+### Client Viewport Interaction
 
 #### [MODIFY] [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx)
-- Receive `locateElementTrigger` and `setLocateElementTrigger` as props.
-- Add `useEffect` to listen to `locateElementTrigger` changes. When triggered, center the viewport (panOffset) on the element's center coordinates based on current zoom scale, then reset the trigger.
+- Add HTML5 `onDragOver` and `onDrop` event listeners to the canvas layout container.
+- When an asset is dropped, calculate the drop coordinate `(vx, vy)` based on zoom/pan viewport transform, and spawn the image at that location.
+
+### Client Sidebar View
+
+#### [MODIFY] [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx)
+- Add search input and quick category filter chips (`All`, `Presets`, `Uploads`) above the images list.
+- Allow dragging image cards by setting `draggable="true"` and defining `onDragStart`.
+- Add inline edit/rename rename input and a permanent deletion trash button (only visible for user-uploaded assets).
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `npm --prefix client run lint` to ensure zero ESLint warnings or errors.
-- Run `npm --prefix client run test -- --coverage --run` to verify all unit tests pass.
-- Run `npm --prefix client run build` to verify production Vite build is successful.
+- Run `npm --prefix client run lint` to ensure zero warnings or errors.
+- Run `npm --prefix client run test -- --coverage --run` to verify all tests pass.
+- Run `npm --prefix client run build` to verify production build.
+- Add unit tests for `uploadStore` assets filtering, renaming, and deletion.
 
 ### Manual Verification
-- Spawn multiple rectangle, circle, and image elements.
-- Verify filtering and searching in the sidebar updates elements list dynamically.
-- Verify clicking `👁️` selects the element and pans/centers the viewport on the element.
-- Verify clicking `⏫` and `⏬` moves the element to the front and back of the layers respectively.
+- Upload files, verify search and filter chips update list in real-time.
+- Rename an asset and verify it updates for other users in the room.
+- Permanently delete an asset and verify the file is removed from server disk and other users' lists.
+- Drag an image from the sidebar and drop it onto the canvas, verifying it spawns at the correct cursor position.
