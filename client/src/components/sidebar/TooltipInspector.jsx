@@ -180,18 +180,38 @@ export default function TooltipInspector({ element, onChange }) {
                         className="w-20 px-2 py-1 bg-slate-900 border border-slate-800 rounded-md text-xs text-slate-200 focus:outline-none focus:border-sky-500 transition"
                       />
                       <div className="flex items-center gap-1">
-                        <input
+                         <input
                           type="number"
-                          value={tracker.value}
-                          onChange={(e) => handleUpdateTracker(tracker.id, { value: parseInt(e.target.value, 10) || 0 })}
+                          value={tracker.value === undefined || tracker.value === null ? '' : tracker.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdateTracker(tracker.id, { 
+                              value: val === '' ? '' : (isNaN(parseInt(val, 10)) ? 0 : parseInt(val, 10))
+                            });
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value === '') {
+                              handleUpdateTracker(tracker.id, { value: 0 });
+                            }
+                          }}
                           className="w-12 px-1 py-1 bg-slate-900 border border-slate-800 rounded-md text-xs text-center text-slate-200 focus:outline-none focus:border-sky-500"
                           placeholder="Val"
                         />
                         <span className="text-slate-600 text-xs select-none">/</span>
                         <input
                           type="number"
-                          value={tracker.max}
-                          onChange={(e) => handleUpdateTracker(tracker.id, { max: parseInt(e.target.value, 10) || 0 })}
+                          value={tracker.max === undefined || tracker.max === null ? '' : tracker.max}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdateTracker(tracker.id, { 
+                              max: val === '' ? '' : (isNaN(parseInt(val, 10)) ? 0 : parseInt(val, 10))
+                            });
+                          }}
+                          onBlur={(e) => {
+                            if (e.target.value === '') {
+                              handleUpdateTracker(tracker.id, { max: 10 });
+                            }
+                          }}
                           className="w-12 px-1 py-1 bg-slate-900 border border-slate-800 rounded-md text-xs text-center text-slate-200 focus:outline-none focus:border-sky-500"
                           placeholder="Max"
                         />
