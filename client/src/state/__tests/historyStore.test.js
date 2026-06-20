@@ -33,7 +33,7 @@ vi.mock('react', () => {
     useMemo: (fn) => fn(),
     useEffect: () => {},
     createContext: () => ({}),
-    useContext: (ctx) => {
+    useContext: () => {
       // Return captured value if resolving HistoryContext
       return reactMockValueCapture.captured;
     },
