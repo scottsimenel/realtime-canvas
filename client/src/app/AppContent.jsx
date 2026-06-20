@@ -72,6 +72,17 @@ export default function AppContent({
   } = useSelectionStore();
 
   const {
+    tabs,
+    setTabs,
+    activeTabId,
+    elements,
+    locks,
+    setLocks,
+    roomSettings,
+    setElements
+  } = useCanvasStore();
+
+  const {
     saves,
     fetchSaves,
     handleCreateSave,
@@ -158,16 +169,7 @@ export default function AppContent({
     handleCriticalRoll, handleRollDice: storeRollDice
   } = useDiceStore();
 
-  const {
-    tabs,
-    setTabs,
-    activeTabId,
-    elements,
-    locks,
-    setLocks,
-    roomSettings,
-    setElements
-  } = useCanvasStore();
+
 
   const {
     handleSwitchTab,
