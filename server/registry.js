@@ -510,15 +510,12 @@ export class CanvasRegistry {
   }
 
   /**
-   * Cleans up state when a user disconnects:
-   * Removes them from the users list and releases any locks they held across ALL tabs.
+   * Releases any locks held by a user across ALL tabs.
    * 
-   * @param {string} userId - The socket ID of the disconnecting user.
-   * @returns {{ releasedLocks: Array<{ tabId: string, elementId: string }> }} List of element locks that were unlocked.
+   * @param {string} userId - The user's socket ID.
+   * @returns {Array<{ tabId: string, elementId: string }>} List of element locks that were unlocked.
    */
-  disconnectUser(userId) {
-    this.users.delete(userId);
-
+  releaseUserLocks(userId) {
     const releasedLocks = [];
     for (const [tabId, tab] of this.tabs.entries()) {
       for (const [elementId, holderId] of tab.locks.entries()) {
@@ -528,7 +525,19 @@ export class CanvasRegistry {
         }
       }
     }
+    return releasedLocks;
+  }
 
+  /**
+   * Cleans up state when a user disconnects:
+   * Removes them from the users list and releases any locks they held across ALL tabs.
+   * 
+   * @param {string} userId - The socket ID of the disconnecting user.
+   * @returns {{ releasedLocks: Array<{ tabId: string, elementId: string }> }} List of element locks that were unlocked.
+   */
+  disconnectUser(userId) {
+    this.users.delete(userId);
+    const releasedLocks = this.releaseUserLocks(userId);
     return { releasedLocks };
   }
 

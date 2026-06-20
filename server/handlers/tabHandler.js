@@ -1,4 +1,5 @@
 import { EVENTS } from '../../shared/protocol.js';
+import { clearLockTimeout } from './elementHandler.js';
 export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle tab creation.
@@ -76,9 +77,18 @@ export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Tab ID is required' });
       return;
     }
+    // Release locks held by this user before switching tabs
+    const releasedLocks = registry.releaseUserLocks(socket.id);
+    const room = socket.room || DEFAULT_ROOM;
+    if (releasedLocks && releasedLocks.length > 0) {
+      releasedLocks.forEach(({ elementId, tabId: tId }) => {
+        clearLockTimeout(tId, elementId);
+        io.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId, userId: socket.id, tabId: tId });
+      });
+    }
+
     const user = registry.switchUserTab(socket.id, tabId);
     if (user) {
-      const room = socket.room || DEFAULT_ROOM;
       // Broadcast that user switched tab
       socket.to(room).emit(EVENTS.TAB_SWITCHED, { userId: socket.id, tabId });
       if (typeof callback === 'function') callback({ success: true, user });

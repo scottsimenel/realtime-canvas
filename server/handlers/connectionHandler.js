@@ -1,4 +1,5 @@
 import { EVENTS } from '../../shared/protocol.js';
+import { clearLockTimeout } from './elementHandler.js';
 export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle user joining a room.
@@ -116,6 +117,7 @@ export function registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM) {
     // Notify other clients about any locks that were released due to disconnect
     if (releasedLocks && releasedLocks.length > 0) {
       releasedLocks.forEach(({ elementId, tabId }) => {
+        clearLockTimeout(tabId, elementId);
         io.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId, tabId });
       });
     }

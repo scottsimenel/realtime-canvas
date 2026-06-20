@@ -1,4 +1,33 @@
 import { EVENTS } from '../../shared/protocol.js';
+
+export const lockTimeouts = new Map(); // key: "${tabId}:${elementId}" -> timeout
+
+export function clearLockTimeout(tabId, elementId) {
+  const key = `${tabId}:${elementId}`;
+  if (lockTimeouts.has(key)) {
+    clearTimeout(lockTimeouts.get(key));
+    lockTimeouts.delete(key);
+  }
+}
+
+function resetLockTimeout(io, room, tabId, elementId, userId, registry) {
+  const key = `${tabId}:${elementId}`;
+  if (lockTimeouts.has(key)) {
+    clearTimeout(lockTimeouts.get(key));
+  }
+
+  const timeout = setTimeout(() => {
+    const success = registry.unlockElement(tabId, elementId, userId);
+    if (success) {
+      console.log(`[Auto-Unlock] Element ${elementId} unlocked due to inactivity in tab ${tabId}`);
+      io.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId, userId, tabId });
+    }
+    lockTimeouts.delete(key);
+  }, 30000); // 30 seconds
+
+  lockTimeouts.set(key, timeout);
+}
+
 export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
   /**
    * Handle element lock request when a user selects/drags an element.
@@ -13,6 +42,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       const lockedIds = registry.lockElements(targetTabId, elementIds, socket.id);
       console.log(`Elements locked: [${lockedIds.join(', ')}] by ${socket.id} in tab ${targetTabId}`);
       lockedIds.forEach((id) => {
+        resetLockTimeout(io, room, targetTabId, id, socket.id, registry);
         socket.to(room).emit(EVENTS.ELEMENT_LOCKED, { elementId: id, userId: socket.id, tabId: targetTabId });
       });
       if (typeof callback === 'function') {
@@ -29,6 +59,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
     const success = registry.lockElement(targetTabId, elementId, socket.id);
     if (success) {
       console.log(`Element locked: ${elementId} by ${socket.id} in tab ${targetTabId}`);
+      resetLockTimeout(io, room, targetTabId, elementId, socket.id, registry);
       socket.to(room).emit(EVENTS.ELEMENT_LOCKED, { elementId, userId: socket.id, tabId: targetTabId });
       if (typeof callback === 'function') callback({ success: true });
     } else {
@@ -57,6 +88,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       const unlockedIds = registry.unlockElements(targetTabId, elementIds, socket.id);
       console.log(`Elements unlocked: [${unlockedIds.join(', ')}] by ${socket.id} in tab ${targetTabId}`);
       unlockedIds.forEach((id) => {
+        clearLockTimeout(targetTabId, id);
         socket.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId: id, userId: socket.id, tabId: targetTabId });
       });
       if (typeof callback === 'function') {
@@ -73,6 +105,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
     const success = registry.unlockElement(targetTabId, elementId, socket.id);
     if (success) {
       console.log(`Element unlocked: ${elementId} by ${socket.id} in tab ${targetTabId}`);
+      clearLockTimeout(targetTabId, elementId);
       socket.to(room).emit(EVENTS.ELEMENT_UNLOCKED, { elementId, userId: socket.id, tabId: targetTabId });
       if (typeof callback === 'function') callback({ success: true });
     } else {
@@ -94,6 +127,9 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
     if (batch && Array.isArray(batch)) {
       const updatedElements = registry.updateElements(targetTabId, batch, socket.id);
       if (updatedElements.length > 0) {
+        updatedElements.forEach((el) => {
+          resetLockTimeout(io, room, targetTabId, el.id, socket.id, registry);
+        });
         // Broadcast batch updates to other clients
         socket.to(room).emit(EVENTS.ELEMENT_UPDATED_BATCH, {
           batch: batch.filter(item => updatedElements.some(el => el.id === item.elementId)),
@@ -114,6 +150,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
 
     const updatedElement = registry.updateElement(targetTabId, elementId, updates, socket.id);
     if (updatedElement) {
+      resetLockTimeout(io, room, targetTabId, elementId, socket.id, registry);
       socket.to(room).emit(EVENTS.ELEMENT_UPDATED, {
         elementId,
         updates,
@@ -198,6 +235,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       const deletedIds = registry.deleteElements(targetTabId, elementIds, socket.id);
       console.log(`Elements deleted: [${deletedIds.join(', ')}] by ${socket.id} in tab ${targetTabId}`);
       deletedIds.forEach((id) => {
+        clearLockTimeout(targetTabId, id);
         socket.to(room).emit(EVENTS.ELEMENT_DELETED, { elementId: id, userId: socket.id, tabId: targetTabId });
       });
       if (typeof callback === 'function') {
@@ -214,6 +252,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
     const success = registry.deleteElement(targetTabId, elementId, socket.id);
     if (success) {
       console.log(`Element deleted: ${elementId} by ${socket.id} in tab ${targetTabId}`);
+      clearLockTimeout(targetTabId, elementId);
       socket.to(room).emit(EVENTS.ELEMENT_DELETED, { elementId, userId: socket.id, tabId: targetTabId });
       if (typeof callback === 'function') callback({ success: true });
     } else {
