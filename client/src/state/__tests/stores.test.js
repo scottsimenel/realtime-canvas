@@ -152,6 +152,16 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     value = reactMockValueCapture.captured;
     expect(value.showRightSidebar).toBe(true);
     expect(value.rightPanelCollapsed).toBe(false);
+
+    // Test locateElementTrigger
+    expect(value.locateElementTrigger).toBeNull();
+    value.setLocateElementTrigger('el_test_123');
+
+    // Re-run Provider to get updated states
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+    expect(value.locateElementTrigger).toBe('el_test_123');
   });
 
   test('ClipboardProvider copy and paste calculations', () => {

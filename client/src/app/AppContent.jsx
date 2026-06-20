@@ -59,7 +59,8 @@ export default function AppContent({
     penColor,
     penSize,
     eraserSize,
-    showCursorNames, setShowCursorNames
+    showCursorNames, setShowCursorNames,
+    locateElementTrigger, setLocateElementTrigger
   } = useUiStore();
 
   const {
@@ -362,6 +363,8 @@ export default function AppContent({
               showCursorNames={showCursorNames}
               onCanvasInteraction={handleCanvasInteraction}
               pushHistoryAction={pushHistoryAction}
+              locateElementTrigger={locateElementTrigger}
+              setLocateElementTrigger={setLocateElementTrigger}
             />
           </div>
         </main>
@@ -405,6 +408,7 @@ export default function AppContent({
           draggedElementId={draggedElementId}
           dragOverElementId={dragOverElementId}
           pushHistoryAction={pushHistoryAction}
+          setLocateElementTrigger={setLocateElementTrigger}
         />
       </div>
 

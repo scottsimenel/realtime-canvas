@@ -101,6 +101,8 @@ export default function Canvas({
   showCursorNames = true,
   onCanvasInteraction,
   pushHistoryAction,
+  locateElementTrigger,
+  setLocateElementTrigger,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -126,6 +128,36 @@ export default function Canvas({
   const [userZoom, setUserZoom] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const activePointersRef = useRef({}); // maps pointerId -> { clientX, clientY }
+
+  // Handle locate element trigger
+  useEffect(() => {
+    if (!locateElementTrigger) return;
+
+    const targetEl = elements.find((el) => el.id === locateElementTrigger);
+    if (targetEl) {
+      // Calculate element center in virtual space
+      const vx = targetEl.x + targetEl.width / 2;
+      const vy = targetEl.y + targetEl.height / 2;
+
+      // Calculate current scale
+      const { width: virtualWidth, height: virtualHeight } = virtualDimensions;
+      const baseScale = Math.min(canvasSize.width / virtualWidth, canvasSize.height / virtualHeight) || 1;
+      const scale = baseScale * userZoom;
+
+      // Compute new pan offset to center viewport on the element
+      const newPanX = (virtualWidth / 2 - vx) * scale;
+      const newPanY = (virtualHeight / 2 - vy) * scale;
+
+      setTimeout(() => {
+        setPanOffset({ x: newPanX, y: newPanY });
+        setLocateElementTrigger(null);
+      }, 0);
+    } else {
+      setTimeout(() => {
+        setLocateElementTrigger(null);
+      }, 0);
+    }
+  }, [locateElementTrigger, elements, canvasSize, virtualDimensions, userZoom, setLocateElementTrigger]);
   const touchStartRef = useRef(null); // { distance, midpoint, userZoom, panOffset }
   const isSpacePressedRef = useRef(false);
 

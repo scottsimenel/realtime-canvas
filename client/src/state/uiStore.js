@@ -64,6 +64,8 @@ export function UiProvider({ children }) {
     }
   }, [showLeftSidebar, showRightSidebar]);
 
+  const [locateElementTrigger, setLocateElementTrigger] = useState(null);
+
   const value = {
     showHeader,
     setShowHeader,
@@ -97,7 +99,9 @@ export function UiProvider({ children }) {
     eraserSize,
     setEraserSize,
     showCursorNames,
-    setShowCursorNames
+    setShowCursorNames,
+    locateElementTrigger,
+    setLocateElementTrigger
   };
 
   return createElement(UiContext.Provider, { value }, children);

@@ -1,45 +1,52 @@
-# Implementation Plan — Refactor Remediation Plan
+# Revamped Elements Layer Ordering Manager
 
-This plan implements the remediation of all architectural gaps (G1 to G5) identified in the Stage 0–7 review, as detailed in the workspace [REMEDIATION_PLAN.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/REMEDIATION_PLAN.md).
+Revamp the elements layer ordering manager in the right sidebar (`RightSidebar.jsx`) to improve usability in dense canvas environments.
 
----
+## User Review Required
 
-## Status: Fully Executed and Verified
-
-All five workstreams of the remediation plan have been fully executed and verified. All unit tests pass, statement/branch coverage targets have been met, build succeeds, and lint checks run cleanly. All changes have been committed and pushed.
-
----
+No new external packages or dependencies will be introduced. Emojis and standard Tailwind styling will be used.
 
 ## Proposed Changes
 
-We will execute the remediation in five distinct workstreams, committing and verifying at each boundary.
+### Client Sidebar Component
 
-### WS5: Housekeeping
-* **Update `agent.md`**: Document the self-edit history log.
-* **Verify `STRUCTURE.md`**: Confirm every file added by the refactor is documented.
+#### [MODIFY] [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx)
+- Add `searchQuery` (string) and `activeFilter` (`'all' | 'selected' | 'images' | 'shapes'`) states.
+- Increase layer list viewport height constraint from `max-h-80` to `max-h-[450px]`.
+- Add search input and category filter chips at the top of the layers list.
+- Import `getFullUrl` from `../../lib/url.js` to render thumbnail images for image elements.
+- Render styled color swatches for shape/path elements using their exact fill or stroke color.
+- Add quick ordering buttons `⏫` (Bring to Front) and `⏬` (Send to Back) next to forward/backward shift buttons.
+- Add Locate/Focus eye button `👁️` that selects the element and triggers `setLocateElementTrigger`.
 
-### WS1: Protocol Rewiring
-* **Canvas.jsx & RightSidebar.jsx**: Swap all 18 hardcoded event emission strings with their corresponding constants from `shared/protocol.js`.
+### Client Core State
 
-### WS4: AppContent Slimming
-* **AppContent.jsx**: Move active tool, configuration, and zoom states to `uiStore.js`, and selection transform references to `selectionStore.js`.
-* **AppContent.jsx**: Reduce line size from 1,165 lines to under 500 lines.
+#### [MODIFY] [uiStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uiStore.js)
+- Add `locateElementTrigger` (string/null) state.
+- Export `locateElementTrigger` and `setLocateElementTrigger` in `UiContext`.
 
-### WS2: Behavioral Tests
-* **tests/stores.test.js**: Replace existence checking assertions with real behavioral tests covering history undo/redo stacks, clipboard offset transformations, and canvas tab isolation.
-* **CanvasSelection.test.js & DiceMath.test.js**: Write pure logic tests for hit-testing math and rotation math.
+### Client App Orchestrator
 
-### WS3: Walkthrough Rewrite
-* **walkthrough.md**: Rewrite to document precise, verifiable metrics and verification results.
+#### [MODIFY] [AppContent.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/AppContent.jsx)
+- Destructure `locateElementTrigger` and `setLocateElementTrigger` from `useUiStore`.
+- Pass `setLocateElementTrigger` prop to `RightSidebar`.
+- Pass `locateElementTrigger` and `setLocateElementTrigger` props to `Canvas`.
 
----
+### Client Canvas Viewport
+
+#### [MODIFY] [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx)
+- Receive `locateElementTrigger` and `setLocateElementTrigger` as props.
+- Add `useEffect` to listen to `locateElementTrigger` changes. When triggered, center the viewport (panOffset) on the element's center coordinates based on current zoom scale, then reset the trigger.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `npm --prefix client run lint` to ensure ESLint passes with no warnings.
-- Run `npm --prefix client run build` to verify the production build succeeds.
-- Run `npm --prefix client run test` to verify all unit tests pass with coverage analysis.
+- Run `npm --prefix client run lint` to ensure zero ESLint warnings or errors.
+- Run `npm --prefix client run test -- --coverage --run` to verify all unit tests pass.
+- Run `npm --prefix client run build` to verify production Vite build is successful.
 
 ### Manual Verification
-- Smoke-test real-time collaboration using two browser tabs (moving elements, locks, pasting, tab switches).
+- Spawn multiple rectangle, circle, and image elements.
+- Verify filtering and searching in the sidebar updates elements list dynamically.
+- Verify clicking `👁️` selects the element and pans/centers the viewport on the element.
+- Verify clicking `⏫` and `⏬` moves the element to the front and back of the layers respectively.

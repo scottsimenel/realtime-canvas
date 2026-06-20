@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import InspectorWidget from './InspectorWidget.jsx';
 import { EVENTS } from '../../../../shared/protocol.js';
+import { getFullUrl } from '../../lib/url.js';
 
 export default function RightSidebar({
   showRightSidebar,
@@ -35,10 +37,43 @@ export default function RightSidebar({
   handleDrop,
   socketRef,
   pushHistoryAction,
+  setLocateElementTrigger,
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'selected', 'images', 'shapes'
+
   const renderElementsAndLocks = () => {
+    const filteredElements = elements.filter((el) => {
+      // 1. Filter by category
+      if (activeFilter === 'selected') {
+        if (!selectedElementIds.includes(el.id)) return false;
+      } else if (activeFilter === 'images') {
+        if (el.type !== 'image') return false;
+      } else if (activeFilter === 'shapes') {
+        if (el.type === 'image') return false;
+      }
+
+      // 2. Filter by search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const typeMatch = el.type.toLowerCase().includes(q);
+        const titleMatch = el.properties?.tooltip?.title?.toLowerCase().includes(q);
+        const textMatch = el.properties?.text?.toLowerCase().includes(q);
+        
+        const shapeName = (el.type.charAt(0).toUpperCase() + el.type.slice(1)).toLowerCase();
+        const shapeMatch = shapeName.includes(q);
+
+        if (!typeMatch && !titleMatch && !textMatch && !shapeMatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
     return (
       <div className="space-y-4">
+        {/* Title & Count */}
         <div className="flex items-center justify-between border-b border-slate-800/85 pb-2">
           <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
             <span>Layers & locks</span>
@@ -48,13 +83,62 @@ export default function RightSidebar({
           </span>
         </div>
 
-        {elements.length === 0 ? (
+        {/* Search Input */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search elements..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-3 py-2 pl-9 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-205 placeholder-slate-650 focus:outline-none focus:border-sky-500 transition"
+          />
+          <span className="absolute left-3 top-2.5 text-slate-500 text-xs">🔍</span>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-2 text-slate-400 hover:text-slate-200 text-xs"
+              title="Clear Search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Filter Chips */}
+        <div className="flex flex-wrap gap-1.5 pb-1">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'selected', label: 'Selected' },
+            { id: 'images', label: 'Images' },
+            { id: 'shapes', label: 'Shapes' },
+          ].map((f) => {
+            const isActive = activeFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setActiveFilter(f.id)}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold border transition duration-150 active:scale-95 cursor-pointer ${
+                  isActive
+                    ? 'bg-sky-500/15 border-sky-500/50 text-sky-400'
+                    : 'bg-slate-900 border-slate-800 text-slate-450 hover:bg-slate-850 hover:text-slate-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredElements.length === 0 ? (
           <p className="text-xs text-slate-500 text-center py-6 bg-slate-900/20 rounded-xl border border-dashed border-slate-800">
-            No items on canvas. Use the left panel to spawn something.
+            {elements.length === 0
+              ? "No items on canvas. Use the left panel to spawn something."
+              : "No items match your search or filter."}
           </p>
         ) : (
-          <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
-            {[...elements].reverse().map((el) => {
+          <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1 custom-scrollbar">
+            {[...filteredElements].reverse().map((el) => {
               const lockHolderId = locks[el.id];
               const isLocked = !!lockHolderId;
               const lockHolder = isLocked ? users.find((u) => u.id === lockHolderId) : null;
@@ -68,6 +152,44 @@ export default function RightSidebar({
 
               const isDragging = draggedElementId === el.id;
               const isDragOver = dragOverElementId === el.id;
+
+              const tooltipTitle = el.properties?.tooltip?.title;
+              const customName = tooltipTitle ? `"${tooltipTitle}"` : '';
+              
+              const textSnippet = el.type === 'text' && el.properties?.text
+                ? `"${el.properties.text.length > 15 ? el.properties.text.slice(0, 15) + '...' : el.properties.text}"`
+                : '';
+              
+              const displayName = el.type === 'text' && textSnippet
+                ? `Text: ${textSnippet}`
+                : `${shapeName}${customName ? `: ${customName}` : ''}`;
+
+              const renderPreview = () => {
+                if (el.type === 'image') {
+                  return (
+                    <img
+                      src={getFullUrl(el.properties?.url)}
+                      alt=""
+                      className="w-6 h-6 rounded object-cover border border-slate-750 flex-shrink-0"
+                    />
+                  );
+                }
+
+                // Draw colored shape swatch
+                const fill = el.type === 'path'
+                  ? (el.properties?.stroke || '#3b82f6')
+                  : (el.properties?.fill || '#3b82f6');
+                
+                return (
+                  <div
+                    className="w-5 h-5 border border-slate-700/50 flex-shrink-0"
+                    style={{
+                      backgroundColor: fill,
+                      borderRadius: el.type === 'circle' ? '50%' : '4px',
+                    }}
+                  />
+                );
+              };
 
               return (
                 <div
@@ -98,19 +220,34 @@ export default function RightSidebar({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="text-slate-600 hover:text-slate-400 cursor-grab text-[13px] select-none mr-0.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="text-slate-600 hover:text-slate-400 cursor-grab text-[13px] select-none mr-0.5 flex-shrink-0">
                         ⋮⋮
                       </div>
-                      <div className="w-5 h-5 rounded border border-slate-750 flex items-center justify-center text-xs">
-                        {el.type === 'circle' ? '⚪' : el.type === 'image' ? '🖼️' : '🟦'}
-                      </div>
-                      <span className="text-xs font-bold text-slate-350">
-                        {shapeName}
+                      {renderPreview()}
+                      <span className="text-xs font-bold text-slate-350 truncate">
+                        {displayName}
                       </span>
                     </div>
                     
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        disabled={isFirst}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustElementLayer(el.id, 'front');
+                        }}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] border transition active:scale-95 cursor-pointer ${
+                          isFirst
+                            ? 'border-slate-800 text-slate-750 cursor-not-allowed bg-slate-950/20'
+                            : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
+                        }`}
+                        title="Bring to Front"
+                        draggable="false"
+                      >
+                        ⏫
+                      </button>
                       <button
                         type="button"
                         disabled={isFirst}
@@ -147,6 +284,38 @@ export default function RightSidebar({
                       </button>
                       <button
                         type="button"
+                        disabled={isLast}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          adjustElementLayer(el.id, 'back');
+                        }}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] border transition active:scale-95 cursor-pointer ${
+                          isLast
+                            ? 'border-slate-800 text-slate-750 cursor-not-allowed bg-slate-950/20'
+                            : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800'
+                        }`}
+                        title="Send to Back"
+                        draggable="false"
+                      >
+                        ⏬
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedElementIds([el.id]);
+                          if (setLocateElementTrigger) {
+                            setLocateElementTrigger(el.id);
+                          }
+                        }}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-xs border border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-700 hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                        title="Locate on Canvas"
+                        draggable="false"
+                      >
+                        👁️
+                      </button>
+                      <button
+                        type="button"
                         disabled={isLockedByOther}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -164,9 +333,6 @@ export default function RightSidebar({
                       >
                         {el.properties?.locked ? '🔒' : '🔓'}
                       </button>
-                      <span className="text-[10px] text-slate-550 font-mono ml-1">
-                        X:{el.x} Y:{el.y}
-                      </span>
                     </div>
                   </div>
 
@@ -218,7 +384,7 @@ export default function RightSidebar({
                                 pushHistoryAction({
                                   type: 'delete',
                                   elements: [elementToDelete],
-                                  tabId: 'tab-default', // Fallback, will switch context correctly if needed
+                                  tabId: 'tab-default',
                                 });
                               }
                             }
