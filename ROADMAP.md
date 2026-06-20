@@ -30,6 +30,8 @@ This document tracks planned collaborative features for the Antigravity Canvas. 
   - Turn order tracker for combat/encounters.
 - [ ] **Feature 6: Full Character Sheet**
   - Modeled after DND 5th edition (2014) rules, including resource management, stats, features, abilities, and items.
+- [ ] **Feature 7: Error Logger Window**
+  - Access window to view application error logs in real-time as they occur.
 
 ---
 
