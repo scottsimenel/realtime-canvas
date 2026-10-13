@@ -42,7 +42,8 @@ export default function AppContent({
   setCurrentUser,
   users,
   setUsers,
-  roomIdInput
+  roomIdInput,
+  handleLeaveRoom
 }) {
   const {
     showHeader,
@@ -117,8 +118,15 @@ export default function AppContent({
     visibleAssets,
     hiddenAssets,
     draggedElementId,
-    dragOverElementId
+    dragOverElementId,
+    setCurrentRoomId
   } = useUploadStore();
+
+  useEffect(() => {
+    if (roomIdInput && setCurrentRoomId) {
+      setCurrentRoomId(roomIdInput);
+    }
+  }, [roomIdInput, setCurrentRoomId]);
 
   const {
     handleSpawnShape,
@@ -288,6 +296,7 @@ export default function AppContent({
           fetchSaves();
           setShowSavesModal(true);
         }}
+        onLeaveRoom={handleLeaveRoom}
       />
 
       {/* Main Workspace Panels */}

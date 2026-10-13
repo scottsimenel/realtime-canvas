@@ -69,4 +69,16 @@
 - `[x]` 10.6 Run ESLint, tests, and production build checks.
 - `[x]` 10.7 Sync artifacts, commit, and push.
 
+## 📦 WS11 — Multi-Room Canvas Architecture & Room Discovery
+- `[x]` 11.1 Update `shared/protocol.js` with `ROOMS_LIST`, `ROOMS_UPDATED`, and `LEAVE_ROOM` events.
+- `[x]` 11.2 Refactor `server/registry.js` to scope saves by `roomId` and migrate legacy root saves into `server/saves/canvas-default/`.
+- `[x]` 11.3 Create `server/roomManager.js` to manage multi-room instances, sanitize room IDs, and list active/saved rooms.
+- `[x]` 11.4 Update `server/server.js` with `roomManager`, `GET /api/rooms`, and room-scoped uploads `POST /api/upload?roomId=...`.
+- `[x]` 11.5 Rewire `server/handlers/*` (`connectionHandler`, `elementHandler`, `tabHandler`, `diceHandler`, `saveHandler`) to look up room registry via `roomManager` and isolate broadcasts to `socket.roomId`.
+- `[x]` 11.6 Redesign `client/src/components/lobby/Lobby.jsx` with an Available Rooms browser, live user count badges, 1-click join, random room generator, and deep linking via `?room=...`.
+- `[x]` 11.7 Update `Header.jsx`, `App.jsx`, and `uploadStore.js` with "Copy Invite Link", "Switch Room", and room-scoped image uploads.
+- `[x]` 11.8 Write tests for `roomManager`, verify ESLint, all client tests, and production build.
+- `[x]` 11.9 Sync artifacts, commit, and push.
+
+
 

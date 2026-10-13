@@ -1,12 +1,21 @@
 import { EVENTS } from '../../shared/protocol.js';
-export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
+
+export function registerSaveHandlers(io, socket, roomManager) {
+  const getRoomContext = () => {
+    const room = socket.roomId || socket.room || 'canvas-default';
+    const registry = roomManager.getOrCreateRoom(room);
+    return { room, registry };
+  };
+
   /**
    * Handle save creation.
    */
   socket.on(EVENTS.SAVE_CREATE, (data, callback) => {
     const { name } = data || {};
+    const { registry } = getRoomContext();
     try {
       const save = registry.saveState(name);
+      io.emit(EVENTS.ROOMS_UPDATED, roomManager.listRooms());
       if (typeof callback === 'function') {
         callback({ success: true, save });
       }
@@ -19,9 +28,10 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   });
 
   /**
-   * Handle save listing.
+   * Handle save listing for the active room.
    */
   socket.on(EVENTS.SAVE_LIST, (callback) => {
+    const { registry } = getRoomContext();
     try {
       const saves = registry.listSaves();
       if (typeof callback === 'function') {
@@ -36,7 +46,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   });
 
   /**
-   * Handle loading a save.
+   * Handle loading a save in the active room.
    */
   socket.on(EVENTS.SAVE_LOAD, (data, callback) => {
     const { saveId } = data || {};
@@ -47,6 +57,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
+    const { room, registry } = getRoomContext();
     try {
       const success = registry.loadState(saveId);
       if (success) {
@@ -60,14 +71,15 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
         }));
         const assetsList = Array.from(registry.assets.values());
         
-        const room = socket.room || DEFAULT_ROOM;
-        
         // Broadcast newly loaded state to all users in the room
         io.to(room).emit(EVENTS.ROOM_STATE_LOADED, {
           tabs: tabsList,
-          assets: assetsList
+          assets: assetsList,
+          folders: Array.from(registry.folders.values())
         });
         
+        io.emit(EVENTS.ROOMS_UPDATED, roomManager.listRooms());
+
         if (typeof callback === 'function') {
           callback({ success: true });
         }
@@ -85,7 +97,7 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
   });
 
   /**
-   * Handle deleting a save.
+   * Handle deleting a save in the active room.
    */
   socket.on(EVENTS.SAVE_DELETE, (data, callback) => {
     const { saveId } = data || {};
@@ -96,9 +108,11 @@ export function registerSaveHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
+    const { registry } = getRoomContext();
     try {
       const success = registry.deleteSave(saveId);
       if (success) {
+        io.emit(EVENTS.ROOMS_UPDATED, roomManager.listRooms());
         if (typeof callback === 'function') {
           callback({ success: true });
         }

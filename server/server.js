@@ -2,7 +2,8 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { CanvasRegistry } from './registry.js';
+import { CanvasRegistry, sanitizeRoomId } from './registry.js';
+import { RoomManager } from './roomManager.js';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -30,10 +31,16 @@ app.use(express.json());
 // Serve uploaded images statically
 app.use('/uploads', express.static(uploadsDir));
 
-// Configure Multer storage
+// Configure Multer storage to organize uploads into per-room subdirectories
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadsDir);
+    const rawRoom = req.query.roomId || req.body?.roomId || 'canvas-default';
+    const safeRoom = sanitizeRoomId(rawRoom);
+    const roomUploadsDir = path.join(uploadsDir, safeRoom);
+    if (!fs.existsSync(roomUploadsDir)) {
+      fs.mkdirSync(roomUploadsDir, { recursive: true });
+    }
+    cb(null, roomUploadsDir);
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp to prevent name collisions
@@ -57,16 +64,19 @@ const upload = multer({
   }
 });
 
-// Custom file upload endpoint
+// Custom file upload endpoint (scoped per roomId)
 app.post('/api/upload', upload.array('image', 50), (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'No files uploaded' });
     }
+    const rawRoom = req.query.roomId || req.body?.roomId || 'canvas-default';
+    const safeRoom = sanitizeRoomId(rawRoom);
     const filesData = req.files.map(file => ({
-      url: `/uploads/${file.filename}`,
+      url: `/uploads/${safeRoom}/${file.filename}`,
       filename: file.filename,
-      originalname: file.originalname
+      originalname: file.originalname,
+      roomId: safeRoom
     }));
     
     res.status(200).json({
@@ -94,6 +104,16 @@ app.use('/api/upload', (err, req, res, next) => {
 // Add basic HTTP health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// REST endpoint to list all available rooms (both active and saved)
+app.get('/api/rooms', (req, res) => {
+  try {
+    const rooms = roomManager.listRooms();
+    res.status(200).json({ success: true, rooms });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Serve React frontend static files in production if the build directory exists
@@ -127,22 +147,16 @@ const io = new Server(httpServer, {
   }
 });
 
-// Initialize global in-memory canvas registry
-const registry = new CanvasRegistry();
-const DEFAULT_ROOM = 'canvas-default';
+// Initialize RoomManager for multi-room canvas isolation
+const roomManager = new RoomManager();
 
-// Automatically restore latest save if available on boot
-try {
-  registry.loadLatestSave();
-} catch (err) {
-  console.error('Failed to auto-restore latest canvas save:', err);
-}
-
-// Set up periodic background autosave (every 2 minutes)
+// Set up periodic background autosave (every 2 minutes) across all active rooms
 setInterval(() => {
   try {
-    registry.saveState('Autosave (Auto)', 'autosave');
-    console.log('Background periodic autosave completed successfully.');
+    const savedCount = roomManager.autosaveAllRooms();
+    if (savedCount > 0) {
+      console.log(`Periodic background autosave completed for ${savedCount} active room(s).`);
+    }
   } catch (err) {
     console.error('Periodic background autosave failed:', err);
   }
@@ -154,12 +168,12 @@ setInterval(() => {
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
 
-  // Register modular handlers
-  registerConnectionHandlers(io, socket, registry, DEFAULT_ROOM);
-  registerElementHandlers(io, socket, registry, DEFAULT_ROOM);
-  registerTabHandlers(io, socket, registry, DEFAULT_ROOM);
-  registerDiceHandlers(io, socket, registry, DEFAULT_ROOM);
-  registerSaveHandlers(io, socket, registry, DEFAULT_ROOM);
+  // Register modular handlers bound to roomManager
+  registerConnectionHandlers(io, socket, roomManager);
+  registerElementHandlers(io, socket, roomManager);
+  registerTabHandlers(io, socket, roomManager);
+  registerDiceHandlers(io, socket, roomManager);
+  registerSaveHandlers(io, socket, roomManager);
 });
 
 // Run server on configured port

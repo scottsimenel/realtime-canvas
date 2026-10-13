@@ -15,10 +15,24 @@ export default function Header({
   handleRedo,
   redoDisabled,
   onOpenSaves,
+  onLeaveRoom,
 }) {
   const [showUsersPopover, setShowUsersPopover] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyInvite = () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('room', roomIdInput);
+      navigator.clipboard.writeText(url.toString());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Ignore clipboard write failure
+    }
+  };
 
   return (
     <header className={`transition-all duration-300 ease-in-out flex items-center justify-between z-50 ${
@@ -34,9 +48,23 @@ export default function Header({
           <h1 className="text-sm sm:text-base font-bold tracking-tight text-slate-200 line-clamp-1">
             Antigravity Canvas
           </h1>
-          <p className="text-[10px] text-slate-500 font-mono">
-            Room: <span className="text-indigo-400">{roomIdInput}</span>
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] text-slate-500 font-mono">
+              Room: <span className="text-indigo-400 font-semibold">{roomIdInput}</span>
+            </p>
+            <button
+              onClick={handleCopyInvite}
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition flex items-center gap-1 cursor-pointer select-none active:scale-95 ${
+                copied
+                  ? 'bg-emerald-950/60 border-emerald-500/60 text-emerald-300'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-indigo-300 hover:border-indigo-500/50'
+              }`}
+              title="Copy room invite link"
+            >
+              <span>{copied ? '✓' : '🔗'}</span>
+              <span>{copied ? 'Copied' : 'Invite'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -82,6 +110,18 @@ export default function Header({
             <span className="text-xs">💾</span>
             <span>Saves</span>
           </button>
+
+          {/* Switch Room / Lobby button */}
+          {onLeaveRoom && (
+            <button
+              onClick={onLeaveRoom}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 hover:text-indigo-300 cursor-pointer shadow-md"
+              title="Return to room browser lobby"
+            >
+              <span className="text-xs">🚪</span>
+              <span className="hidden sm:inline">Lobby</span>
+            </button>
+          )}
         </div>
 
         {/* Connection status badge */}

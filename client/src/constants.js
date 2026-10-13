@@ -38,3 +38,42 @@ export const SAMPLE_IMAGES = [
     url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=400&auto=format&fit=crop&q=60',
   },
 ];
+
+export const RANDOM_ROOM_PREFIXES = [
+  'realm',
+  'canvas',
+  'nexus',
+  'spire',
+  'vault',
+  'grove',
+  'haven',
+  'forge',
+  'sanctum',
+  'dungeon',
+];
+
+export const RANDOM_ROOM_SUFFIXES = [
+  'amber',
+  'frost',
+  'shadow',
+  'solar',
+  'mystic',
+  'arcane',
+  'astral',
+  'cyber',
+  'nova',
+  'echo',
+];
+
+/**
+ * Generates a memorable, URL-friendly random room ID.
+ * e.g. "realm-amber-42"
+ * 
+ * @returns {string}
+ */
+export function generateRandomRoomId() {
+  const prefix = RANDOM_ROOM_PREFIXES[Math.floor(Math.random() * RANDOM_ROOM_PREFIXES.length)];
+  const suffix = RANDOM_ROOM_SUFFIXES[Math.floor(Math.random() * RANDOM_ROOM_SUFFIXES.length)];
+  const num = Math.floor(Math.random() * 90) + 10;
+  return `${prefix}-${suffix}-${num}`;
+}

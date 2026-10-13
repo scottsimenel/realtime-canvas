@@ -24,7 +24,18 @@ export default function App() {
   const [colorInput, setColorInput] = useState(() => {
     return PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)];
   });
-  const [roomIdInput, setRoomIdInput] = useState('canvas-default');
+  const [roomIdInput, setRoomIdInput] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roomParam = params.get('room') || params.get('roomId');
+      if (roomParam && roomParam.trim()) {
+        return roomParam.trim();
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+    return 'canvas-default';
+  });
 
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
@@ -53,9 +64,12 @@ export default function App() {
   }, []);
 
   const handleJoin = useCallback(
-    (e) => {
-      e.preventDefault();
+    (e, overrideRoomId) => {
+      if (e?.preventDefault) e.preventDefault();
       if (!nameInput.trim()) return;
+
+      const targetRoom = (overrideRoomId || roomIdInput || 'canvas-default').trim();
+      setRoomIdInput(targetRoom);
 
       const socket = socketRef.current;
       if (socket && socket.connected) {
@@ -64,7 +78,7 @@ export default function App() {
           {
             name: nameInput,
             color: colorInput,
-            roomId: roomIdInput,
+            roomId: targetRoom,
           },
           (res) => {
             if (res && res.success) {
@@ -91,6 +105,15 @@ export default function App() {
                 color: colorInput,
               });
               setJoined(true);
+
+              // Reflect active room in URL without page refresh
+              try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('room', targetRoom);
+                window.history.replaceState({}, '', url.toString());
+              } catch {
+                // Ignore URL history errors
+              }
             } else {
               alert('Failed to join room.');
             }
@@ -102,6 +125,24 @@ export default function App() {
     },
     [nameInput, colorInput, roomIdInput, activeTabId, setTabs, setActiveTabId]
   );
+
+  const handleLeaveRoom = useCallback(() => {
+    const socket = socketRef.current;
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.LEAVE_ROOM, () => {
+        setJoined(false);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('room');
+          window.history.replaceState({}, '', url.toString());
+        } catch {
+          // Ignore
+        }
+      });
+    } else {
+      setJoined(false);
+    }
+  }, []);
 
   if (!joined) {
     return (
@@ -129,6 +170,7 @@ export default function App() {
       users={users}
       setUsers={setUsers}
       roomIdInput={roomIdInput}
+      handleLeaveRoom={handleLeaveRoom}
     />
   );
 }

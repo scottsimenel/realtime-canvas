@@ -31,13 +31,17 @@ graph TD
 *   [shared/protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js): Standardized event strings and payload protocols used between client and server.
 
 ### 2. Backend Server (`/server`)
-*   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js): Entry point that instantiates the Express application, serving compiled client files in production, setting up the `/api/upload` endpoint, and routing incoming socket connections to sub-event handlers.
-*   [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js): The in-memory transactional database. Houses lists of active users, canvas elements, tab instances, and element locks, providing mutation methods like `recolorUser()`, `switchUserTab()`, and `disconnectUser()`.
+*   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js): Entry point that instantiates Express, room-scoped `/api/upload` endpoint, `/api/rooms` discovery API, and passes `roomManager` to socket sub-handlers.
+*   [roomManager.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/roomManager.js): Central multi-room orchestrator managing a collection of isolated `CanvasRegistry` instances, room ID sanitization, automatic per-room save discovery, and periodic autosaves.
+*   [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js): The per-room transactional state database. Houses isolated users, canvas elements, tab instances, assets, folders, and element locks scoped to `this.savesDir`.
 *   `/server/handlers/`:
-    *   `connectionHandler.js`: Manages socket connections, room creation/joining (`join-room`), throttled real-time cursor updates (`cursor-move`), and disconnection cleanup routines.
+    *   `connectionHandler.js`: Manages socket connections, room creation/joining (`join-room`), room discovery queries (`rooms-list`), room leaves (`leave-room`), throttled real-time cursor updates (`cursor-move`), and disconnection cleanup routines.
     *   `elementHandler.js`: Manages element manipulation events: locking (`element-lock`), unlocking (`element-unlock`), spawning new shapes/images (`element-create`), moving/scaling/rotating (`element-update` / `elements-reorder`), and deleting elements (`element-delete`).
     *   `tabHandler.js`: Manages multi-tab operations: creating tabs (`tab-create`), deleting tabs (`tab-delete`), renaming (`tab-rename`), and switching active viewports (`tab-switch`).
     *   `diceHandler.js`: Handles backend RPG dice rolls. Receives dice count, type, and roll mode (Normal, Advantage, Disadvantage), calculates values, and broadcasts the resolved payload.
+    *   `saveHandler.js`: Scopes save creation, listing, loading, and deletion to `socket.roomId`.
+*   `/server/__tests__/`:
+    *   `roomManager.test.js`: Suite of unit tests covering room isolation, user separation, save scoping, ID sanitization, and room listing.
 
 ### 3. Frontend Client (`/client`)
 *   `App.jsx`: The layout orchestrator. Manages parent React state bindings, establishes Socket.io event receivers, handles optimistic local merges, and arranges the grid panels.
@@ -75,9 +79,9 @@ graph TD
     *   `DieIcon.jsx`: Renders scalable vector SVG representations for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
     *   `TabButton.jsx`: Render tab capsules in the workspace header supporting double-click renaming, custom delete controls, and inline active user indicators.
 *   `/client/src/components/lobby/`:
-    *   `Lobby.jsx`: The welcome page. Gathers user name input, handles cursor color presets, collects target Room IDs, and runs verification checks before joining a workspace.
+    *   `Lobby.jsx`: The welcome and discovery portal. Features live available rooms browser, user presence counts, 1-click room joining, random room identifier generation, profile customization, and deep link invite handling.
 *   `/client/src/components/header/`:
-    *   `Header.jsx`: Top control bar displaying room IDs, syncing status indicators, a Zen Mode toggle, profile capsule (with name and color picker editor), and the active room participants popover card.
+    *   `Header.jsx`: Top control bar displaying active room ID with 1-click invite link copying, return-to-lobby switch, syncing status, profile editor, undo/redo triggers, and participants popover.
 *   `/client/src/components/sidebar/`:
     *   `LeftSidebar.jsx`: Spawns shapes (rectangle, circle, text), handles image uploads, manages canvas background settings (grid toggle, size, and background images).
     *   `RightSidebar.jsx`: Hosts collapsible drawers for active list items:

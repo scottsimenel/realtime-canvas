@@ -27,6 +27,7 @@ export function UploadProvider({ children }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'presets' | 'uploads'
   const [folders, setFolders] = useState([]);
+  const [currentRoomId, setCurrentRoomId] = useState('canvas-default');
 
   const toggleHideAsset = useCallback((url) => {
     setHiddenAssetUrls((prev) => {
@@ -39,7 +40,7 @@ export function UploadProvider({ children }) {
     });
   }, []);
 
-  const handleImageUpload = useCallback(async (files) => {
+  const handleImageUpload = useCallback(async (files, targetRoomId) => {
     if (!files || files.length === 0) return;
 
     const filesArray = Array.from(files);
@@ -79,8 +80,10 @@ export function UploadProvider({ children }) {
       formData.append('image', file);
     });
 
+    const room = (targetRoomId || currentRoomId || 'canvas-default').trim();
+
     try {
-      const response = await fetch(`${SOCKET_URL}/api/upload`, {
+      const response = await fetch(`${SOCKET_URL}/api/upload?roomId=${encodeURIComponent(room)}`, {
         method: 'POST',
         body: formData,
       });
@@ -113,7 +116,7 @@ export function UploadProvider({ children }) {
     } finally {
       setIsUploading(false);
     }
-  }, []);
+  }, [currentRoomId]);
 
   const handleRenameAsset = useCallback((assetId, newName) => {
     if (!newName || !newName.trim()) return;
@@ -283,7 +286,9 @@ export function UploadProvider({ children }) {
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
-    handleMoveAsset
+    handleMoveAsset,
+    currentRoomId,
+    setCurrentRoomId
   }), [
     assets,
     hiddenAssetUrls,
@@ -305,7 +310,8 @@ export function UploadProvider({ children }) {
     handleCreateFolder,
     handleRenameFolder,
     handleDeleteFolder,
-    handleMoveAsset
+    handleMoveAsset,
+    currentRoomId
   ]);
 
   return createElement(UploadContext.Provider, { value }, children);

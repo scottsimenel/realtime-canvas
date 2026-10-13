@@ -155,6 +155,14 @@ describe('uploadStore behavioral unit tests', () => {
       expect.objectContaining({ assetId: 'custom_asset_1' }),
       expect.any(Function)
     );
+
+    // Test currentRoomId initial value and setter
+    expect(store.currentRoomId).toBe('canvas-default');
+    store.setCurrentRoomId('room-dungeon-99');
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.currentRoomId).toBe('room-dungeon-99');
   });
 
   test('Folder management actions: create, rename, delete, move', () => {

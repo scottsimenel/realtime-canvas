@@ -186,43 +186,93 @@ We implemented collaborative folder management in the asset manager:
 
 ---
 
+## 🌐 WS11: Multi-Room Canvas Architecture & Room Discovery
+
+We designed and implemented a complete multi-room collaborative architecture, converting the single-instance backend into a multi-tenant room orchestrator, alongside an overhaul of the Lobby and navigation.
+
+### 1. In-Memory Canvas Isolation (`RoomManager`)
+* **Manager Engine ([roomManager.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/roomManager.js))**:
+  - Maintains a collection of active `CanvasRegistry` instances keyed by sanitized `roomId`: `rooms: Map<string, CanvasRegistry>`.
+  - `getOrCreateRoom(roomId)`: Validates room identifier, lazily spins up a `CanvasRegistry` instance for that room, restores the latest disk save, and caches it in memory.
+  - `listRooms()`: Discovers both active in-memory rooms and existing disk save directories, aggregating live stats: `activeUsers`, `userList` with color badges, `tabCount`, `elementsCount`, `hasSave`, and relative `lastActive` timestamps.
+  - `autosaveAllRooms()`: Runs periodic disk autosaves for all active rooms with connected users or content.
+* **Filesystem & Path Traversal Security ([registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js))**:
+  - `sanitizeRoomId(roomId)`: Strips non-alphanumeric characters, collapses and trims hyphens (`replace(/^-+|-+$/g, '')`), enforces a max length of 32 characters, and safely defaults to `canvas-default`.
+  - Automatically migrates any legacy flat saves from `server/saves/*.json` into `server/saves/canvas-default/`.
+
+### 2. Room-Scoped Storage & Uploads
+* **Saves Isolation**:
+  - Every `CanvasRegistry` now bounds its saves to `this.savesDir = path.join(baseSavesDir, sanitizeRoomId(roomId))`.
+  - Rooms cannot view, overwrite, or delete saves belonging to other rooms.
+* **Uploads Isolation ([server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js))**:
+  - `POST /api/upload?roomId=...`: Disk storage engine automatically routes image uploads into `server/public/uploads/<safeRoomId>/`, returning URLs like `/uploads/<safeRoomId>/<filename>`.
+  - Asset deletion cleanly unlinks the physical file from the room subfolder without leaking across rooms.
+
+### 3. Server Handlers & Socket Broadcasting
+* **Handler Scoping ([server/handlers/](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/))**:
+  - All socket handlers accept `roomManager` and look up state via `roomManager.getRoom(socket.roomId)`.
+  - Broadcasts are strictly scoped using `socket.to(socket.roomId)` or `io.to(socket.roomId)`.
+* **Room Discovery Protocol ([protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js))**:
+  - `ROOMS_LIST`: Emitted by client to query available room summaries.
+  - `ROOMS_UPDATED`: Broadcast by server on user join, leave, disconnect, or save creation so all clients in the Lobby update in real time.
+  - `LEAVE_ROOM`: Cleanly exits current room without dropping the underlying WebSocket connection.
+
+### 4. Client Lobby Overhaul ([Lobby.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/lobby/Lobby.jsx))
+* **Available Canvases Browser**:
+  - Live room cards displaying room display name, `#id`, status badge (`🟢 X online` or `⚪ Idle`), user avatar bubbles, tab and element metrics, save indicator, and relative activity time (`Just now`, `5m ago`).
+  - Search filter input to find rooms by name or ID.
+  - Filter chips: `All Canvases`, `Active Online`, `Has Saves`.
+  - 1-click **Join Room** button on any card.
+* **Identity & Custom Room Creation**:
+  - Display name input with 🎲 Random Name generator from `RANDOM_NAMES`.
+  - Preset color swatches and native color picker.
+  - Custom Room ID input with **🎲 Random ID** generator creating memorable IDs (`realm-amber-42`, `arcane-keep-7`, etc.) via [constants.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/constants.js).
+* **Deep Linking & Invites**:
+  - Reads `?room=<id>` or `?roomId=<id>` from URL parameters on page load.
+  - Displays invite notification banner with 1-click "Join Now" trigger.
+  - Dynamically synchronizes active room in the browser URL using `window.history.replaceState`.
+
+### 5. Header & In-App Navigation ([Header.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/header/Header.jsx) & [App.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/App.jsx))
+* **Copy Invite Link**: Button placed next to room name that writes `?room=<roomId>` to the clipboard and provides visual feedback (`✓ Copied`).
+* **Lobby / Switch Room**: Button in header that safely leaves the current room and returns to the lobby browser without page reload.
+* **Room-Scoped Uploads ([uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js))**: Upload calls pass `currentRoomId` in `/api/upload?roomId=${roomId}`.
+
+---
+
 ## 🔍 Verification & Testing Logs (Final validation)
 
-### 1. Build Verification
-Production bundler successfully compiled the codebase:
+### 1. Server Unit Tests (`node --test`)
+Node.js test runner executed the full `RoomManager` test suite covering creation, isolation, disk saves scoping, user cleanup, ID sanitization, and autosave:
 ```bash
-> client@0.0.0 build
-> vite build
+> realtime-canvas-server@1.0.0 test
+> node --test
 
-vite v6.4.2 building for production...
-✓ 109 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.46 kB │ gzip:   0.29 kB
-dist/assets/index-CWVzd4aB.css   70.64 kB │ gzip:  10.92 kB
-dist/assets/index-DJEVFH-E.js   963.59 kB │ gzip: 258.76 kB
-✓ built in 2.47s
+TAP version 13
+# Subtest: RoomManager & Multi-Room Isolation Tests
+    # Subtest: sanitizeRoomId removes invalid characters and limits length
+    ok 1 - sanitizeRoomId removes invalid characters and limits length
+    # Subtest: getOrCreateRoom creates and caches registry instances
+    ok 2 - getOrCreateRoom creates and caches registry instances
+    # Subtest: isolates user sessions and elements between rooms
+    ok 3 - isolates user sessions and elements between rooms
+    # Subtest: isolates saves on disk per room
+    ok 4 - isolates saves on disk per room
+    # Subtest: listRooms accurately aggregates active rooms and disk saves
+    ok 5 - listRooms accurately aggregates active rooms and disk saves
+    # Subtest: removeUser disconnects user and releases locks for specified room
+    ok 6 - removeUser disconnects user and releases locks for specified room
+    # Subtest: autosaveAllRooms saves active rooms
+    ok 7 - autosaveAllRooms saves active rooms
+    1..7
+ok 1 - RoomManager & Multi-Room Isolation Tests
+# tests 7
+# suites 1
+# pass 7
+# fail 0
 ```
 
-### 2. Lint Check
-ESLint checks passed cleanly with zero warnings/errors:
-```bash
-> client@0.0.0 lint
-> eslint .
-
-(Completed with exit code 0)
-```
-
-### 3. Syntax Verification
-Server entry point verified cleanly:
-```bash
-> node --check server/server.js
-
-(Completed with exit code 0)
-```
-
-### 4. Unit Tests
-Vitest test suite passed all 52 tests successfully:
+### 2. Client Unit Tests (`vitest run`)
+All 53 client tests passed:
 ```bash
 > client@0.0.0 test
 > vitest run
@@ -230,18 +280,41 @@ Vitest test suite passed all 52 tests successfully:
  RUN  v4.1.9 C:/Users/Scott Simenel/.gemini/antigravity/scratch/realtime-canvas/client
 
  ✓ src/lib/__tests/smoke.test.js (1 test)
- ✓ src/lib/__tests/ids.test.js (4 tests)
  ✓ src/lib/__tests/locks.test.js (2 tests)
  ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests)
  ✓ src/lib/__tests/mergeElement.test.js (4 tests)
  ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests)
- ✓ src/state/__tests/historyStore.test.js (11 tests)
- ✓ src/state/__tests/uploadStore.test.js (3 tests)
+ ✓ src/lib/__tests/ids.test.js (5 tests)
  ✓ src/state/__tests/stores.test.js (4 tests)
+ ✓ src/state/__tests/uploadStore.test.js (3 tests)
+ ✓ src/state/__tests/historyStore.test.js (11 tests)
  ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests)
  ✓ src/lib/__tests/url.test.js (3 tests)
 
  Test Files  11 passed (11)
-      Tests  52 passed (52)
-   Duration  413ms
+      Tests  53 passed (53)
 ```
+
+### 3. Linter Verification (`eslint .`)
+ESLint passed with 0 errors and 0 warnings:
+```bash
+> client@0.0.0 lint
+> eslint .
+
+(Completed with exit code 0)
+```
+
+### 4. Production Build (`vite build`)
+Vite compiled the bundle cleanly:
+```bash
+> client@0.0.0 build
+> vite build
+
+vite v6.4.2 building for production...
+✓ 109 modules transformed.
+dist/index.html                   0.46 kB │ gzip:   0.29 kB
+dist/assets/index-Dgh1yKAF.css   77.56 kB │ gzip:  11.81 kB
+dist/assets/index-BN7TIa5Z.js   977.01 kB │ gzip: 261.74 kB
+✓ built in 2.09s
+```
+

@@ -1,6 +1,13 @@
 import { EVENTS } from '../../shared/protocol.js';
 import { clearLockTimeout } from './elementHandler.js';
-export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
+
+export function registerTabHandlers(io, socket, roomManager) {
+  const getRoomContext = () => {
+    const room = socket.roomId || socket.room || 'canvas-default';
+    const registry = roomManager.getOrCreateRoom(room);
+    return { room, registry };
+  };
+
   /**
    * Handle tab creation.
    */
@@ -10,8 +17,8 @@ export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Tab ID is required' });
       return;
     }
+    const { room, registry } = getRoomContext();
     const newTab = registry.createTab(tabId, name);
-    const room = socket.room || DEFAULT_ROOM;
     // Broadcast tab creation to other clients
     socket.to(room).emit(EVENTS.TAB_CREATED, { tab: newTab });
     if (typeof callback === 'function') {
@@ -28,9 +35,9 @@ export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Tab ID is required' });
       return;
     }
+    const { room, registry } = getRoomContext();
     const result = registry.deleteTab(tabId);
     if (result.success) {
-      const room = socket.room || DEFAULT_ROOM;
       // Broadcast deletion to all other clients, including new user assignments and fallback tab
       socket.to(room).emit(EVENTS.TAB_DELETED, {
         tabId,
@@ -58,9 +65,9 @@ export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Tab ID and Name are required' });
       return;
     }
+    const { room, registry } = getRoomContext();
     const success = registry.renameTab(tabId, name);
     if (success) {
-      const room = socket.room || DEFAULT_ROOM;
       socket.to(room).emit(EVENTS.TAB_RENAMED, { tabId, name });
       if (typeof callback === 'function') callback({ success: true });
     } else {
@@ -77,9 +84,9 @@ export function registerTabHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Tab ID is required' });
       return;
     }
+    const { room, registry } = getRoomContext();
     // Release locks held by this user before switching tabs
     const releasedLocks = registry.releaseUserLocks(socket.id);
-    const room = socket.room || DEFAULT_ROOM;
     if (releasedLocks && releasedLocks.length > 0) {
       releasedLocks.forEach(({ elementId, tabId: tId }) => {
         clearLockTimeout(tId, elementId);

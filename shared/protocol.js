@@ -36,6 +36,8 @@ export const EVENTS = {
   TAB_DELETE: 'tab-delete',
   TAB_RENAME: 'tab-rename',
   TAB_SWITCH: 'tab-switch',
+  ROOMS_LIST: 'rooms-list',
+  LEAVE_ROOM: 'leave-room',
 
   // Server to Client Broadcast Events
   USER_JOINED: 'user-joined',
@@ -64,4 +66,5 @@ export const EVENTS = {
   DICE_ROLLED: 'dice-rolled',
   TAB_SWITCHED: 'tab-switched',
   ROOM_STATE_LOADED: 'room-state-loaded',
+  ROOMS_UPDATED: 'rooms-updated',
 };

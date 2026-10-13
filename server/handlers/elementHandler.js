@@ -35,14 +35,20 @@ function resetLockTimeout(io, room, tabId, elementId, userId, registry) {
   lockTimeouts.set(key, timeout);
 }
 
-export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
+export function registerElementHandlers(io, socket, roomManager) {
+  const getRoomContext = () => {
+    const room = socket.roomId || socket.room || 'canvas-default';
+    const registry = roomManager.getOrCreateRoom(room);
+    return { room, registry };
+  };
+
   /**
    * Handle element lock request when a user selects/drags an element.
    * Prevents multiple users from moving the same element simultaneously.
    */
   socket.on(EVENTS.ELEMENT_LOCK, (data, callback) => {
     const { elementId, elementIds, tabId } = data || {};
-    const room = socket.room || DEFAULT_ROOM;
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
 
     if (elementIds && Array.isArray(elementIds)) {
@@ -88,7 +94,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ELEMENT_UNLOCK, (data, callback) => {
     const { elementId, elementIds, tabId } = data || {};
-    const room = socket.room || DEFAULT_ROOM;
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
 
     if (elementIds && Array.isArray(elementIds)) {
@@ -128,7 +134,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ELEMENT_UPDATE, (data, callback) => {
     const { elementId, updates, batch, tabId } = data || {};
-    const room = socket.room || DEFAULT_ROOM;
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
 
     if (batch && Array.isArray(batch)) {
@@ -181,6 +187,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ELEMENT_CREATE, (data, callback) => {
     const { element, tabId } = data || {};
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
     if (!element || !element.id || !element.type) {
       if (typeof callback === 'function') callback({ success: false, error: 'Invalid element schema' });
@@ -192,7 +199,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       if (typeof callback === 'function') callback({ success: false, error: 'Failed to create element' });
       return;
     }
-    const room = socket.room || DEFAULT_ROOM;
 
     socket.to(room).emit(EVENTS.ELEMENT_CREATED, {
       element: createdElement,
@@ -211,13 +217,13 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ASSET_CREATE, (data, callback) => {
     const { asset } = data || {};
+    const { room, registry } = getRoomContext();
     if (!asset || !asset.id || !asset.url) {
       if (typeof callback === 'function') callback({ success: false, error: 'Invalid asset schema' });
       return;
     }
 
     const createdAsset = registry.createAsset(asset);
-    const room = socket.room || DEFAULT_ROOM;
 
     // Broadcast newly created asset to other clients in the room
     socket.to(room).emit(EVENTS.ASSET_CREATED, {
@@ -235,6 +241,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ASSET_DELETE, (data, callback) => {
     const { assetId } = data || {};
+    const { room, registry } = getRoomContext();
     if (!assetId) {
       if (typeof callback === 'function') callback({ success: false, error: 'No assetId provided' });
       return;
@@ -249,8 +256,8 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
     // Attempt to delete physical file from disk
     if (deletedAsset.url && deletedAsset.url.startsWith('/uploads/')) {
       try {
-        const filename = path.basename(deletedAsset.url);
-        const filePath = path.join(uploadsDir, filename);
+        const relPath = deletedAsset.url.replace(/^\/uploads\//, '');
+        const filePath = path.join(uploadsDir, relPath);
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
         }
@@ -259,7 +266,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       }
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     // Broadcast asset deletion to all other clients in the room
     socket.to(room).emit(EVENTS.ASSET_DELETED, {
       assetId,
@@ -276,6 +282,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ASSET_RENAME, (data, callback) => {
     const { assetId, name } = data || {};
+    const { room, registry } = getRoomContext();
     if (!assetId || !name) {
       if (typeof callback === 'function') callback({ success: false, error: 'assetId and name are required' });
       return;
@@ -287,7 +294,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     // Broadcast renamed asset to all other clients in the room
     socket.to(room).emit(EVENTS.ASSET_RENAMED, {
       asset: updatedAsset,
@@ -304,13 +310,13 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.FOLDER_CREATE, (data, callback) => {
     const { folder } = data || {};
+    const { room, registry } = getRoomContext();
     if (!folder || !folder.id || !folder.name) {
       if (typeof callback === 'function') callback({ success: false, error: 'Invalid folder schema' });
       return;
     }
 
     const createdFolder = registry.createFolder(folder);
-    const room = socket.room || DEFAULT_ROOM;
 
     socket.to(room).emit(EVENTS.FOLDER_CREATED, {
       folder: createdFolder,
@@ -327,6 +333,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.FOLDER_RENAME, (data, callback) => {
     const { folderId, name } = data || {};
+    const { room, registry } = getRoomContext();
     if (!folderId || !name) {
       if (typeof callback === 'function') callback({ success: false, error: 'folderId and name are required' });
       return;
@@ -338,7 +345,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     socket.to(room).emit(EVENTS.FOLDER_RENAMED, {
       folder: updatedFolder,
       userId: socket.id
@@ -354,6 +360,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.FOLDER_DELETE, (data, callback) => {
     const { folderId } = data || {};
+    const { room, registry } = getRoomContext();
     if (!folderId) {
       if (typeof callback === 'function') callback({ success: false, error: 'folderId is required' });
       return;
@@ -365,7 +372,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     socket.to(room).emit(EVENTS.FOLDER_DELETED, {
       folderId,
       userId: socket.id
@@ -381,6 +387,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ASSET_MOVE, (data, callback) => {
     const { assetId, folderId } = data || {};
+    const { room, registry } = getRoomContext();
     if (!assetId) {
       if (typeof callback === 'function') callback({ success: false, error: 'assetId is required' });
       return;
@@ -392,7 +399,6 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
       return;
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     socket.to(room).emit(EVENTS.ASSET_MOVED, {
       assetId,
       folderId: updatedAsset.folderId,
@@ -409,7 +415,7 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ELEMENT_DELETE, (data, callback) => {
     const { elementId, elementIds, tabId } = data || {};
-    const room = socket.room || DEFAULT_ROOM;
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
 
     if (elementIds && Array.isArray(elementIds)) {
@@ -448,13 +454,13 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ELEMENTS_REORDER, (data, callback) => {
     const { orderedIds, tabId } = data || {};
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
     if (!orderedIds || !Array.isArray(orderedIds)) {
       if (typeof callback === 'function') callback({ success: false, error: 'orderedIds array is required' });
       return;
     }
 
-    const room = socket.room || DEFAULT_ROOM;
     const finalOrderedIds = registry.reorderElements(targetTabId, orderedIds);
 
     // Broadcast the new order to all other clients in the room
@@ -470,8 +476,8 @@ export function registerElementHandlers(io, socket, registry, DEFAULT_ROOM) {
    */
   socket.on(EVENTS.ROOM_SETTINGS_UPDATE, (data, callback) => {
     const { updates, tabId } = data || {};
+    const { room, registry } = getRoomContext();
     const targetTabId = tabId || 'tab-default';
-    const room = socket.room || DEFAULT_ROOM;
     const updatedSettings = registry.updateRoomSettings(targetTabId, updates || {});
 
     if (!updatedSettings) {

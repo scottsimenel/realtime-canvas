@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { newElementId, newTabId, newAssetId, newRollId } from '../ids.js';
+import { generateRandomRoomId } from '../../constants.js';
 
 describe('ID generators', () => {
   test('newElementId generates correct format', () => {
@@ -20,5 +21,10 @@ describe('ID generators', () => {
   test('newRollId generates correct format', () => {
     const id = newRollId();
     expect(id).toMatch(/^roll_\d+_[a-z0-9]+$/);
+  });
+
+  test('generateRandomRoomId generates prefixed random room id', () => {
+    const id = generateRandomRoomId();
+    expect(id).toMatch(/^[a-z]+-[a-z]+-\d+$/);
   });
 });

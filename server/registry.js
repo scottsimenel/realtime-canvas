@@ -4,7 +4,48 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const savesDir = path.join(__dirname, 'saves');
+const baseSavesDir = path.join(__dirname, 'saves');
+
+/**
+ * Sanitizes a room ID to ensure filesystem safety and prevent path traversal.
+ * 
+ * @param {string} roomId 
+ * @returns {string} Sanitized room identifier.
+ */
+export function sanitizeRoomId(roomId) {
+  if (!roomId || typeof roomId !== 'string') return 'canvas-default';
+  const clean = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+  return clean || 'canvas-default';
+}
+
+/**
+ * Migrates legacy root save files to server/saves/canvas-default/ if present.
+ */
+export function migrateLegacyRootSaves() {
+  try {
+    if (!fs.existsSync(baseSavesDir)) {
+      fs.mkdirSync(baseSavesDir, { recursive: true });
+    }
+    const defaultRoomDir = path.join(baseSavesDir, 'canvas-default');
+    if (!fs.existsSync(defaultRoomDir)) {
+      fs.mkdirSync(defaultRoomDir, { recursive: true });
+    }
+
+    const files = fs.readdirSync(baseSavesDir, { withFileTypes: true });
+    for (const file of files) {
+      if (file.isFile() && file.name.endsWith('.json')) {
+        const sourcePath = path.join(baseSavesDir, file.name);
+        const destPath = path.join(defaultRoomDir, file.name);
+        if (!fs.existsSync(destPath)) {
+          fs.renameSync(sourcePath, destPath);
+          console.log(`Migrated legacy save ${file.name} to canvas-default/`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to migrate legacy root saves:', err);
+  }
+}
 
 /**
  * @typedef {Object} User
@@ -32,10 +73,13 @@ const savesDir = path.join(__dirname, 'saves');
  * Manages users, canvas tabs, elements, locks, and settings to ensure consistent state.
  */
 export class CanvasRegistry {
-  constructor() {
+  constructor(roomId = 'canvas-default', customSavesDir = null) {
+    this.roomId = sanitizeRoomId(roomId);
+    this.savesDir = customSavesDir || path.join(baseSavesDir, this.roomId);
+
     // Ensure saves directory exists
-    if (!fs.existsSync(savesDir)) {
-      fs.mkdirSync(savesDir, { recursive: true });
+    if (!fs.existsSync(this.savesDir)) {
+      fs.mkdirSync(this.savesDir, { recursive: true });
     }
 
     /**
@@ -703,7 +747,7 @@ export class CanvasRegistry {
       folders: Array.from(this.folders.values())
     };
     
-    const filePath = path.join(savesDir, `${saveId}.json`);
+    const filePath = path.join(this.savesDir, `${saveId}.json`);
     fs.writeFileSync(filePath, JSON.stringify(saveContent, null, 2), 'utf-8');
     
     return {
@@ -719,16 +763,16 @@ export class CanvasRegistry {
    * @returns {Array<{ id: string, name: string, timestamp: string }>} List of save metadata.
    */
   listSaves() {
-    if (!fs.existsSync(savesDir)) return [];
+    if (!fs.existsSync(this.savesDir)) return [];
     
     try {
-      const files = fs.readdirSync(savesDir);
+      const files = fs.readdirSync(this.savesDir);
       const saves = [];
       
       for (const file of files) {
         if (file.endsWith('.json')) {
           try {
-            const content = fs.readFileSync(path.join(savesDir, file), 'utf-8');
+            const content = fs.readFileSync(path.join(this.savesDir, file), 'utf-8');
             const data = JSON.parse(content);
             saves.push({
               id: data.id,
@@ -756,7 +800,7 @@ export class CanvasRegistry {
    * @returns {boolean} True if successful.
    */
   loadState(saveId) {
-    const filePath = path.join(savesDir, `${saveId}.json`);
+    const filePath = path.join(this.savesDir, `${saveId}.json`);
     if (!fs.existsSync(filePath)) return false;
     
     try {
@@ -820,7 +864,7 @@ export class CanvasRegistry {
    * @returns {boolean} True if deleted successfully.
    */
   deleteSave(saveId) {
-    const filePath = path.join(savesDir, `${saveId}.json`);
+    const filePath = path.join(this.savesDir, `${saveId}.json`);
     if (!fs.existsSync(filePath)) return false;
     
     try {

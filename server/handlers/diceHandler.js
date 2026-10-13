@@ -1,14 +1,16 @@
 import { EVENTS } from '../../shared/protocol.js';
-export function registerDiceHandlers(io, socket, registry, DEFAULT_ROOM) {
+
+export function registerDiceHandlers(io, socket, roomManager) {
   /**
    * Handle collaborative dice rolling.
    * Generates random values for mixed dice groups and d20 (with advantage/disadvantage), then broadcasts.
    */
   socket.on(EVENTS.DICE_ROLL, (data) => {
     const { d20, dice } = data || {};
-    const room = socket.room || DEFAULT_ROOM;
+    const room = socket.roomId || socket.room || 'canvas-default';
+    const registry = roomManager.getRoom(room);
 
-    const user = registry.users.get(socket.id);
+    const user = registry?.users?.get(socket.id);
     if (!user) {
       console.warn(`[dice-roll] Socket ${socket.id} attempted to roll but user was not found in registry`);
       return;
