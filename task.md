@@ -26,3 +26,9 @@
 - `[x]` 3.1 Restructure walkthrough to separate legacy 2024 work from the current refactor.
 - `[x]` 3.2 Update exact line count metrics and document remediation achievements.
 - `[x]` 3.3 Paste final verification logs and checks.
+
+## 📦 WS9 — Inspector Panel Selection Behavior Update
+- `[x]` 9.1 Update `handleCanvasInteraction` in `client/src/state/uiStore.js` to prevent auto-opening or collapsing the inspector panel on token selection or canvas interaction.
+- `[x]` 9.2 Update unit test in `client/src/state/__tests/stores.test.js` to assert the updated behavior.
+- `[x]` 9.3 Run linter, test coverage, and build checks.
+- `[x]` 9.4 Sync artifacts, commit, and push.

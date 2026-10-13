@@ -54,3 +54,9 @@
 - `[x]` 8.7 Implement drag-to-move-assets-to-folders logic in `LeftSidebar.jsx` dropzones.
 - `[x]` 8.8 Add folder unit tests in `uploadStore.test.js` and verify builds.
 
+## 📦 WS9 — Inspector Panel Selection Behavior Update
+- `[x]` 9.1 Update `handleCanvasInteraction` in `client/src/state/uiStore.js` to prevent auto-opening or collapsing the inspector panel on token selection or canvas interaction.
+- `[x]` 9.2 Update unit test in `client/src/state/__tests/stores.test.js` to assert the updated behavior.
+- `[x]` 9.3 Run linter, test coverage, and build checks.
+- `[x]` 9.4 Sync artifacts, commit, and push.
+

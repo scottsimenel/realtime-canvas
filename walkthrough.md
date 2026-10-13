@@ -55,6 +55,9 @@ To resolve file bloat and decouple concerns for enhanced codebase maintainabilit
     * Created a dedicated behavioral test suite `historyStore.test.js` covering undo/redo stacks, limit eviction, tab switching, and all 5 collaborative action types under a Node environment.
     * Expanded `stores.test.js` to cover empty-space clicks, element canvas interactions, and hook error throwing.
     * Achieved overall state statements coverage of **82.05%** and branch coverage of **62.2%** (well above target ≥70%/60% thresholds).
+ 6. **Prevented Inspector Jump on Selection (WS9)**:
+    * Decoupled RightSidebar inspector auto-open and auto-collapse triggers from `handleCanvasInteraction`.
+    * Selecting tokens or clicking canvas space no longer jumps open or collapses the inspector panel, leaving panel control purely under user intent (via dock toggle ⚙️ and close button ✖️).
  
  ### 📊 Code Metrics Summary
  
@@ -62,7 +65,7 @@ To resolve file bloat and decouple concerns for enhanced codebase maintainabilit
  |------|-----------------|-------------------------------|------------|
  | `AppContent.jsx` | 1,165 lines | **452 lines** | **-61.2%** |
  | Hardcoded Emits | 18 | **0** | **-100%** |
- | Test Assertions | 20 (Definition checks) | **47 (Behavioral unit tests)** | **+135%** |
+ | Test Assertions | 20 (Definition checks) | **52 (Behavioral unit tests)** | **+160%** |
  
  ---
  

@@ -52,6 +52,15 @@ We implemented the revamped element layer ordering manager in the right sidebar 
 * **Fix**: Added an early return check in `InspectorWidget.jsx` (`if (!selectedEl) return null;`) to safely avoid accessing properties of elements not present on the current active canvas tab.
 * **Tests**: Created a dedicated unit test suite `InspectorWidget.test.jsx` verifying that `InspectorWidget` returns `null` safely without throwing exceptions when the selected element ID is not found.
 
+## 🎯 WS9: Inspector Panel Selection Behavior Update
+
+* **Problem**: Selecting any token or element on the canvas invoked `onCanvasInteraction(!clickedElement)`, which ran `handleCanvasInteraction(false)`. This callback explicitly executed `setShowRightSidebar(true)` and `setRightPanelCollapsed(false)`, causing the Inspector (RightSidebar) to aggressively jump open and expand over the canvas whenever any token was clicked. Additionally, clicking empty canvas space forcefully collapsed the panel if open (`setRightPanelCollapsed(true)`).
+* **Fix**: Updated `handleCanvasInteraction` in [client/src/state/uiStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uiStore.js) to decouple the right sidebar's visibility and collapse state from canvas clicks:
+  - Interacting with the canvas continues to collapse the left library drawer (`setLeftPanelCollapsed(true)`) out of the way.
+  - The right sidebar (Inspector) is no longer forced open or uncollapsed on token selection. If closed, it stays closed; if collapsed, it stays collapsed; if already open, it updates its properties controls smoothly in place without jarring slide animations.
+  - Clicking empty canvas no longer forcibly collapses the inspector panel.
+* **Tests**: Updated `client/src/state/__tests/stores.test.js` to assert that selecting an element (`handleCanvasInteraction(false)`) preserves `showRightSidebar: false` and `rightPanelCollapsed: true`. All 52 unit tests pass and ESLint reports 0 warnings.
+
 ---
 
 ## 🔍 Verification & Testing Logs

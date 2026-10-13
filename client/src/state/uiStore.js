@@ -53,16 +53,9 @@ export function UiProvider({ children }) {
     setRightPanelCollapsed(false);
   }, [isZenMode]);
 
-  const handleCanvasInteraction = useCallback((clickedEmptySpace) => {
-    if (clickedEmptySpace) {
-      if (showLeftSidebar) setLeftPanelCollapsed(true);
-      if (showRightSidebar) setRightPanelCollapsed(true);
-    } else {
-      if (showLeftSidebar) setLeftPanelCollapsed(true);
-      setShowRightSidebar(true);
-      setRightPanelCollapsed(false);
-    }
-  }, [showLeftSidebar, showRightSidebar]);
+  const handleCanvasInteraction = useCallback(() => {
+    if (showLeftSidebar) setLeftPanelCollapsed(true);
+  }, [showLeftSidebar]);
 
   const [locateElementTrigger, setLocateElementTrigger] = useState(null);
 

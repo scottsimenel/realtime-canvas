@@ -132,7 +132,7 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     UiProvider({ children: null });
     value = reactMockValueCapture.captured;
     expect(value.leftPanelCollapsed).toBe(true);
-    expect(value.rightPanelCollapsed).toBe(true);
+    expect(value.rightPanelCollapsed).toBe(false);
 
     // Call toggle Zen Mode callback
     value.handleToggleZenMode();
@@ -146,12 +146,19 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     expect(value.showHeader).toBe(false);
 
     // Call handleCanvasInteraction with false (clicked element)
+    value.setShowRightSidebar(false);
+    value.setRightPanelCollapsed(true);
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+
     value.handleCanvasInteraction(false);
     stateIndex = 0;
     UiProvider({ children: null });
     value = reactMockValueCapture.captured;
-    expect(value.showRightSidebar).toBe(true);
-    expect(value.rightPanelCollapsed).toBe(false);
+    // Inspector panel should not jump open or uncollapse when a token is selected
+    expect(value.showRightSidebar).toBe(false);
+    expect(value.rightPanelCollapsed).toBe(true);
 
     // Test locateElementTrigger
     expect(value.locateElementTrigger).toBeNull();
