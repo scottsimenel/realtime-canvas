@@ -469,7 +469,15 @@ export default function Canvas({
     const socket = socketRef.current;
     if (!socket || !socket.connected) return;
 
-    containerRef.current?.setPointerCapture(e.pointerId);
+    if (e.cancelable && e.pointerType === 'touch') {
+      e.preventDefault();
+    }
+
+    try {
+      containerRef.current?.setPointerCapture(e.pointerId);
+    } catch {
+      // In case pointerId is invalid or synthetic
+    }
 
     activePointersRef.current[e.pointerId] = { clientX: e.clientX, clientY: e.clientY };
 
@@ -605,7 +613,35 @@ export default function Canvas({
   };
 
   const handlePointerUp = (e) => {
-    containerRef.current?.releasePointerCapture(e.pointerId);
+    try {
+      if (containerRef.current?.hasPointerCapture?.(e.pointerId)) {
+        containerRef.current?.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore release capture errors
+    }
+    delete activePointersRef.current[e.pointerId];
+
+    const drag = dragStateRef.current;
+    if (drag) {
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+        dragStateRef.current = null;
+        triggerRedraw();
+        return;
+      }
+
+      handleMouseUp();
+    }
+  };
+
+  const handlePointerCancel = (e) => {
+    try {
+      if (containerRef.current?.hasPointerCapture?.(e.pointerId)) {
+        containerRef.current?.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore release capture errors
+    }
     delete activePointersRef.current[e.pointerId];
 
     const drag = dragStateRef.current;
@@ -621,7 +657,11 @@ export default function Canvas({
   };
 
   const handlePointerLeave = (e) => {
-    containerRef.current?.releasePointerCapture(e.pointerId);
+    // If the pointer is captured, the user is actively dragging; do not abort the drag
+    if (containerRef.current?.hasPointerCapture?.(e.pointerId)) {
+      return;
+    }
+
     delete activePointersRef.current[e.pointerId];
 
     const drag = dragStateRef.current;
@@ -1534,7 +1574,8 @@ export default function Canvas({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-full bg-[#0b0f19] select-none overflow-hidden border border-slate-800/80 rounded-xl shadow-inner shadow-black/50 ${
+      style={{ touchAction: 'none' }}
+      className={`touch-none relative w-full h-full bg-[#0b0f19] select-none overflow-hidden border border-slate-800/80 rounded-xl shadow-inner shadow-black/50 ${
         activeTool === 'pen'
           ? 'cursor-crosshair'
           : activeTool === 'eraser'
@@ -1544,13 +1585,17 @@ export default function Canvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onPointerLeave={handlePointerLeave}
+      onLostPointerCapture={(e) => {
+        delete activePointersRef.current[e.pointerId];
+      }}
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleAssetDrop}
     >
-      <canvas ref={canvasRef} className="absolute inset-0" />
+      <canvas ref={canvasRef} style={{ touchAction: 'none' }} className="touch-none absolute inset-0" />
 
       {/* Floating Tooltip Card */}
       {showTooltip && (
@@ -1682,7 +1727,10 @@ export default function Canvas({
         })}
 
       {/* Floating Zoom & Reset Controls */}
-      <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 shadow-lg select-none">
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 shadow-lg select-none"
+      >
         <button
           type="button"
           onClick={() => {

@@ -61,6 +61,21 @@ We implemented the revamped element layer ordering manager in the right sidebar 
   - Clicking empty canvas no longer forcibly collapses the inspector panel.
 * **Tests**: Updated `client/src/state/__tests/stores.test.js` to assert that selecting an element (`handleCanvasInteraction(false)`) preserves `showRightSidebar: false` and `rightPanelCollapsed: true`. All 52 unit tests pass and ESLint reports 0 warnings.
 
+## 🎯 WS10: Touchscreen Drag Reliability Fix
+
+* **Problem**: On touchscreen devices (iOS, Android, Windows touch laptops), dragging tokens failed or dropped immediately after moving a few pixels. This was caused by:
+  1. **Default gesture hijacking**: Missing CSS `touch-action: none` / `touch-none` on the canvas container and `<canvas>` caused browsers to interpret token drags as native pan/scroll gestures, firing `pointercancel` and revoking pointer capture.
+  2. **Zombie pointer leaks**: Because `onPointerCancel` was unhandled and browsers never emit `pointerup` after `pointercancel`, cancelled pointers stayed registered in `activePointersRef`. Subsequent single-finger touches were misidentified as two-finger pinch-zoom gestures (`activePointerIds.length === 2`), locking out token drags until page refresh.
+  3. **Premature boundary aborts**: `handlePointerLeave` forcibly revoked capture and called `handleMouseUp()`, dropping dragged tokens whenever touches neared edges or crossed over child UI controls.
+  4. **Pointer capture exceptions**: Unchecked `setPointerCapture` and `releasePointerCapture` calls could throw unhandled `DOMException` on synthetic or cancelled pointers.
+* **Fix**: Updated [client/src/components/canvas/Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx):
+  - Applied `style={{ touchAction: 'none' }}` and `className="touch-none ..."` to both the canvas container (`containerRef`) and the `<canvas>` element.
+  - Added `handlePointerCancel` and bound `onPointerCancel` and `onLostPointerCapture` to cleanly release capture, remove pointers from `activePointersRef`, and unlock elements without leaving zombie pointers.
+  - Guarded `handlePointerLeave` so that if `containerRef.current?.hasPointerCapture?.(e.pointerId)` is true, active drags are not aborted when crossing element boundaries.
+  - Wrapped `setPointerCapture` and `releasePointerCapture` calls in `try...catch` and added `hasPointerCapture` checks.
+  - Added `e.preventDefault()` on `pointerdown` for touch events and isolated the floating zoom widget with `onPointerDown={(e) => e.stopPropagation()}`.
+* **Tests**: Verified ESLint cleanly with 0 errors/warnings, Vitest test suite passing all 52 tests, and Vite production bundle building cleanly.
+
 ---
 
 ## 🔍 Verification & Testing Logs
@@ -77,9 +92,9 @@ transforming...
 rendering chunks...
 computing gzip size...
 dist/index.html                   0.46 kB │ gzip:   0.29 kB
-dist/assets/index-rx7Uq1Qp.css   69.73 kB │ gzip:  10.81 kB
-dist/assets/index-BSr6qch7.js   948.77 kB │ gzip: 255.86 kB
-✓ built in 2.39s
+dist/assets/index-C4Iw8E8V.css   70.67 kB │ gzip:  10.93 kB
+dist/assets/index-wSIMInv5.js   964.30 kB │ gzip: 258.86 kB
+✓ built in 2.06s
 ```
 
 ### 2. Lint Check

@@ -60,3 +60,13 @@
 - `[x]` 9.3 Run linter, test coverage, and build checks.
 - `[x]` 9.4 Sync artifacts, commit, and push.
 
+## 📦 WS10 — Touchscreen Drag Reliability Fix
+- `[x]` 10.1 Add CSS `touch-action: none` / `touch-none` to `containerRef` and `<canvas>`.
+- `[x]` 10.2 Add `handlePointerCancel` and attach `onPointerCancel` and `onLostPointerCapture` to clean up active pointers and drag states without leaving zombie pointers.
+- `[x]` 10.3 Guard `handlePointerLeave` so captured drags are not prematurely terminated when crossing boundaries.
+- `[x]` 10.4 Wrap `setPointerCapture` and `releasePointerCapture` calls in `try...catch` and check `hasPointerCapture`.
+- `[x]` 10.5 Add `e.preventDefault()` on `pointerdown` for touch events and isolate floating zoom controls.
+- `[x]` 10.6 Run ESLint, tests, and production build checks.
+- `[x]` 10.7 Sync artifacts, commit, and push.
+
+
