@@ -1,84 +1,148 @@
-# Collaborative Image Library Folder Management Implementation Plan
+# Implementation Plan: Multi-Room Canvas Architecture & Room Discovery
 
-Add collaborative folder organization for custom uploaded images and presets in the Left Sidebar asset manager, including socket sync events, database storage, drag-and-drop folder moves, and collapsible UI widgets.
+## 🎯 Executive Overview
+Currently, the client includes a "Room ID" field in the lobby, but the backend is bound to a single singleton `CanvasRegistry` with hardcoded `DEFAULT_ROOM = 'canvas-default'`. All users join the same in-memory state, saves are stored in a single flat directory (`server/saves/*.json`), and uploaded images reside in a shared root folder (`server/public/uploads/`).
 
-## User Review Required
+This implementation plan outlines the architecture and execution steps to introduce **true multi-room support**:
+1. **Isolated In-Memory Canvas States**: Dedicated `CanvasRegistry` per room managed by a `RoomManager`.
+2. **Room-Scoped Saves**: Saves segregated in `server/saves/<roomId>/`.
+3. **Room-Scoped Asset Uploads**: Uploaded media organized in `server/public/uploads/<roomId>/`.
+4. **Room Discovery & Lobby UI**: Live room browser displaying active user counts, room statuses, and 1-click joining.
+5. **Deep Linking & Sharing**: URL query parameters (`?room=<id>`), copy invite links, and seamless in-app room switching.
 
-> [!IMPORTANT]
-> - We will modify `shared/protocol.js` to add folder events. Both backend and frontend will be updated in the same change to prevent protocol drift.
-> - Deleting a folder will automatically move all of its assets back to the root folder (no files will be deleted).
+---
 
-## Proposed Changes
+## 🏗️ Architecture & Component Boundaries
 
-### Protocol Definition
+```mermaid
+flowchart TD
+    subgraph Client ["Client (React + Vite)"]
+        Lobby["Lobby UI (Room Browser & Join)"]
+        Header["Header (Room Info & Invite Link)"]
+        Stores["State Stores (Canvas, Upload, Selection)"]
+    end
 
-#### [MODIFY] [protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js)
-- Add events:
-  - `FOLDER_CREATE`, `FOLDER_CREATED`
-  - `FOLDER_RENAME`, `FOLDER_RENAMED`
-  - `FOLDER_DELETE`, `FOLDER_DELETED`
-  - `ASSET_MOVE`, `ASSET_MOVED`
+    subgraph Server ["Server (Node.js + Express + Socket.io)"]
+        RoomManager["RoomManager (server/roomManager.js)"]
+        RegistryA["CanvasRegistry (Room: 'campaign-1')"]
+        RegistryB["CanvasRegistry (Room: 'dungeon-crawler')"]
+        UploadAPI["POST /api/upload?roomId=..."]
+        RoomsAPI["GET /api/rooms"]
+    end
 
-### Backend Registry & State
+    subgraph Storage ["Disk Storage"]
+        SavesA["server/saves/campaign-1/*.json"]
+        SavesB["server/saves/dungeon-crawler/*.json"]
+        UploadsA["server/public/uploads/campaign-1/*"]
+        UploadsB["server/public/uploads/dungeon-crawler/*"]
+    end
 
-#### [MODIFY] [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js)
-- Maintain `this.folders = new Map()` in `CanvasRegistry`.
-- Update `joinRoom` to return `folders: Array.from(this.folders.values())`.
-- Add registry mutations:
-  - `createFolder(folder)`
-  - `renameFolder(folderId, name)`
-  - `deleteFolder(folderId)` (deletes folder and updates any referencing assets' `folderId` to `null`).
-  - `moveAsset(assetId, folderId)` (updates `folderId` on the asset).
-- Update `saveState` and `loadState` to serialize/deserialize the `folders` registry.
+    Lobby -->|Fetch available rooms| RoomsAPI
+    Lobby -->|Socket JOIN_ROOM| RoomManager
+    RoomManager -->|Manages| RegistryA
+    RoomManager -->|Manages| RegistryB
+    RegistryA -->|Read/Write| SavesA
+    RegistryB -->|Read/Write| SavesB
+    UploadAPI -->|Saves to| UploadsA
+    UploadAPI -->|Saves to| UploadsB
+```
 
-### Backend Handlers
+---
 
-#### [MODIFY] [elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js)
-- Register socket event listeners:
-  - `EVENTS.FOLDER_CREATE` -> calls `createFolder` and broadcasts `EVENTS.FOLDER_CREATED`.
-  - `EVENTS.FOLDER_RENAME` -> calls `renameFolder` and broadcasts `EVENTS.FOLDER_RENAMED`.
-  - `EVENTS.FOLDER_DELETE` -> calls `deleteFolder` and broadcasts `EVENTS.FOLDER_DELETED`.
-  - `EVENTS.ASSET_MOVE` -> calls `moveAsset` and broadcasts `EVENTS.ASSET_MOVED`.
+## 📋 Proposed Workstreams
 
-### Client State Store
+### 📦 WS1: Server Multi-Room Engine (`RoomManager`)
+* **Create `server/roomManager.js`**:
+  - `RoomManager` class maintaining `rooms: Map<string, CanvasRegistry>`.
+  - `getOrCreateRoom(roomId)`: sanitizes `roomId` (alphanumeric, dashes, underscores; max 32 chars; prevents path traversal), initializes `new CanvasRegistry(roomId)`, restores latest save from `server/saves/<roomId>/`, and caches the room.
+  - `getRoom(roomId)`: returns active room or null.
+  - `listRooms()`: aggregates in-memory rooms and existing disk save directories into structured metadata:
+    ```typescript
+    interface RoomSummary {
+      id: string;
+      name: string;
+      activeUsers: number;
+      users: Array<{ id: string; name: string; color: string }>;
+      tabCount: number;
+      elementsCount: number;
+      lastActive: string;
+      hasSave: boolean;
+    }
+    ```
+  - `removeUserFromRoom(socketId, roomId)`: unbinds socket locks and user records.
+  - Background autosave: periodically autosaves all active in-memory rooms to `server/saves/<roomId>/autosave.json`.
+* **Refactor `CanvasRegistry` (`server/registry.js`)**:
+  - Accept `roomId` in constructor: `constructor(roomId = 'canvas-default')`.
+  - Scope `savesDir` to `path.join(__dirname, 'saves', sanitize(roomId))`.
+  - Ensure legacy saves in `server/saves/*.json` are safely accessible or migrated into `server/saves/canvas-default/`.
 
-#### [MODIFY] [uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js)
-- Add local state `folders` array.
-- Expose methods:
-  - `handleCreateFolder(name)`
-  - `handleRenameFolder(folderId, name)`
-  - `handleDeleteFolder(folderId)`
-  - `handleMoveAsset(assetId, folderId)`
-- Update room loading sequence to initialize the local `folders` state when `join-room` response is received.
+---
 
-#### [MODIFY] [useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js)
-- Add broadcast event listeners:
-  - `EVENTS.FOLDER_CREATED` -> appends the folder.
-  - `EVENTS.FOLDER_RENAMED` -> updates the folder name.
-  - `EVENTS.FOLDER_DELETED` -> removes the folder and resets asset references to `null`.
-  - `EVENTS.ASSET_MOVED` -> updates the asset's `folderId`.
+### 📦 WS2: Server Handlers & API Rewiring
+* **Update `server/server.js`**:
+  - Replace `const registry = new CanvasRegistry()` with `const roomManager = new RoomManager()`.
+  - Add REST endpoint `GET /api/rooms` returning `roomManager.listRooms()`.
+  - Update `POST /api/upload`:
+    - Extract `roomId = req.query.roomId || req.body.roomId || 'canvas-default'`.
+    - Save to `server/public/uploads/<safeRoomId>/`.
+    - Return URL `/uploads/<safeRoomId>/<filename>`.
+* **Update Socket Handlers (`server/handlers/*`)**:
+  - Pass `roomManager` instead of singleton `registry` to all handlers.
+  - In `connectionHandler.js`:
+    - On `JOIN_ROOM`: validate `roomId`, store `socket.roomId`, register in `roomManager.getOrCreateRoom(roomId)`, emit `USER_JOINED` to `socket.to(roomId)`, and broadcast `ROOMS_UPDATED` to all sockets.
+    - On `ROOMS_LIST`: reply with `roomManager.listRooms()`.
+    - On `DISCONNECT`: remove user from `socket.roomId`, release locks, and broadcast `ROOMS_UPDATED`.
+  - In `elementHandler.js`, `tabHandler.js`, `diceHandler.js`, `saveHandler.js`:
+    - Retrieve `const registry = roomManager.getRoom(socket.roomId)`.
+    - Scope all broadcasts strictly to `socket.roomId`.
 
-### Client Sidebar View
+---
 
-#### [MODIFY] [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx)
-- Render a new "Create Folder" button/form at the top of the images panel.
-- Implement collapsible folder drawer items:
-  - Show a folder icon, name, rename edit button, and delete folder button.
-  - Act as a dropzone: `onDragOver` prevents default and `onDrop` dispatches `handleMoveAsset(draggedAssetId, folder.id)`.
-  - Render nested assets that match the active filters, search, and belong to the folder.
-- Render a "Root Library" dropzone to allow dragging items back to the root folder.
-- Add local UI states to manage collapsed folder state (`collapsedFolderIds` array).
+### 📦 WS3: Protocol Updates (`shared/protocol.js`)
+* Register new shared events:
+  - `ROOMS_LIST: 'rooms-list'`
+  - `ROOMS_UPDATED: 'rooms-updated'`
+  - `LEAVE_ROOM: 'leave-room'`
 
-## Verification Plan
+---
 
-### Automated Tests
-- Run `npm --prefix client run lint` to ensure zero errors.
-- Run `npm --prefix client run test -- --coverage --run` to verify tests pass.
-- Run `npm --prefix client run build` to verify compiling is clean.
-- Update `uploadStore.test.js` to assert folder creation, renaming, deletion, and asset movement.
+### 📦 WS4: Client Room Discovery & Lobby Overhaul (`Lobby.jsx`)
+* **Lobby Experience**:
+  - **Room Discovery Panel**:
+    - Display cards of available rooms with live user counts (`🟢 3 online`), user badges, tab counts, and save status.
+    - Filter/search input to quickly find rooms by name or ID.
+    - 1-click **Join** button on any room card.
+  - **Create / Join Custom Room Panel**:
+    - Clean input field with validation and quick "Generate Random Room" dice button (e.g. `realm-stone-42`).
+  - **Deep Linking / URL Parameter**:
+    - Read `?room=<id>` from URL on load (`URLSearchParams`) and prefill room input.
+  - **Live Room Updates**:
+    - Listen to `EVENTS.ROOMS_UPDATED` so the lobby list updates in real time as other users join/leave rooms.
 
-### Manual Verification
-- Create a folder, rename it, and verify it updates for other clients in real time.
-- Drag an image card and drop it onto a folder header, verifying it moves inside.
-- Drag it back out to the "Root Library" dropzone.
-- Save the room state, restart the server, reload the save, and verify folder structures are fully restored.
+---
+
+### 📦 WS5: Client Upload & Header Integration
+* **`uploadStore.js`**:
+  - Update `handleImageUpload` to append `roomId` to formData or query parameter (`/api/upload?roomId=${roomId}`).
+* **`Header.jsx` & Navigation**:
+  - Add **"Copy Invite Link"** button next to room indicator with visual copy confirmation.
+  - Add **"Switch Room"** button allowing users to return to the Lobby to change canvases without refreshing the browser.
+* **`App.jsx`**:
+  - Support `handleLeaveRoom` to return to Lobby state cleanly, clearing active canvas selections.
+
+---
+
+### 📦 WS6: Verification & Testing
+* **Unit Tests**:
+  - Add `roomManager.test.js` validating room creation, isolation between rooms, save separation, and room listing.
+  - Update `stores.test.js` and `uploadStore.test.js` to verify room-scoped uploads and state isolation.
+* **Regression Testing**:
+  - Ensure all existing 52 client tests continue to pass.
+  - Verify ESLint has 0 errors/warnings and production build compiles cleanly.
+
+---
+
+## 🔒 Security & Data Integrity Considerations
+1. **Path Traversal Protection**: Sanitize all `roomId` strings using `roomId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)` before passing to filesystem APIs.
+2. **Graceful Autosave & Resource Management**: Unload empty rooms after inactivity timeout (e.g., 30 minutes with 0 connected users) while preserving saved files on disk.
+3. **Backwards Compatibility**: Default to `canvas-default` if no `roomId` is supplied, preserving existing workspace data.
