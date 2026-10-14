@@ -275,6 +275,32 @@ We audited all modal, drawer, sidebar, and popover components across the interfa
 
 ---
 
+## 📁 WS13: Image Folder Functionality & Interaction Overhaul
+
+We completed a comprehensive audit and remediation of image folder functionality across data structures, real-time protocols, and drag-and-drop interactions:
+
+1. **Robust Drag-and-Drop Pipeline**:
+   - **Self-Contained Drag Payload**: Emitted drag payloads carry `{ type: 'image', url, assetId, isPreset, sourceFolderId }`. Dropping resolves targets directly by `assetId` rather than fragile URL lookups.
+   - **Flicker-Free State Highlighting**: Eliminated raw DOM `classList.add/remove` mutations. Drag hover states are managed via React states (`dragOverFolderId`, `isOverRootDropzone`), verified using `e.currentTarget.contains(e.relatedTarget)` to avoid child element event hijacking.
+   - **Drop Guards & Preset Rejection**: Dropping an asset into its current folder is ignored cleanly without emitting socket events. Presets are rejected from folder moves.
+   - **Expanded Root Dropzone**: The entire uncategorized assets area and root dropzone banner act as unified targets to move assets out of folders.
+   - **OS Desktop File Drops**: Users can drag image files directly from their OS desktop onto any folder or the root library to upload and file them instantly.
+
+2. **Intelligent Search & Filter Hierarchy**:
+   - **Folder Name Search Matching**: Searching queries both asset names and folder names; matching folders include all their filed assets in search results.
+   - **Automatic Folder Expansion on Search**: Folders containing search matches automatically expand while a search query is active, collapsing back to their saved state when cleared.
+   - **Clean Presets View**: Folder management controls and the folder tree are hidden when filtering by "Presets", preventing empty folder clutter.
+   - **Empty Folder Hiding During Search**: Folders with 0 search matches are hidden during active queries.
+
+3. **Validation, Deduplication & Persistence**:
+   - **Double-Emit Fix**: Guarded rename callbacks (`saveFolderRename`, `saveAssetRename`) to prevent duplicate WebSocket emissions caused by `Enter` key unmounting triggering subsequent `onBlur` events.
+   - **Entropy & Unique IDs**: Added `newFolderId()` to [ids.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/lib/ids.js) using timestamp + 9-character random suffix.
+   - **Sanitization & Limits**: Added `maxLength={40}` and automatic string trimming to folder creation and rename inputs. Duplicate folder names are detected and rejected.
+   - **Persistent Collapsed State**: Folder collapse states are saved to and restored from `localStorage` (`canvas_collapsed_folders`).
+   - **Context-Aware Deletion**: Empty folders show simple deletion confirmations; populated folders warn that assets inside will remain in the library.
+
+---
+
 ## 🔍 Verification & Testing Logs (Final validation)
 
 ### 1. Server Unit Tests (`node --test`)
@@ -308,7 +334,7 @@ ok 1 - RoomManager & Multi-Room Isolation Tests
 ```
 
 ### 2. Client Unit Tests (`vitest run`)
-All 53 client tests passed:
+All 54 client tests passed (including folder duplicate prevention and search matching):
 ```bash
 > client@0.0.0 test
 > vitest run
@@ -317,18 +343,18 @@ All 53 client tests passed:
 
  ✓ src/lib/__tests/smoke.test.js (1 test)
  ✓ src/lib/__tests/locks.test.js (2 tests)
- ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests)
  ✓ src/lib/__tests/mergeElement.test.js (4 tests)
+ ✓ src/components/canvas/__tests__/CanvasSelection.test.js (11 tests)
  ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests)
  ✓ src/lib/__tests/ids.test.js (5 tests)
+ ✓ src/state/__tests/uploadStore.test.js (4 tests)
  ✓ src/state/__tests/stores.test.js (4 tests)
- ✓ src/state/__tests/uploadStore.test.js (3 tests)
  ✓ src/state/__tests/historyStore.test.js (11 tests)
  ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests)
  ✓ src/lib/__tests/url.test.js (3 tests)
 
  Test Files  11 passed (11)
-      Tests  53 passed (53)
+      Tests  54 passed (54)
 ```
 
 ### 3. Linter Verification (`eslint .`)
@@ -349,8 +375,8 @@ Vite compiled the bundle cleanly:
 vite v6.4.2 building for production...
 ✓ 109 modules transformed.
 dist/index.html                   0.46 kB │ gzip:   0.29 kB
-dist/assets/index-D4fz4VrX.css   77.70 kB │ gzip:  11.86 kB
-dist/assets/index-j3SjWdeJ.js   977.10 kB │ gzip: 261.83 kB
-✓ built in 2.10s
+dist/assets/index-dq94tsmX.css   77.92 kB │ gzip:  11.89 kB
+dist/assets/index-3qOOIw3W.js   980.06 kB │ gzip: 262.66 kB
+✓ built in 2.18s
 ```
 

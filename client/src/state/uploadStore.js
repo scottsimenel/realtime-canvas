@@ -1,7 +1,7 @@
 import { EVENTS } from '../../../shared/protocol.js';
 import { createContext, useContext, useState, useCallback, useMemo, createElement } from 'react';
 import { SOCKET_URL, getSocket } from '../lib/socket.js';
-import { newAssetId } from '../lib/ids.js';
+import { newAssetId, newFolderId } from '../lib/ids.js';
 import { SAMPLE_IMAGES } from '../constants.js';
 
 const UploadContext = createContext(null);
@@ -40,7 +40,7 @@ export function UploadProvider({ children }) {
     });
   }, []);
 
-  const handleImageUpload = useCallback(async (files, targetRoomId) => {
+  const handleImageUpload = useCallback(async (files, targetRoomId, targetFolderId = null) => {
     if (!files || files.length === 0) return;
 
     const filesArray = Array.from(files);
@@ -94,7 +94,12 @@ export function UploadProvider({ children }) {
           const assetId = newAssetId();
           const originalName = uploadedFile.originalname || uploadedFile.filename;
           const assetName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
-          const newAsset = { id: assetId, name: assetName, url: uploadedFile.url };
+          const newAsset = {
+            id: assetId,
+            name: assetName,
+            url: uploadedFile.url,
+            folderId: targetFolderId || null,
+          };
 
           const socket = getSocket();
           if (socket && socket.connected) {
@@ -148,10 +153,16 @@ export function UploadProvider({ children }) {
   }, []);
 
   const handleCreateFolder = useCallback((name) => {
-    if (!name || !name.trim()) return;
+    const trimmed = name ? name.trim() : '';
+    if (!trimmed) return;
+    if (folders.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+      setUploadError('A folder with that name already exists.');
+      return;
+    }
+    setUploadError('');
     const socket = getSocket();
-    const folderId = 'folder_' + Date.now();
-    const newFolder = { id: folderId, name: name.trim() };
+    const folderId = newFolderId();
+    const newFolder = { id: folderId, name: trimmed };
     if (socket && socket.connected) {
       socket.emit(EVENTS.FOLDER_CREATE, { folder: newFolder }, (res) => {
         if (res && res.success && res.folder) {
@@ -161,23 +172,31 @@ export function UploadProvider({ children }) {
     } else {
       setFolders((prev) => [...prev, newFolder]);
     }
-  }, []);
+  }, [folders]);
 
   const handleRenameFolder = useCallback((folderId, name) => {
-    if (!name || !name.trim()) return;
+    const trimmed = name ? name.trim() : '';
+    if (!trimmed) return;
+    const current = folders.find((f) => f.id === folderId);
+    if (current && current.name === trimmed) return;
+    if (folders.some((f) => f.id !== folderId && f.name.toLowerCase() === trimmed.toLowerCase())) {
+      setUploadError('A folder with that name already exists.');
+      return;
+    }
+    setUploadError('');
     const socket = getSocket();
     if (socket && socket.connected) {
-      socket.emit(EVENTS.FOLDER_RENAME, { folderId, name: name.trim() }, (res) => {
+      socket.emit(EVENTS.FOLDER_RENAME, { folderId, name: trimmed }, (res) => {
         if (res && res.success && res.folder) {
           setFolders((prev) => prev.map((f) => (f.id === folderId ? res.folder : f)));
         }
       });
     } else {
       setFolders((prev) =>
-        prev.map((f) => (f.id === folderId ? { ...f, name: name.trim() } : f))
+        prev.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f))
       );
     }
-  }, []);
+  }, [folders]);
 
   const handleDeleteFolder = useCallback((folderId) => {
     const socket = getSocket();
@@ -230,30 +249,40 @@ export function UploadProvider({ children }) {
   }, [assets]);
 
   const visibleAssets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const folderMap = new Map(folders.map((f) => [f.id, f.name.toLowerCase()]));
+
     return allImageAssets.filter((a) => {
       if (hiddenAssetUrls.includes(a.url)) return false;
       if (activeFilter === 'presets' && !a.isPreset) return false;
       if (activeFilter === 'uploads' && a.isPreset) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        if (!a.name.toLowerCase().includes(q)) return false;
+      if (query) {
+        const assetNameMatch = a.name.toLowerCase().includes(query);
+        const folderName = a.folderId ? folderMap.get(a.folderId) : null;
+        const folderMatch = folderName ? folderName.includes(query) : false;
+        if (!assetNameMatch && !folderMatch) return false;
       }
       return true;
     });
-  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery]);
+  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery, folders]);
 
   const hiddenAssets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const folderMap = new Map(folders.map((f) => [f.id, f.name.toLowerCase()]));
+
     return allImageAssets.filter((a) => {
       if (!hiddenAssetUrls.includes(a.url)) return false;
       if (activeFilter === 'presets' && !a.isPreset) return false;
       if (activeFilter === 'uploads' && a.isPreset) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        if (!a.name.toLowerCase().includes(q)) return false;
+      if (query) {
+        const assetNameMatch = a.name.toLowerCase().includes(query);
+        const folderName = a.folderId ? folderMap.get(a.folderId) : null;
+        const folderMatch = folderName ? folderName.includes(query) : false;
+        if (!assetNameMatch && !folderMatch) return false;
       }
       return true;
     });
-  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery]);
+  }, [allImageAssets, hiddenAssetUrls, activeFilter, searchQuery, folders]);
 
   const value = useMemo(() => ({
     assets,

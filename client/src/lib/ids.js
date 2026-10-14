@@ -29,3 +29,11 @@ export const newAssetId = () => {
 export const newRollId = () => {
   return `roll_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 };
+
+/**
+ * Generates a new folder ID.
+ * @returns {string} The new folder ID.
+ */
+export const newFolderId = () => {
+  return `folder_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+};

@@ -234,6 +234,47 @@ describe('uploadStore behavioral unit tests', () => {
     expect(store.assets[0].folderId).toBeNull();
   });
 
+  test('Folder duplicate prevention and search matching by folder name', () => {
+    UploadProvider({ children: null });
+    let store = reactMockValueCapture.captured;
+
+    // 1. Duplicate folder name check
+    store.handleCreateFolder('Dungeons');
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.folders.length).toBe(1);
+
+    // Attempt to create duplicate (case-insensitive)
+    store.handleCreateFolder('dungeons');
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+    expect(store.uploadError).toBe('A folder with that name already exists.');
+    expect(store.folders.length).toBe(1); // Not duplicated
+
+    // 2. Search matching by folder name
+    const dungeonFolderId = store.folders[0].id;
+    store.setAssets([
+      { id: 'asset_1', name: 'Crypt Level 1', url: '/uploads/c1.png', folderId: dungeonFolderId },
+      { id: 'asset_2', name: 'Forest Trees', url: '/uploads/f1.png', folderId: null }
+    ]);
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+
+    // Search query matches folder name "dungeon" but not asset name "Crypt Level 1"
+    store.setSearchQuery('dungeon');
+    stateIndex = 0;
+    UploadProvider({ children: null });
+    store = reactMockValueCapture.captured;
+
+    // "Crypt Level 1" should be matched because its folder is "Dungeons"
+    const matchedNames = store.visibleAssets.map(a => a.name);
+    expect(matchedNames).toContain('Crypt Level 1');
+    expect(matchedNames).not.toContain('Forest Trees');
+  });
+
   test('useUploadStore throws error outside provider', () => {
     reactMockValueCapture.captured = null;
     expect(() => useUploadStore()).toThrowError('useUploadStore must be used within an UploadProvider');

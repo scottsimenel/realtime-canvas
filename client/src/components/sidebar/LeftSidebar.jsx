@@ -35,6 +35,8 @@ export default function LeftSidebar({
   getFullUrl,
 }) {
   const {
+    assets,
+    currentRoomId,
     searchQuery,
     setSearchQuery,
     activeFilter,
@@ -50,9 +52,17 @@ export default function LeftSidebar({
 
   const [showNewFolderForm, setShowNewFolderForm] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [collapsedFolderIds, setCollapsedFolderIds] = useState([]);
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('canvas_collapsed_folders') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [editingFolderId, setEditingFolderId] = useState(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [dragOverFolderId, setDragOverFolderId] = useState(null);
+  const [isOverRootDropzone, setIsOverRootDropzone] = useState(false);
 
   const [editingAssetId, setEditingAssetId] = useState(null);
   const [editingAssetName, setEditingAssetName] = useState('');
@@ -65,10 +75,14 @@ export default function LeftSidebar({
   };
 
   const saveAssetRename = (assetId) => {
-    if (editingAssetName.trim() && editingAssetName.trim() !== '') {
-      handleRenameAsset(assetId, editingAssetName.trim());
+    if (editingAssetId !== assetId) return;
+    const trimmed = editingAssetName.trim();
+    const current = (allImageAssets || []).find((a) => a.id === assetId);
+    if (trimmed && current && trimmed !== current.name) {
+      handleRenameAsset(assetId, trimmed);
     }
     setEditingAssetId(null);
+    setEditingAssetName('');
   };
 
   const startEditingFolder = (e, folder) => {
@@ -79,61 +93,115 @@ export default function LeftSidebar({
   };
 
   const saveFolderRename = (folderId) => {
-    if (editingFolderName.trim() && editingFolderName.trim() !== '') {
-      handleRenameFolder(folderId, editingFolderName.trim());
+    if (editingFolderId !== folderId) return;
+    const trimmed = editingFolderName.trim();
+    const current = (folders || []).find((f) => f.id === folderId);
+    if (trimmed && current && trimmed !== current.name) {
+      handleRenameFolder(folderId, trimmed);
     }
     setEditingFolderId(null);
+    setEditingFolderName('');
   };
 
   const toggleFolderCollapsed = (folderId) => {
-    setCollapsedFolderIds((prev) =>
-      prev.includes(folderId) ? prev.filter((id) => id !== folderId) : [...prev, folderId]
-    );
+    setCollapsedFolderIds((prev) => {
+      const next = prev.includes(folderId) ? prev.filter((id) => id !== folderId) : [...prev, folderId];
+      try {
+        localStorage.setItem('canvas_collapsed_folders', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
-  const handleDragOverFolder = (e) => {
+  const handleDragOverFolder = (e, folderId) => {
     e.preventDefault();
-    e.currentTarget.classList.add('bg-sky-500/10', 'border-sky-500/30');
+    e.stopPropagation();
+    if (dragOverFolderId !== folderId) {
+      setDragOverFolderId(folderId);
+    }
   };
 
   const handleDragLeaveFolder = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('bg-sky-500/10', 'border-sky-500/30');
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverFolderId(null);
+    }
   };
 
   const handleDropOnFolder = (e, folderId) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('bg-sky-500/10', 'border-sky-500/30');
+    e.stopPropagation();
+    setDragOverFolderId(null);
+
+    // If external OS desktop files dropped directly onto folder
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleImageUpload(e.dataTransfer.files, currentRoomId, folderId);
+      setCollapsedFolderIds((prev) => prev.filter((id) => id !== folderId));
+      return;
+    }
+
     try {
-      const textData = e.dataTransfer.getData('text/plain');
+      const textData = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
       if (!textData) return;
       const data = JSON.parse(textData);
-      if (data && data.url) {
-        const match = visibleAssets.find((a) => a.url === data.url && !a.isPreset);
-        if (match) {
-          handleMoveAsset(match.id, folderId);
-        }
+      if (!data) return;
+
+      if (data.isPreset) return;
+      if (data.sourceFolderId === folderId) return;
+
+      const targetAssetId = data.assetId || ((assets || []).find((a) => a.url === data.url)?.id);
+      if (targetAssetId) {
+        handleMoveAsset(targetAssetId, folderId);
+        setCollapsedFolderIds((prev) => prev.filter((id) => id !== folderId));
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to handle drop on folder:', err);
+    }
+  };
+
+  const handleDragOverRoot = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isOverRootDropzone) {
+      setIsOverRootDropzone(true);
+    }
+  };
+
+  const handleDragLeaveRoot = (e) => {
+    e.preventDefault();
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsOverRootDropzone(false);
     }
   };
 
   const handleDropOnRoot = (e) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('bg-slate-900/50', 'border-slate-800');
+    e.stopPropagation();
+    setIsOverRootDropzone(false);
+
+    // If external OS desktop files dropped directly onto root
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleImageUpload(e.dataTransfer.files, currentRoomId, null);
+      return;
+    }
+
     try {
-      const textData = e.dataTransfer.getData('text/plain');
+      const textData = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
       if (!textData) return;
       const data = JSON.parse(textData);
-      if (data && data.url) {
-        const match = visibleAssets.find((a) => a.url === data.url && !a.isPreset);
-        if (match) {
-          handleMoveAsset(match.id, null);
-        }
+      if (!data) return;
+
+      if (data.isPreset) return;
+      if (!data.sourceFolderId) return; // already root
+
+      const targetAssetId = data.assetId || ((assets || []).find((a) => a.url === data.url)?.id);
+      if (targetAssetId) {
+        handleMoveAsset(targetAssetId, null);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to handle drop on root:', err);
     }
   };
 
@@ -142,7 +210,16 @@ export default function LeftSidebar({
       key={img.id}
       draggable="true"
       onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify({ url: img.url, type: 'image' }));
+        const payload = {
+          type: 'image',
+          url: img.url,
+          assetId: img.id,
+          isPreset: !!img.isPreset,
+          sourceFolderId: img.folderId || null,
+        };
+        e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+        e.dataTransfer.setData('application/json', JSON.stringify(payload));
+        e.dataTransfer.effectAllowed = 'copyMove';
       }}
       className="group relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950 hover:border-slate-700 transition cursor-grab active:cursor-grabbing"
     >
@@ -160,13 +237,17 @@ export default function LeftSidebar({
           <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
             <input
               type="text"
+              maxLength={40}
               value={editingAssetName}
               onChange={(e) => setEditingAssetName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                  e.preventDefault();
                   saveAssetRename(img.id);
                 } else if (e.key === 'Escape') {
+                  e.preventDefault();
                   setEditingAssetId(null);
+                  setEditingAssetName('');
                 }
               }}
               onBlur={() => saveAssetRename(img.id)}
@@ -624,22 +705,33 @@ export default function LeftSidebar({
               </div>
 
               {/* Create Folder Section */}
-              {!showHiddenMode && (
+              {!showHiddenMode && activeFilter !== 'presets' && (
                 <div className="space-y-2 border-t border-slate-900 pt-2 pb-1">
                   {showNewFolderForm ? (
                     <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-2">
                       <input
                         type="text"
+                        maxLength={40}
                         placeholder="Folder name..."
                         value={newFolderName}
                         onChange={(e) => setNewFolderName(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            handleCreateFolder(newFolderName);
-                            setNewFolderName('');
-                            setShowNewFolderForm(false);
+                            e.preventDefault();
+                            const trimmed = newFolderName.trim();
+                            if (trimmed) {
+                              if (folders.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+                                alert('A folder with that name already exists.');
+                                return;
+                              }
+                              handleCreateFolder(trimmed);
+                              setNewFolderName('');
+                              setShowNewFolderForm(false);
+                            }
                           } else if (e.key === 'Escape') {
+                            e.preventDefault();
                             setShowNewFolderForm(false);
+                            setNewFolderName('');
                           }
                         }}
                         className="w-full text-xs bg-slate-900 border border-slate-850 text-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:border-sky-500"
@@ -648,7 +740,10 @@ export default function LeftSidebar({
                       <div className="flex justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setShowNewFolderForm(false)}
+                          onClick={() => {
+                            setShowNewFolderForm(false);
+                            setNewFolderName('');
+                          }}
                           className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-350 transition cursor-pointer"
                         >
                           Cancel
@@ -656,7 +751,13 @@ export default function LeftSidebar({
                         <button
                           type="button"
                           onClick={() => {
-                            handleCreateFolder(newFolderName);
+                            const trimmed = newFolderName.trim();
+                            if (!trimmed) return;
+                            if (folders.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+                              alert('A folder with that name already exists.');
+                              return;
+                            }
+                            handleCreateFolder(trimmed);
                             setNewFolderName('');
                             setShowNewFolderForm(false);
                           }}
@@ -682,16 +783,31 @@ export default function LeftSidebar({
 
               <div className="pr-1 space-y-3">
                 {/* Collapsible Folders List */}
-                {!showHiddenMode && folders.map((folder) => {
+                {!showHiddenMode && activeFilter !== 'presets' && folders.map((folder) => {
                   const folderAssets = visibleAssets.filter((a) => a.folderId === folder.id);
-                  const isCollapsed = collapsedFolderIds.includes(folder.id);
+                  const hasSearch = !!searchQuery.trim();
+                  const folderNameMatches = folder.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+
+                  // When searching, hide folders that have no matches and don't match the query
+                  if (hasSearch && folderAssets.length === 0 && !folderNameMatches) {
+                    return null;
+                  }
+
+                  // Auto-expand folder if active search returned matches
+                  const isCollapsed = hasSearch ? false : collapsedFolderIds.includes(folder.id);
+                  const isDragOver = dragOverFolderId === folder.id;
+
                   return (
                     <div
                       key={folder.id}
-                      onDragOver={handleDragOverFolder}
+                      onDragOver={(e) => handleDragOverFolder(e, folder.id)}
                       onDragLeave={handleDragLeaveFolder}
                       onDrop={(e) => handleDropOnFolder(e, folder.id)}
-                      className="border border-slate-900/60 rounded-xl overflow-hidden bg-slate-950/20 transition duration-150"
+                      className={`border rounded-xl overflow-hidden transition duration-150 ${
+                        isDragOver
+                          ? 'border-sky-500 bg-sky-500/10 shadow-sm shadow-sky-500/20 ring-1 ring-sky-500/40'
+                          : 'border-slate-900/60 bg-slate-950/20'
+                      }`}
                     >
                       {/* Folder Header */}
                       <div
@@ -706,26 +822,30 @@ export default function LeftSidebar({
                           {editingFolderId === folder.id ? (
                             <input
                               type="text"
+                              maxLength={40}
                               value={editingFolderName}
                               onChange={(e) => setEditingFolderName(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
+                                  e.preventDefault();
                                   saveFolderRename(folder.id);
                                 } else if (e.key === 'Escape') {
+                                  e.preventDefault();
                                   setEditingFolderId(null);
+                                  setEditingFolderName('');
                                 }
                               }}
                               onBlur={() => saveFolderRename(folder.id)}
                               autoFocus
-                              className="text-xs bg-slate-900 border border-slate-750 text-slate-200 px-1 py-0.5 rounded focus:outline-none focus:border-sky-500"
+                              className="text-xs bg-slate-900 border border-slate-750 text-slate-200 px-1.5 py-0.5 rounded focus:outline-none focus:border-sky-500 max-w-[140px]"
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <span className="text-xs font-bold text-slate-400 truncate max-w-[130px]">
+                            <span className="text-xs font-bold text-slate-300 truncate max-w-[130px]" title={folder.name}>
                               {folder.name}
                             </span>
                           )}
-                          <span className="text-[10px] text-slate-600 font-bold">
+                          <span className="text-[10px] text-slate-500 font-bold shrink-0">
                             ({folderAssets.length})
                           </span>
                         </div>
@@ -734,7 +854,7 @@ export default function LeftSidebar({
                           <button
                             type="button"
                             onClick={(e) => startEditingFolder(e, folder)}
-                            className="text-slate-500 hover:text-slate-300 transition cursor-pointer"
+                            className="text-slate-500 hover:text-slate-300 transition cursor-pointer p-0.5"
                             title="Rename Folder"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -745,11 +865,14 @@ export default function LeftSidebar({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm(`Are you sure you want to delete folder "${folder.name}"? Assets inside will remain in the library.`)) {
+                              const confirmMessage = folderAssets.length > 0
+                                ? `Are you sure you want to delete folder "${folder.name}"? The ${folderAssets.length} asset(s) inside will remain in your library.`
+                                : `Are you sure you want to delete empty folder "${folder.name}"?`;
+                              if (confirm(confirmMessage)) {
                                 handleDeleteFolder(folder.id);
                               }
                             }}
-                            className="text-slate-500 hover:text-rose-500 transition cursor-pointer"
+                            className="text-slate-500 hover:text-rose-500 transition cursor-pointer p-0.5"
                             title="Delete Folder"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -763,8 +886,8 @@ export default function LeftSidebar({
                       {!isCollapsed && (
                         <div className="p-2.5">
                           {folderAssets.length === 0 ? (
-                            <p className="text-[10px] text-slate-600 text-center py-2.5 italic">
-                              Drag custom uploads here.
+                            <p className="text-[10px] text-slate-500 text-center py-2.5 italic">
+                              Drag custom uploads or drop files here.
                             </p>
                           ) : (
                             <div className="grid grid-cols-2 gap-2.5">
@@ -778,18 +901,16 @@ export default function LeftSidebar({
                 })}
 
                 {/* Root / Uncategorized Dropzone Header */}
-                {!showHiddenMode && folders.length > 0 && (
+                {!showHiddenMode && activeFilter !== 'presets' && folders.length > 0 && (
                   <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.add('bg-slate-900/50', 'border-slate-800');
-                    }}
-                    onDragLeave={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.remove('bg-slate-900/50', 'border-slate-800');
-                    }}
+                    onDragOver={handleDragOverRoot}
+                    onDragLeave={handleDragLeaveRoot}
                     onDrop={handleDropOnRoot}
-                    className="border border-dashed border-slate-900 p-2 rounded-xl text-center select-none text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-950/10 transition"
+                    className={`border border-dashed p-2.5 rounded-xl text-center select-none text-[10px] font-bold uppercase tracking-widest transition duration-150 ${
+                      isOverRootDropzone
+                        ? 'bg-sky-500/10 border-sky-500/50 text-sky-400'
+                        : 'border-slate-800 text-slate-500 bg-slate-950/20 hover:border-slate-700'
+                    }`}
                   >
                     📥 Drop here to move back to Root Library
                   </div>
@@ -815,13 +936,17 @@ export default function LeftSidebar({
                             <div className="absolute inset-x-0 bottom-0 bg-slate-950/95 p-1 z-20 flex gap-1 pointer-events-auto">
                               <input
                                 type="text"
+                                maxLength={40}
                                 value={editingAssetName}
                                 onChange={(e) => setEditingAssetName(e.target.value)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
+                                    e.preventDefault();
                                     saveAssetRename(img.id);
                                   } else if (e.key === 'Escape') {
+                                    e.preventDefault();
                                     setEditingAssetId(null);
+                                    setEditingAssetName('');
                                   }
                                 }}
                                 onBlur={() => saveAssetRename(img.id)}
@@ -832,7 +957,7 @@ export default function LeftSidebar({
                             </div>
                           ) : (
                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent flex items-end justify-between p-2 pointer-events-none">
-                              <span className="text-[10px] font-bold text-rose-350 truncate max-w-[75%]">
+                              <span className="text-[10px] font-bold text-rose-350 truncate max-w-[75%]" title={img.name}>
                                 {img.name}
                               </span>
                               {!img.isPreset && (
@@ -889,19 +1014,30 @@ export default function LeftSidebar({
                       ? visibleAssets.filter((a) => !a.folderId)
                       : visibleAssets;
 
-                    return rootAssets.length === 0 ? (
-                      folders.length > 0 ? (
-                        <p className="text-[10px] text-slate-600 text-center py-2.5 italic">
-                          No uncategorized root assets.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-slate-500 text-center py-5 bg-slate-950/20 border border-dashed border-slate-800 rounded-xl animate-in zoom-in-95 duration-200">
-                          No visible images. Upload below or restore hidden.
-                        </p>
-                      )
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {rootAssets.map((img) => renderAssetCard(img))}
+                    return (
+                      <div
+                        onDragOver={handleDragOverRoot}
+                        onDragLeave={handleDragLeaveRoot}
+                        onDrop={handleDropOnRoot}
+                        className={`rounded-xl transition duration-150 ${
+                          isOverRootDropzone ? 'ring-1 ring-sky-500/40 bg-sky-500/5 p-1' : ''
+                        }`}
+                      >
+                        {rootAssets.length === 0 ? (
+                          folders.length > 0 ? (
+                            <p className="text-[10px] text-slate-500 text-center py-2.5 italic">
+                              No uncategorized root assets.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-500 text-center py-5 bg-slate-950/20 border border-dashed border-slate-800 rounded-xl animate-in zoom-in-95 duration-200">
+                              No visible images. Upload below or restore hidden.
+                            </p>
+                          )
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {rootAssets.map((img) => renderAssetCard(img))}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}

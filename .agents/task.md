@@ -91,5 +91,22 @@
 - `[x]` 12.8 Run ESLint, client unit tests, and production build checks.
 - `[x]` 12.9 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
 
+## 📦 WS13 — Image Folder Functionality & Interaction Overhaul
+- `[x]` 13.1 Add `newFolderId()` to `client/src/lib/ids.js`.
+- `[x]` 13.2 Update `client/src/state/uploadStore.js`: use `newFolderId()`, add duplicate name prevention, support `targetFolderId` in `handleImageUpload`, and enhance `visibleAssets` search matching for folders.
+- `[x]` 13.3 Overhaul `client/src/components/sidebar/LeftSidebar.jsx`:
+  - Self-contained drag payload (`assetId`, `isPreset`, `sourceFolderId`).
+  - React state-driven drag hover (`dragOverFolderId`, `isOverRootDropzone`), eliminating DOM class flickering.
+  - OS desktop file drop directly onto folders & root to upload.
+  - Guard self-drops & reject presets.
+  - Expand root dropzone to entire root section.
+  - Fix Enter/Blur double-emit bug on folder and asset rename.
+  - Persist `collapsedFolderIds` in `localStorage`.
+  - Auto-expand folders on search matches, hide empty folders during search, and hide folder UI on "Presets" filter tab.
+  - Add character limits (`maxLength={40}`) and context-aware delete confirmation.
+- `[x]` 13.4 Add unit tests for folder enhancements in `uploadStore.test.js`.
+- `[x]` 13.5 Run ESLint, client unit tests, server tests, and production build checks.
+- `[x]` 13.6 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
+
 
 
