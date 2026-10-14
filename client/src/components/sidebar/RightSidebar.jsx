@@ -137,7 +137,7 @@ export default function RightSidebar({
               : "No items match your search or filter."}
           </p>
         ) : (
-          <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="space-y-2.5 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 custom-scrollbar">
             {[...filteredElements].reverse().map((el) => {
               const lockHolderId = locks[el.id];
               const isLocked = !!lockHolderId;
@@ -408,7 +408,7 @@ export default function RightSidebar({
 
   return (
     <aside 
-      className={`group fixed right-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out select-none ${
+      className={`group fixed right-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
         showRightSidebar
           ? 'opacity-100 scale-100 pointer-events-auto'
           : 'opacity-0 translate-x-10 scale-95 pointer-events-none'

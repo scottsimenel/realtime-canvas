@@ -423,7 +423,7 @@ export default function Lobby({
             </div>
 
             {/* Room Cards List */}
-            <div className="flex-1 overflow-y-auto max-h-[380px] pt-3 pr-1 space-y-2.5">
+            <div className="flex-1 overflow-y-auto max-h-[540px] lg:max-h-[620px] pt-3 pr-1 space-y-2.5 custom-scrollbar">
               {loadingRooms ? (
                 <div className="flex flex-col items-center justify-center h-48 text-slate-500 text-xs">
                   <span className="animate-spin text-xl mb-2">🌀</span>

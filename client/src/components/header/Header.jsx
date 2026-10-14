@@ -158,6 +158,7 @@ export default function Header({
                 tabs={tabs}
                 handleRecolorUser={handleRecolorUser}
                 isCollapsedDisabled={true}
+                maxHeightClass="max-h-[50vh]"
               />
             </div>
           )}

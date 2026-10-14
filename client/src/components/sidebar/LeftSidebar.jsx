@@ -266,7 +266,7 @@ export default function LeftSidebar({
 
   return (
     <aside 
-      className={`group fixed left-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out select-none ${
+      className={`group fixed left-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
         showLeftSidebar
           ? 'opacity-100 scale-100 pointer-events-auto'
           : 'opacity-0 -translate-x-10 scale-95 pointer-events-none'
@@ -680,7 +680,7 @@ export default function LeftSidebar({
                 </div>
               )}
 
-              <div className="max-h-72 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
+              <div className="pr-1 space-y-3">
                 {/* Collapsible Folders List */}
                 {!showHiddenMode && folders.map((folder) => {
                   const folderAssets = visibleAssets.filter((a) => a.folderId === folder.id);
@@ -1071,7 +1071,7 @@ export default function LeftSidebar({
                   {/* Preset Backgrounds Grid */}
                   <div className="space-y-2 pt-1">
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Preset Backgrounds</span>
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-0.5 custom-scrollbar">
+                    <div className="grid grid-cols-2 gap-2 pr-0.5">
                       {SAMPLE_IMAGES.map((img, index) => {
                         const isActive = roomSettings.backgroundImageUrl === img.url;
                         return (
@@ -1304,6 +1304,7 @@ export default function LeftSidebar({
               tabs={tabs}
               handleRecolorUser={handleRecolorUser}
               isCollapsedDisabled={false}
+              maxHeightClass=""
             />
           </div>
         )}

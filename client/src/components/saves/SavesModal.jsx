@@ -34,10 +34,10 @@ export default function SavesModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 pointer-events-auto">
       {/* Modal Card */}
-      <div className="w-full max-w-lg backdrop-blur-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4.5 text-slate-100 animate-in zoom-in-95 duration-200 select-none">
+      <div className="w-full max-w-lg max-h-[85vh] backdrop-blur-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-slate-100 animate-in zoom-in-95 duration-200 select-none">
         
         {/* Header Title */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-lg">💾</span>
             <h2 className="text-sm sm:text-base font-bold text-slate-200">
@@ -54,7 +54,7 @@ export default function SavesModal({
         </div>
 
         {/* Create Save Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2 shrink-0">
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
             Save Current State
           </label>
@@ -82,12 +82,12 @@ export default function SavesModal({
         </form>
 
         {/* Saves List */}
-        <div className="flex flex-col gap-2">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+        <div className="flex flex-col gap-2 flex-1 min-h-0">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">
             Available Sessions ({saves.length})
           </h3>
           
-          <div className="max-h-60 overflow-y-auto pr-1 flex flex-col gap-2 custom-scrollbar">
+          <div className="max-h-[55vh] flex-1 min-h-0 overflow-y-auto pr-1 flex flex-col gap-2 custom-scrollbar">
             {saves.length === 0 ? (
               <div className="text-center text-xs text-slate-500 py-8 border border-dashed border-slate-800/80 rounded-xl bg-slate-950/20">
                 No saved states found. State is auto-saved periodically in the background.

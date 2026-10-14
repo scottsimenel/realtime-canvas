@@ -239,6 +239,42 @@ We designed and implemented a complete multi-room collaborative architecture, co
 
 ---
 
+## 📐 WS12: Responsive Scrollable Containers & Viewport Optimization
+
+We audited all modal, drawer, sidebar, and popover components across the interface to identify artificially constrained viewports, nested scrollbar collisions, and unscrollable cutoff traps:
+
+1. **`SavesModal.jsx` (Saves Manager)**:
+   - Expanded modal container from hardcoded fixed sizes to `max-h-[85vh]` with `flex flex-col`.
+   - Replaced fixed `max-h-60` on the saves list with `max-h-[55vh] flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar`.
+   - Form and header marked `shrink-0`, ensuring the list expands to show 8–10 saves at once without cramping the modal.
+
+2. **`LeftSidebar.jsx` (Library & Settings Drawers)**:
+   - Fixed outer container scroll hijacking: switched outer `<aside>` from `overflow-y-auto` to `overflow-hidden`. The inner tab content `flex-1 overflow-y-auto custom-scrollbar` now serves as the single unified scrollbar.
+   - Removed nested `max-h-72 overflow-y-auto` from the images/folders tree.
+   - Removed nested `max-h-48 overflow-y-auto` from the preset backgrounds grid.
+   - Passed `maxHeightClass=""` to `ActiveUsersWidget` in the Settings tab so the user list flows naturally within the parent drawer scroll.
+
+3. **`RightSidebar.jsx` (Layers & Properties Inspector)**:
+   - Switched outer `<aside>` to `overflow-hidden` to eliminate dual/nested scrollbar collisions.
+   - Expanded layers list from static `max-h-[450px]` to responsive dynamic `max-h-[calc(100vh-320px)]`, doubling visible layers on large screens while adapting smoothly to laptop viewports.
+
+4. **`ActiveUsersWidget.jsx` & `Header.jsx`**:
+   - Added configurable `maxHeightClass = 'max-h-96'` prop to `ActiveUsersWidget`.
+   - In `Header.jsx` popover, passed `maxHeightClass="max-h-[50vh]"` to allow multi-user room lists to expand comfortably up to half the viewport height.
+
+5. **`DiceRollerWidget.jsx`**:
+   - Expanded floating card width from fixed `w-[360px]` to responsive `w-[360px] sm:w-[400px]` and maximum height from `max-h-[70vh]` to `max-h-[82vh]`.
+   - Expanded roll history container from `max-h-56` to `max-h-72 sm:max-h-80`.
+
+6. **`ActiveRollsIndicator.jsx` (Hover Popover Fix)**:
+   - Fixed unscrollable cutoff bug: because the detailed roll popover has `pointer-events-none`, its inner `max-h-60 overflow-y-auto` meant any overflow was permanently unscrollable and clipped.
+   - Removed inner `max-h-60 overflow-y-auto` from the dice container and gave the outer popover `max-h-[75vh] overflow-hidden`, allowing large dice rolls to display fully and cleanly.
+
+7. **`Lobby.jsx` (Available Canvases Browser)**:
+   - Expanded Available Canvases browser list from `max-h-[380px]` to `max-h-[540px] lg:max-h-[620px] custom-scrollbar`, doubling the visible room capacity to 6–8 rooms simultaneously.
+
+---
+
 ## 🔍 Verification & Testing Logs (Final validation)
 
 ### 1. Server Unit Tests (`node --test`)
@@ -313,8 +349,8 @@ Vite compiled the bundle cleanly:
 vite v6.4.2 building for production...
 ✓ 109 modules transformed.
 dist/index.html                   0.46 kB │ gzip:   0.29 kB
-dist/assets/index-Dgh1yKAF.css   77.56 kB │ gzip:  11.81 kB
-dist/assets/index-BN7TIa5Z.js   977.01 kB │ gzip: 261.74 kB
-✓ built in 2.09s
+dist/assets/index-D4fz4VrX.css   77.70 kB │ gzip:  11.86 kB
+dist/assets/index-j3SjWdeJ.js   977.10 kB │ gzip: 261.83 kB
+✓ built in 2.10s
 ```
 

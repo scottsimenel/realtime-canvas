@@ -6,11 +6,12 @@ export default function ActiveUsersWidget({
   tabs,
   handleRecolorUser,
   isCollapsedDisabled = false,
+  maxHeightClass = 'max-h-96',
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const listContent = (
-    <div className="space-y-2 pt-1 max-h-72 overflow-y-auto custom-scrollbar animate-in fade-in duration-200">
+    <div className={`space-y-2 pt-1 ${maxHeightClass ? `${maxHeightClass} overflow-y-auto custom-scrollbar` : ''} animate-in fade-in duration-200`}>
       {users.map((user) => {
         const isMe = user.id === currentUser?.id;
         const isUserActive = user.x !== 0 || user.y !== 0;

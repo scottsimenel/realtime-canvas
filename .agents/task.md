@@ -80,5 +80,16 @@
 - `[x]` 11.8 Write tests for `roomManager`, verify ESLint, all client tests, and production build.
 - `[x]` 11.9 Sync artifacts, commit, and push.
 
+## 📦 WS12 — Responsive Scrollable Containers & Viewport Optimization
+- `[x]` 12.1 Fix `SavesModal.jsx`: Expand modal card with `max-h-[85vh]` and saves list to `max-h-[55vh] flex-1 overflow-y-auto`.
+- `[x]` 12.2 Fix `LeftSidebar.jsx`: Remove redundant outer `<aside>` `overflow-y-auto`, eliminate nested `max-h-72` in Images/Folders tab, and remove nested `max-h-48` in Preset Backgrounds grid.
+- `[x]` 12.3 Fix `RightSidebar.jsx`: Remove redundant outer `<aside>` `overflow-y-auto`, expand layers list to `max-h-[calc(100vh-320px)]`.
+- `[x]` 12.4 Fix `ActiveUsersWidget.jsx`: Support customizable `maxHeightClass` (defaulting to `max-h-96` / `max-h-[50vh]` for Header popover and natural flow for RightSidebar).
+- `[x]` 12.5 Fix `DiceRollerWidget.jsx`: Expand widget container to `max-h-[82vh] w-[360px] sm:w-[400px]` and roll history to `max-h-72 sm:max-h-80`.
+- `[x]` 12.6 Fix `ActiveRollsIndicator.jsx`: Remove unscrollable `max-h-60` cutoff in `pointer-events-none` hover popover and set popover to `max-h-[75vh]`.
+- `[x]` 12.7 Fix `Lobby.jsx`: Expand Available Canvases browser to `max-h-[540px] lg:max-h-[620px]` to show 6-8 rooms at once.
+- `[x]` 12.8 Run ESLint, client unit tests, and production build checks.
+- `[x]` 12.9 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
+
 
 

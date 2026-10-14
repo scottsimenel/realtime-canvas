@@ -182,7 +182,7 @@ export default function ActiveRollsIndicator() {
       {/* Detailed Roll Hover Popover Card */}
       {hoveredRoll && (
         <div
-          className="fixed z-50 w-80 bg-slate-900/98 border border-slate-700/80 backdrop-blur-lg rounded-2xl p-4.5 shadow-2xl flex flex-col gap-3.5 pointer-events-none animate-in fade-in slide-in-from-right-3 duration-150"
+          className="fixed z-50 w-80 max-h-[75vh] bg-slate-900/98 border border-slate-700/80 backdrop-blur-lg rounded-2xl p-4.5 shadow-2xl flex flex-col gap-3.5 pointer-events-none animate-in fade-in slide-in-from-right-3 duration-150 overflow-hidden"
           style={{
             right: '336px',
             top: `${Math.max(80, Math.min(window.innerHeight - 260, hoveredRoll.clientTop - 60))}px`
@@ -229,7 +229,7 @@ export default function ActiveRollsIndicator() {
             );
           })()}
 
-          <div className="flex flex-col gap-3.5 py-1 bg-slate-950/40 border border-slate-950/80 p-3 rounded-xl max-h-60 overflow-y-auto custom-scrollbar">
+          <div className="flex flex-col gap-3.5 py-1 bg-slate-950/40 border border-slate-950/80 p-3 rounded-xl">
             {hoveredRoll.d20 && hoveredRoll.d20.count > 0 && (
               <div className="flex flex-col items-center gap-1.5 w-full">
                 <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider">
