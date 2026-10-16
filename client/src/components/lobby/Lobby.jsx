@@ -177,7 +177,7 @@ export default function Lobby({
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-[#070b13] relative overflow-y-auto min-h-full">
+    <div className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-[#070b13] relative overflow-y-auto overflow-x-hidden min-h-full">
       {/* Dynamic Background Glows */}
       <div className="absolute top-1/4 left-1/4 w-[450px] h-[450px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-[450px] h-[450px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
@@ -324,6 +324,9 @@ export default function Lobby({
                     required
                     maxLength={32}
                     value={roomIdInput}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     onChange={(e) => setRoomIdInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                     className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/80 focus:ring-1 focus:ring-blue-500/50 transition font-mono text-sm"
                     placeholder="e.g. canvas-default or realm-42"

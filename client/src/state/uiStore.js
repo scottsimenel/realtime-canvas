@@ -45,17 +45,24 @@ export function UiProvider({ children }) {
 
   const handleToggleZenMode = useCallback(() => {
     const nextState = isZenMode;
+    const isDesktop = typeof window === 'undefined' || window.innerWidth >= 1024;
     setShowHeader(nextState);
-    setShowLeftSidebar(nextState);
-    setShowRightSidebar(nextState);
+    setShowLeftSidebar(nextState && isDesktop);
+    setShowRightSidebar(nextState && isDesktop);
     setShowTabsBar(nextState);
     setLeftPanelCollapsed(false);
     setRightPanelCollapsed(false);
   }, [isZenMode]);
 
   const handleCanvasInteraction = useCallback(() => {
-    if (showLeftSidebar) setLeftPanelCollapsed(true);
-  }, [showLeftSidebar]);
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+    if (isMobile) {
+      if (showLeftSidebar) setShowLeftSidebar(false);
+      if (showRightSidebar) setShowRightSidebar(false);
+    } else {
+      if (showLeftSidebar) setLeftPanelCollapsed(true);
+    }
+  }, [showLeftSidebar, showRightSidebar]);
 
   const [locateElementTrigger, setLocateElementTrigger] = useState(null);
 

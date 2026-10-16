@@ -1729,7 +1729,7 @@ export default function Canvas({
       {/* Floating Zoom & Reset Controls */}
       <div
         onPointerDown={(e) => e.stopPropagation()}
-        className="absolute bottom-4 right-4 z-20 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1.5 shadow-lg select-none"
+        className="absolute bottom-20 sm:bottom-4 right-4 z-20 flex items-center gap-1 sm:gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1 sm:p-1.5 shadow-lg select-none"
       >
         <button
           type="button"

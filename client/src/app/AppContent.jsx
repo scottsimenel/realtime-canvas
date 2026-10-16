@@ -277,7 +277,7 @@ export default function AppContent({
   }, [socketRef]);
 
   return (
-    <div className={`flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full ${shakeClass}`}>
+    <div className={`flex-1 flex flex-col bg-[#070b13] overflow-hidden text-slate-100 h-full min-h-[100dvh] ${shakeClass}`}>
       {/* Header */}
       <Header
         showHeader={showHeader}
@@ -335,7 +335,7 @@ export default function AppContent({
         />
 
         {/* Center Canvas Area */}
-        <main className="flex-1 p-5 flex flex-col overflow-hidden relative">
+        <main className="flex-1 p-2 sm:p-5 flex flex-col overflow-hidden relative">
           {/* Collaborative Canvas Tabs Bar */}
           <CanvasTabsBar
             users={users}

@@ -408,14 +408,15 @@ export default function RightSidebar({
 
   return (
     <aside 
-      className={`group fixed right-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
+      className={`group fixed left-3 right-3 sm:left-auto sm:right-6 sm:w-80 top-20 sm:top-24 bottom-24 sm:bottom-28 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-4 sm:p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
         showRightSidebar
           ? 'opacity-100 scale-100 pointer-events-auto'
           : 'opacity-0 translate-x-10 scale-95 pointer-events-none'
       } ${
-        rightPanelCollapsed ? 'translate-x-[calc(100%+12px)] opacity-40 hover:opacity-100 hover:border-sky-500/50 cursor-pointer' : 'translate-x-0'
+        rightPanelCollapsed ? 'translate-x-[calc(100%-12px)] opacity-40 hover:opacity-100 hover:border-sky-500/50 cursor-pointer' : 'translate-x-0'
       }`}
       onMouseEnter={rightPanelCollapsed ? () => setRightPanelCollapsed(false) : undefined}
+      onClick={rightPanelCollapsed ? () => setRightPanelCollapsed(false) : undefined}
     >
       {/* Collapsed Indicator Strip */}
       {rightPanelCollapsed && (

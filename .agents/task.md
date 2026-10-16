@@ -108,5 +108,40 @@
 - `[x]` 13.5 Run ESLint, client unit tests, server tests, and production build checks.
 - `[x]` 13.6 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
 
+## 📦 WS14 — Theme Tokens, Responsive Viewport, Dock & Sidebars
+- `[x]` 14.1 Add missing Tailwind v4 palette tokens (`slate-850`, `slate-750`, `slate-650`, `slate-550`, `slate-455`, `slate-450`, `slate-405`, `slate-355`, `slate-350`, `slate-205`, `slate-905`, `indigo-650`, `indigo-205`, `rose-455`, `rose-350`, `sky-350`) in `client/src/index.css` `@theme` and fix `duration-205` to `duration-200`.
+- `[x]` 14.2 Set `#root` and `AppContent` viewport height to `100dvh` (`100vh` fallback), add `viewport-fit=cover` and `<title>Antigravity Canvas</title>` in `client/index.html`, and use responsive padding (`p-1.5 sm:p-5`) in `AppContent.jsx`.
+- `[x]` 14.3 Make `CanvasDock.jsx` responsive on mobile (`max-w-[calc(100vw-1rem)] overflow-x-auto no-scrollbar`), tighten button padding on mobile, and elevate Canvas Zoom pill (`bottom-20 sm:bottom-4`) to eliminate overlap.
+- `[x]` 14.4 Responsive sidebars (`LeftSidebar.jsx`, `RightSidebar.jsx`): responsive margins/widths (`left-3 right-3 sm:left-6 sm:right-auto sm:w-80`), mutual exclusion on mobile (`<1024px`), fix `uiStore.js` `handleCanvasInteraction` to cleanly close sidebars on mobile canvas tap, and fix `handleToggleZenMode` to avoid forcing both open on mobile.
+- `[x]` 14.5 Lobby mobile polish: `overflow-x-hidden` on outer wrapper to prevent 450px glow orb horizontal scroll, and add `autoCapitalize="none" autoCorrect="off" spellCheck="false"` to Room ID input.
+- `[x]` 14.6 Run verification loop (lint, tests, build), commit, and push WS14.
 
+## 📦 WS15 — Header, Tabs, Asset Folder Mobile Fallback & Popovers
+- `[ ]` 15.1 Fix `Header.jsx` mobile overflow: hide Undo/Redo/Saves text labels below `md:`, make mobile profile name and rename trigger visible and tap-editable, and enlarge color picker.
+- `[ ]` 15.2 Fix Header Online Users popover hover gap, add `onClick` toggle and outside-click dismissal for touch, and anchor within screen bounds.
+- `[ ]` 15.3 Update `TabButton.jsx` so active tabs expose rename (`✏️`) and delete (`✕`) safely on touch without invisible `opacity-0` click traps, and fix tab delete confirmation + duplicate tab naming in `useTabs.js`.
+- `[ ]` 15.4 In `LeftSidebar.jsx`, add a touch-friendly "Move to Folder" selector on uploaded asset cards, fix invisible `opacity-0` overlay button touch traps, and spawn click/tap shapes & images at the center of the user's current viewport in `useElementActions.js`.
+- `[ ]` 15.5 Fix `ActiveRollsIndicator.jsx` popover positioning (`right: 336px` bug) & orphaned `hoveredRoll` state, process all queued rolls in `DiceEffects.jsx`, and add `Escape`/backdrop/load-close to `SavesModal.jsx`.
+- `[ ]` 15.6 Run verification loop (lint, tests, build), commit, and push WS15.
 
+## 📦 WS16 — Core Canvas Touch Gestures, Lock Race, Ruler, Cursors & Pen/Eraser Fixes
+- `[ ]` 16.1 Extract focal-point-preserving pinch-to-zoom math and zoom-button pan scaling into `CanvasSelection.js` (with unit tests) and wire into `Canvas.jsx`.
+- `[ ]` 16.2 Prevent Finger-1 `pointerdown` from triggering immediate Eraser deletions before a 2-finger pinch is recognized.
+- `[ ]` 16.3 Fix the async `ELEMENT_LOCK` fast-flick race condition in `Canvas.jsx` so locks are never orphaned and final coordinates are always emitted.
+- `[ ]` 16.4 Update Ruler (`measure`) tool to support both click-and-drag (touch & desktop) and click-move-click.
+- `[ ]` 16.5 Enlarge resize/rotate handle hit targets in `CanvasSelection.js`, show element tooltips on touch selection, clamp horizontal tooltip coordinates, and counter-rotate `'i'` badge in `CanvasRenderer.js`.
+- `[ ]` 16.6 Respect `el.properties?.locked` in Eraser tool and "Clear All Drawings" (plus confirmation), support single-tap Pen dots, add contextual canvas cursors, and reset Spacebar pan on window `blur`.
+- `[ ]` 16.7 Run verification loop (lint, tests, build), commit, and push WS16.
+
+## 📦 WS17 — Inspector, Layer Manager, RightSidebar Delete & Undo/Redo Fixes
+- `[ ]` 17.1 Fix `RightSidebar.jsx` layer delete to pass `tabId: activeTabId` and `elementIds: [el.id]`, remove nested scrollbar, and support `Ctrl/Cmd+Click` multi-selection.
+- `[ ]` 17.2 Fix multi-select "Bring Forward" / "Send Backward" boundary swapping and no-op emissions in `useElementActions.js`.
+- `[ ]` 17.3 Clamp live Width/Height broadcasts in `InspectorWidget.jsx`, fix inspector lock cleanup on selection change/slider release in `useSelectionActions.js`, and fix `TooltipInspector.jsx` empty-string concatenation & `Enter` key commit.
+- `[ ]` 17.4 Expand `historyStore.js` and `useSelectionActions.js` so inspector property/type/tooltip changes are tracked by Undo/Redo and deleted/erased elements restore their original layer index.
+- `[ ]` 17.5 Run verification loop (lint, tests, build), commit, and push WS17.
+
+## 📦 WS18 — Automated Tests, Verification & Documentation Sync
+- `[ ]` 18.1 Add unit tests in `CanvasSelection.test.js`, `historyStore.test.js`, and `stores.test.js` covering focal-point zoom math, property/type undo-redo, and mobile sidebar state transitions.
+- `[ ]` 18.2 Run ESLint, Vitest coverage suite, server tests, and Vite production build.
+- `[ ]` 18.3 Update `STRUCTURE.md` if any helpers were added, and document full achievements in `walkthrough.md`.
+- `[ ]` 18.4 Final git commit and push.

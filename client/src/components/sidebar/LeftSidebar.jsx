@@ -347,14 +347,15 @@ export default function LeftSidebar({
 
   return (
     <aside 
-      className={`group fixed left-6 top-24 bottom-28 w-80 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
+      className={`group fixed left-3 right-3 sm:left-6 sm:right-auto sm:w-80 top-20 sm:top-24 bottom-24 sm:bottom-28 z-40 flex flex-col bg-slate-950/80 backdrop-blur-md border border-slate-850 rounded-2xl p-4 sm:p-5 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out select-none ${
         showLeftSidebar
           ? 'opacity-100 scale-100 pointer-events-auto'
           : 'opacity-0 -translate-x-10 scale-95 pointer-events-none'
       } ${
-        leftPanelCollapsed ? '-translate-x-[calc(100%+12px)] opacity-40 hover:opacity-100 hover:border-sky-500/50 cursor-pointer' : 'translate-x-0'
+        leftPanelCollapsed ? '-translate-x-[calc(100%-12px)] opacity-40 hover:opacity-100 hover:border-sky-500/50 cursor-pointer' : 'translate-x-0'
       }`}
       onMouseEnter={leftPanelCollapsed ? () => setLeftPanelCollapsed(false) : undefined}
+      onClick={leftPanelCollapsed ? () => setLeftPanelCollapsed(false) : undefined}
     >
       {/* Collapsed Indicator Strip */}
       {leftPanelCollapsed && (
@@ -383,7 +384,7 @@ export default function LeftSidebar({
         <button
           type="button"
           onClick={() => setLeftPanelTab('images')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-205 cursor-pointer ${
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all duration-200 cursor-pointer ${
             leftPanelTab === 'images'
               ? 'bg-slate-800 text-sky-400 shadow-sm border border-slate-700/50'
               : 'text-slate-500 hover:text-slate-300'

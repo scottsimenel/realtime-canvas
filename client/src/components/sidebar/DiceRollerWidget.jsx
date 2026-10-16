@@ -40,7 +40,7 @@ export default function DiceRollerWidget({
 
   return (
     <div 
-      className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[360px] sm:w-[400px] max-h-[82vh] bg-slate-950/90 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl z-40 flex flex-col gap-4 overflow-y-auto custom-scrollbar animate-in slide-in-from-bottom-5 fade-in duration-200 select-none"
+      className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100vw-2rem)] sm:w-[400px] max-h-[82vh] bg-slate-950/90 backdrop-blur-lg border border-slate-800/80 rounded-3xl p-5 shadow-2xl z-40 flex flex-col gap-4 overflow-y-auto custom-scrollbar animate-in slide-in-from-bottom-5 fade-in duration-200 select-none"
     >
       {/* Card Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
