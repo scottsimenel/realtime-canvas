@@ -36,7 +36,11 @@ export function useTabs(setUsers) {
     if (!socket || !socket.connected) return;
 
     const createdTabId = newTabId();
-    const newName = `Canvas ${tabs.length + 1}`;
+    let counter = tabs.length + 1;
+    while (tabs.some((t) => t.name.toLowerCase() === `canvas ${counter}`.toLowerCase())) {
+      counter++;
+    }
+    const newName = `Canvas ${counter}`;
 
     socket.emit(EVENTS.TAB_CREATE, { tabId: createdTabId, name: newName }, (res) => {
       if (res && res.success && res.tab) {
@@ -48,13 +52,23 @@ export function useTabs(setUsers) {
         handleSwitchTab(createdTabId);
       }
     });
-  }, [tabs.length, setTabs, handleSwitchTab]);
+  }, [tabs, setTabs, handleSwitchTab]);
 
   const handleDeleteTab = useCallback((tabId) => {
     const socket = getSocket();
     if (!socket || !socket.connected) return;
 
     if (tabs.length <= 1) return;
+
+    const tabToDelete = tabs.find((t) => t.id === tabId);
+    const elementCount = tabToDelete?.elements?.length || 0;
+    const confirmMessage = elementCount > 0
+      ? `Delete "${tabToDelete?.name || 'Canvas'}" and all ${elementCount} element(s) on it? This cannot be undone.`
+      : `Delete "${tabToDelete?.name || 'Canvas'}"?`;
+
+    if (typeof window !== 'undefined' && !window.confirm(confirmMessage)) {
+      return;
+    }
 
     socket.emit(EVENTS.TAB_DELETE, { tabId }, (res) => {
       if (res && res.success) {
@@ -72,7 +86,7 @@ export function useTabs(setUsers) {
         }
       }
     });
-  }, [tabs.length, setTabs, setActiveTabId, setUsers]);
+  }, [tabs, setTabs, setActiveTabId, setUsers]);
 
   const handleRenameTab = useCallback((tabId, name) => {
     const socket = getSocket();

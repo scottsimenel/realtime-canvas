@@ -6,6 +6,7 @@ import { useCanvasStore } from '../../state/canvasStore.js';
 import { useHistoryStore } from '../../state/historyStore.js';
 import { useSelectionStore } from '../../state/selectionStore.js';
 import { useUploadStore } from '../../state/uploadStore.js';
+import { useUiStore } from '../../state/uiStore.js';
 
 /**
  * Hook to manage element spawning, layer ordering, and drag-reordering.
@@ -15,6 +16,7 @@ export function useElementActions() {
   const { setElements, activeTabId } = useCanvasStore();
   const { pushHistoryAction } = useHistoryStore();
   const { selectedElementIds } = useSelectionStore();
+  const { activeVirtualDimensions } = useUiStore();
   const {
     draggedElementId,
     setDraggedElementId,
@@ -22,18 +24,25 @@ export function useElementActions() {
   } = useUploadStore();
 
   const handleSpawnShape = useCallback(
-    (type, fill, stroke, additionalProps = {}) => {
+    (type, fill, stroke, additionalProps = {}, customX, customY) => {
       const socket = getSocket();
       if (!socket || !socket.connected) return;
+
+      const w = (type === 'circle' || type === 'star' || type === 'hexagon') ? 100 : 120;
+      const h = 100;
+      const defaultCenterX = activeVirtualDimensions?.width ? activeVirtualDimensions.width / 2 : 500;
+      const defaultCenterY = activeVirtualDimensions?.height ? activeVirtualDimensions.height / 2 : 500;
+      const spawnX = (customX !== undefined) ? customX - w / 2 : Math.round(defaultCenterX - w / 2 + (Math.random() - 0.5) * 60);
+      const spawnY = (customY !== undefined) ? customY - h / 2 : Math.round(defaultCenterY - h / 2 + (Math.random() - 0.5) * 60);
 
       const id = newElementId();
       const element = {
         id,
         type,
-        x: Math.floor(Math.random() * 200) + 120,
-        y: Math.floor(Math.random() * 200) + 120,
-        width: (type === 'circle' || type === 'star' || type === 'hexagon') ? 100 : 120,
-        height: 100,
+        x: spawnX,
+        y: spawnY,
+        width: w,
+        height: h,
         properties: {
           fill,
           stroke,
@@ -61,7 +70,7 @@ export function useElementActions() {
         }
       });
     },
-    [setElements, pushHistoryAction, activeTabId]
+    [setElements, pushHistoryAction, activeTabId, activeVirtualDimensions]
   );
 
   const handleSpawnImage = useCallback(
@@ -80,8 +89,10 @@ export function useElementActions() {
           spawnX = customX - w / 2;
           spawnY = customY - h / 2;
         } else {
-          spawnX = Math.floor(Math.random() * 200) + 120;
-          spawnY = Math.floor(Math.random() * 200) + 120;
+          const defaultCenterX = activeVirtualDimensions?.width ? activeVirtualDimensions.width / 2 : 500;
+          const defaultCenterY = activeVirtualDimensions?.height ? activeVirtualDimensions.height / 2 : 500;
+          spawnX = Math.round(defaultCenterX - w / 2 + (Math.random() - 0.5) * 60);
+          spawnY = Math.round(defaultCenterY - h / 2 + (Math.random() - 0.5) * 60);
         }
 
         const element = {
@@ -136,7 +147,7 @@ export function useElementActions() {
         spawnWithDimensions(Math.round(160 * (150 / 110)), 150);
       };
     },
-    [setElements, pushHistoryAction, activeTabId]
+    [setElements, pushHistoryAction, activeTabId, activeVirtualDimensions]
   );
 
   const adjustElementLayer = useCallback((elementId, direction) => {

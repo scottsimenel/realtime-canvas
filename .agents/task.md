@@ -117,12 +117,12 @@
 - `[x]` 14.6 Run verification loop (lint, tests, build), commit, and push WS14.
 
 ## 📦 WS15 — Header, Tabs, Asset Folder Mobile Fallback & Popovers
-- `[ ]` 15.1 Fix `Header.jsx` mobile overflow: hide Undo/Redo/Saves text labels below `md:`, make mobile profile name and rename trigger visible and tap-editable, and enlarge color picker.
-- `[ ]` 15.2 Fix Header Online Users popover hover gap, add `onClick` toggle and outside-click dismissal for touch, and anchor within screen bounds.
-- `[ ]` 15.3 Update `TabButton.jsx` so active tabs expose rename (`✏️`) and delete (`✕`) safely on touch without invisible `opacity-0` click traps, and fix tab delete confirmation + duplicate tab naming in `useTabs.js`.
-- `[ ]` 15.4 In `LeftSidebar.jsx`, add a touch-friendly "Move to Folder" selector on uploaded asset cards, fix invisible `opacity-0` overlay button touch traps, and spawn click/tap shapes & images at the center of the user's current viewport in `useElementActions.js`.
-- `[ ]` 15.5 Fix `ActiveRollsIndicator.jsx` popover positioning (`right: 336px` bug) & orphaned `hoveredRoll` state, process all queued rolls in `DiceEffects.jsx`, and add `Escape`/backdrop/load-close to `SavesModal.jsx`.
-- `[ ]` 15.6 Run verification loop (lint, tests, build), commit, and push WS15.
+- `[x]` 15.1 Fix `Header.jsx` mobile overflow: hide Undo/Redo/Saves text labels below `md:`, make mobile profile name and rename trigger visible and tap-editable, and enlarge color picker.
+- `[x]` 15.2 Fix Header Online Users popover hover gap, add `onClick` toggle and outside-click dismissal for touch, and anchor within screen bounds.
+- `[x]` 15.3 Update `TabButton.jsx` so active tabs expose rename (`✏️`) and delete (`✕`) safely on touch without invisible `opacity-0` click traps, and fix tab delete confirmation + duplicate tab naming in `useTabs.js`.
+- `[x]` 15.4 In `LeftSidebar.jsx`, add a touch-friendly "Move to Folder" selector on uploaded asset cards, fix invisible `opacity-0` overlay button touch traps, and spawn click/tap shapes & images at the center of the user's current viewport in `useElementActions.js`.
+- `[x]` 15.5 Fix `ActiveRollsIndicator.jsx` popover positioning (`right: 336px` bug) & orphaned `hoveredRoll` state, process all queued rolls in `DiceEffects.jsx`, and add `Escape`/backdrop/load-close to `SavesModal.jsx`.
+- `[x]` 15.6 Run verification loop (lint, tests, build), commit, and push WS15.
 
 ## 📦 WS16 — Core Canvas Touch Gestures, Lock Race, Ruler, Cursors & Pen/Eraser Fixes
 - `[ ]` 16.1 Extract focal-point-preserving pinch-to-zoom math and zoom-button pan scaling into `CanvasSelection.js` (with unit tests) and wire into `Canvas.jsx`.

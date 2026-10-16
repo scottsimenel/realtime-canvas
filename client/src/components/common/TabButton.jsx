@@ -54,6 +54,21 @@ export default function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete,
         <span className="text-xs truncate max-w-[100px] font-semibold">{tab.name}</span>
       )}
 
+      {/* Rename trigger button on active tab */}
+      {!isEditing && isActive && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsEditing(true);
+          }}
+          className="text-slate-400 hover:text-sky-300 text-[10px] cursor-pointer transition p-0.5"
+          title="Rename Canvas"
+        >
+          ✏️
+        </button>
+      )}
+
       {/* Users Avatars indicator */}
       {tabUsers.length > 0 && (
         <div className="flex items-center -space-x-1.5 ml-1">
@@ -73,11 +88,16 @@ export default function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete,
       {/* Delete button (shows on hover or active, hidden if disabled) */}
       {!isDeleteDisabled && (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(tab.id);
           }}
-          className="w-3.5 h-3.5 rounded-md flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 transition opacity-0 group-hover:opacity-100 cursor-pointer"
+          className={`w-4 h-4 rounded-md flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 transition cursor-pointer shrink-0 ${
+            isActive
+              ? 'opacity-70 hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
+          }`}
           title="Delete Canvas"
         >
           ✕

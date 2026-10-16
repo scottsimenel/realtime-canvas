@@ -456,7 +456,7 @@ export default function AppContent({
           saves={saves}
           onClose={() => setShowSavesModal(false)}
           onCreateSave={handleCreateSave}
-          onLoadSave={handleLoadSave}
+          onLoadSave={(saveId) => handleLoadSave(saveId, () => setShowSavesModal(false))}
           onDeleteSave={handleDeleteSave}
         />
       )}

@@ -182,10 +182,16 @@ export default function ActiveRollsIndicator() {
       {/* Detailed Roll Hover Popover Card */}
       {hoveredRoll && (
         <div
-          className="fixed z-50 w-80 max-h-[75vh] bg-slate-900/98 border border-slate-700/80 backdrop-blur-lg rounded-2xl p-4.5 shadow-2xl flex flex-col gap-3.5 pointer-events-none animate-in fade-in slide-in-from-right-3 duration-150 overflow-hidden"
+          className="fixed z-50 w-72 sm:w-80 max-h-[75vh] max-w-[calc(100vw-2rem)] bg-slate-900/98 border border-slate-700/80 backdrop-blur-lg rounded-2xl p-4 sm:p-4.5 shadow-2xl flex flex-col gap-3.5 pointer-events-none animate-in fade-in duration-150 overflow-hidden"
           style={{
-            right: '336px',
-            top: `${Math.max(80, Math.min(window.innerHeight - 260, hoveredRoll.clientTop - 60))}px`
+            left: typeof window !== 'undefined' && window.innerWidth >= 880
+              ? `${Math.min(window.innerWidth - 340, Math.max(16, (window.innerWidth / 2) + 215))}px`
+              : '50%',
+            transform: typeof window !== 'undefined' && window.innerWidth < 880 ? 'translateX(-50%)' : 'none',
+            bottom: typeof window !== 'undefined' && window.innerWidth < 880 ? '110px' : 'auto',
+            top: typeof window !== 'undefined' && window.innerWidth >= 880
+              ? `${Math.max(80, Math.min(window.innerHeight - 260, (hoveredRoll.clientTop || 200) - 60))}px`
+              : 'auto'
           }}
         >
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">

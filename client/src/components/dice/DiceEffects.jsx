@@ -230,15 +230,18 @@ export default function DiceEffects({ activeRolls, onCriticalRoll, diceSizeMulti
   useEffect(() => {
     if (!activeRolls || activeRolls.length === 0) return;
     
-    const latestRoll = activeRolls[activeRolls.length - 1];
-    if (processedRollIds.current.has(latestRoll.rollId)) return;
-    processedRollIds.current.add(latestRoll.rollId);
+    const unprocessed = activeRolls.filter((r) => !processedRollIds.current.has(r.rollId));
+    if (unprocessed.length === 0) return;
+
+    unprocessed.forEach((r) => {
+      processedRollIds.current.add(r.rollId);
+    });
     
     setIsActive(true);
     
     // Stagger spawn shortly to ensure canvas sizing completes
     setTimeout(() => {
-      spawnDiceGroup(latestRoll);
+      unprocessed.forEach((r) => spawnDiceGroup(r));
     }, 50);
   }, [activeRolls, spawnDiceGroup]);
 

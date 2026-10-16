@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function SavesModal({
   saves,
@@ -8,6 +8,14 @@ export default function SavesModal({
   onDeleteSave,
 }) {
   const [saveName, setSaveName] = useState('');
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -32,9 +40,15 @@ export default function SavesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 pointer-events-auto">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 pointer-events-auto"
+      onClick={onClose}
+    >
       {/* Modal Card */}
-      <div className="w-full max-w-lg max-h-[85vh] backdrop-blur-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-slate-100 animate-in zoom-in-95 duration-200 select-none">
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg max-h-[85vh] backdrop-blur-xl bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-slate-100 animate-in zoom-in-95 duration-200 select-none"
+      >
         
         {/* Header Title */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 shrink-0">

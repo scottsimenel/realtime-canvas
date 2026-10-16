@@ -49,7 +49,10 @@ export default function DiceRollerWidget({
         </h2>
         <button
           type="button"
-          onClick={() => setShowDiceRoller(false)}
+          onClick={() => {
+            setShowDiceRoller(false);
+            setHoveredRoll(null);
+          }}
           className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-900 border border-slate-800 transition cursor-pointer active:scale-95 flex items-center justify-center"
           title="Close Roller"
         >
@@ -217,7 +220,10 @@ export default function DiceRollerWidget({
           {rollHistory.length > 0 && (
             <button
               type="button"
-              onClick={() => setRollHistory([])}
+              onClick={() => {
+                setRollHistory([]);
+                setHoveredRoll(null);
+              }}
               className="text-xs text-slate-500 hover:text-slate-400 cursor-pointer font-bold"
             >
               Clear
@@ -259,7 +265,11 @@ export default function DiceRollerWidget({
                     setHoveredRoll({ ...roll, clientTop: rect.top });
                   }}
                   onMouseLeave={() => setHoveredRoll(null)}
-                  className="text-xs p-3 rounded-xl bg-slate-900 border border-slate-800/60 hover:bg-slate-850 hover:border-slate-700 flex flex-col gap-2 transition duration-150 cursor-help"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setHoveredRoll((prev) => (prev?.rollId === roll.rollId ? null : { ...roll, clientTop: rect.top }));
+                  }}
+                  className="text-xs p-3 rounded-xl bg-slate-900 border border-slate-800/60 hover:bg-slate-850 hover:border-slate-700 flex flex-col gap-2 transition duration-150 cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-bold">

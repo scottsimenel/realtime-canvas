@@ -280,10 +280,10 @@ export default function LeftSidebar({
       <button
         type="button"
         onClick={() => handleUpdateRoomSettings({ backgroundImageUrl: img.url, showBackground: true })}
-        className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-lg border text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center active:scale-95 transition cursor-pointer z-10 ${
+        className={`absolute top-1.5 left-1.5 w-6 h-6 rounded-lg border text-slate-400 flex items-center justify-center active:scale-95 transition cursor-pointer z-10 ${
           roomSettings.backgroundImageUrl === img.url
-            ? 'bg-sky-500 border-sky-400 text-white shadow-sm'
-            : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:text-sky-400'
+            ? 'opacity-100 bg-sky-500 border-sky-400 text-white shadow-sm'
+            : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:text-sky-400'
         }`}
         title="Set as Canvas Background"
       >
@@ -295,7 +295,7 @@ export default function LeftSidebar({
       <button
         type="button"
         onClick={() => toggleHideAsset(img.url)}
-        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
+        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
         title="Hide Image"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -309,17 +309,43 @@ export default function LeftSidebar({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            if (confirm(`Are you sure you want to permanently delete "${img.name}"? This will delete it for all users and remove it from the server.`)) {
+            if (typeof window !== 'undefined' && window.confirm(`Permanently delete "${img.name}" for all users?`)) {
               handleDeleteAsset(img.id);
             }
           }}
-          className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
+          className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
           title="Delete Permanently"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </button>
+      )}
+
+      {/* Touch & quick folder selector */}
+      {!img.isPreset && folders && folders.length > 0 && (
+        <div className="absolute bottom-1.5 right-1.5 z-20 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition">
+          <select
+            value={img.folderId || ''}
+            onChange={(e) => {
+              e.stopPropagation();
+              const target = e.target.value || null;
+              if (target !== (img.folderId || null)) {
+                handleMoveAsset(img.id, target);
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[9px] bg-slate-900/95 border border-slate-700/80 text-slate-300 rounded px-1 py-0.5 max-w-[84px] cursor-pointer focus:outline-none"
+            title="Move to folder"
+          >
+            <option value="">📁 Root</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                📁 {f.name}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
     </div>
   );

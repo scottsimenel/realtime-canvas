@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ActiveUsersWidget from '../sidebar/ActiveUsersWidget.jsx';
 
 export default function Header({
@@ -21,6 +21,18 @@ export default function Header({
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const [copied, setCopied] = useState(false);
+  const usersPopoverRef = useRef(null);
+
+  useEffect(() => {
+    if (!showUsersPopover) return;
+    const handleOutsideClick = (e) => {
+      if (usersPopoverRef.current && !usersPopoverRef.current.contains(e.target)) {
+        setShowUsersPopover(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutsideClick);
+    return () => document.removeEventListener('pointerdown', handleOutsideClick);
+  }, [showUsersPopover]);
 
   const handleCopyInvite = () => {
     try {
@@ -75,7 +87,7 @@ export default function Header({
           <button
             onClick={handleUndo}
             disabled={undoDisabled}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
               undoDisabled
                 ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
                 : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
@@ -83,14 +95,14 @@ export default function Header({
             title="Undo last action (Ctrl+Z)"
           >
             <span className="text-xs">↩️</span>
-            <span>Undo</span>
+            <span className="hidden md:inline">Undo</span>
           </button>
 
           {/* Redo button */}
           <button
             onClick={handleRedo}
             disabled={redoDisabled}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 ${
               redoDisabled
                 ? 'bg-slate-900/20 border-slate-800/40 text-slate-650 cursor-not-allowed'
                 : 'bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md'
@@ -98,24 +110,24 @@ export default function Header({
             title="Redo last action (Ctrl+Shift+Z)"
           >
             <span className="text-xs">↪️</span>
-            <span>Redo</span>
+            <span className="hidden md:inline">Redo</span>
           </button>
 
           {/* Saves button */}
           <button
             onClick={onOpenSaves}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md"
             title="Manage saved states"
           >
             <span className="text-xs">💾</span>
-            <span>Saves</span>
+            <span className="hidden md:inline">Saves</span>
           </button>
 
           {/* Switch Room / Lobby button */}
           {onLeaveRoom && (
             <button
               onClick={onLeaveRoom}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 hover:text-indigo-300 cursor-pointer shadow-md"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 hover:text-indigo-300 cursor-pointer shadow-md"
               title="Return to room browser lobby"
             >
               <span className="text-xs">🚪</span>
@@ -138,36 +150,44 @@ export default function Header({
 
         {/* User count badge */}
         <div 
+          ref={usersPopoverRef}
+          className="relative"
           onMouseEnter={() => setShowUsersPopover(true)}
           onMouseLeave={() => setShowUsersPopover(false)}
-          className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300 relative cursor-pointer hover:bg-slate-900 transition"
         >
-          👥 <span className="font-bold">{users.length}</span><span className="hidden sm:inline"> online</span>
+          <button
+            type="button"
+            onClick={() => setShowUsersPopover((prev) => !prev)}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300 cursor-pointer hover:bg-slate-900 transition"
+            title="Toggle online users list"
+          >
+            👥 <span className="font-bold">{users.length}</span><span className="hidden sm:inline"> online</span>
+          </button>
           {showUsersPopover && (
             <div 
-              onMouseEnter={() => setShowUsersPopover(true)}
-              onMouseLeave={() => setShowUsersPopover(false)}
-              className="absolute top-9 right-0 w-80 bg-slate-950/90 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-2xl z-50 flex flex-col gap-3 pointer-events-auto text-left animate-in fade-in duration-200"
+              className="absolute top-full pt-2 right-0 z-50 animate-in fade-in duration-200"
             >
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800/80 pb-2">
-                Online Room Users
-              </h3>
-              <ActiveUsersWidget
-                users={users}
-                currentUser={currentUser}
-                tabs={tabs}
-                handleRecolorUser={handleRecolorUser}
-                isCollapsedDisabled={true}
-                maxHeightClass="max-h-[50vh]"
-              />
+              <div className="w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-slate-950/95 backdrop-blur-md border border-slate-800/80 rounded-2xl p-4 shadow-2xl flex flex-col gap-3 text-left">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-800/80 pb-2">
+                  Online Room Users
+                </h3>
+                <ActiveUsersWidget
+                  users={users}
+                  currentUser={currentUser}
+                  tabs={tabs}
+                  handleRecolorUser={handleRecolorUser}
+                  isCollapsedDisabled={true}
+                  maxHeightClass="max-h-[50vh]"
+                />
+              </div>
             </div>
           )}
         </div>
 
         {/* User profile capsule */}
-        <div className="flex items-center gap-2.5 pl-2.5 sm:pl-3 border-l border-slate-800">
+        <div className="flex items-center gap-2 sm:gap-2.5 pl-2 sm:pl-3 border-l border-slate-800">
           <div 
-            className="relative w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm shrink-0 cursor-pointer overflow-hidden group hover:scale-110 active:scale-95 transition" 
+            className="relative w-4 h-4 rounded-full border border-white/20 shadow-sm shrink-0 cursor-pointer overflow-hidden group hover:scale-110 active:scale-95 transition" 
             style={{ backgroundColor: currentUser?.color }}
             title="Change your cursor color"
           >
@@ -201,21 +221,21 @@ export default function Header({
                 }
               }}
               autoFocus
-              className="bg-slate-900 border border-sky-500 rounded px-1.5 py-0.5 text-xs text-sky-300 font-semibold focus:outline-none w-28"
+              className="bg-slate-900 border border-sky-500 rounded px-1.5 py-0.5 text-xs text-sky-300 font-semibold focus:outline-none w-20 sm:w-28"
             />
           ) : (
             <div 
-              className="flex items-center gap-1 group cursor-pointer"
+              className="flex items-center gap-1 group cursor-pointer max-w-[90px] sm:max-w-[140px]"
               onClick={() => {
                 setTempName(currentUser?.name || '');
                 setIsEditingName(true);
               }}
               title="Click to rename"
             >
-              <span className="font-semibold text-sm text-slate-200 hover:text-white transition hidden sm:inline">
+              <span className="font-semibold text-xs sm:text-sm text-slate-200 hover:text-white transition truncate">
                 {currentUser?.name}
               </span>
-              <span className="text-slate-500 hover:text-slate-350 text-[11px] opacity-0 group-hover:opacity-100 transition hidden sm:inline">
+              <span className="text-slate-500 hover:text-slate-350 text-[10px] sm:text-[11px] opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
                 ✏️
               </span>
             </div>
