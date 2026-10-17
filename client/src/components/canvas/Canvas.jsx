@@ -121,6 +121,7 @@ export default function Canvas({
   locateElementTrigger,
   setLocateElementTrigger,
   handleSpawnImage,
+  adjustElementsToFront,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -1042,10 +1043,14 @@ export default function Canvas({
           ? selectedElementIds.filter(id => id !== element.id)
           : [...selectedElementIds, element.id];
         setSelectedElementIds(newSelection);
+        if (!isSelected) {
+          adjustElementsToFront?.([element.id]);
+        }
         return;
       }
 
       if (selectedElementIds.includes(element.id) && selectedElementIds.length > 1) {
+        adjustElementsToFront?.(selectedElementIds);
         const bbox = getGroupBoundingBox(selectedElementIds, elements);
         if (bbox) {
           setDragState({
@@ -1082,6 +1087,7 @@ export default function Canvas({
       }
 
       setSelectedElementIds([element.id]);
+      adjustElementsToFront?.([element.id]);
 
       setDragState({
         elementId: element.id,
@@ -1647,8 +1653,14 @@ export default function Canvas({
               });
               return next;
             });
+            if (intersectingIds.length > 0) {
+              adjustElementsToFront?.(intersectingIds);
+            }
           } else {
             setSelectedElementIds(intersectingIds);
+            if (intersectingIds.length > 0) {
+              adjustElementsToFront?.(intersectingIds);
+            }
           }
         } else {
           if (!drag.isAddingSelection) {

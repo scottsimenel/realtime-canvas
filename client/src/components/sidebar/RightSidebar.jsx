@@ -305,6 +305,7 @@ export default function RightSidebar({
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedElementIds([el.id]);
+                          adjustElementLayer(el.id, 'front');
                           if (setLocateElementTrigger) {
                             setLocateElementTrigger(el.id);
                           }

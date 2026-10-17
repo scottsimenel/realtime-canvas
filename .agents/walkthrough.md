@@ -657,6 +657,39 @@ Implemented cross-platform operations scripts for both PowerShell (`.ps1`) and B
 - **Server Tests**: 10/10 room manager and multi-room isolation tests passed.
 - **Server Syntax**: `node --check server/server.js` passed with exit code 0.
 
+---
+
+## 🔝 WS22 — Automatic Token Layer Elevation on Selection
+
+We added automatic layer elevation so that whenever a token is selected, it automatically gets moved to the top of the canvas layer stack:
+
+1. **Centralized Layer Elevation Helper ([useElementActions.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementActions.js))**:
+   - Implemented `adjustElementsToFront(elementIds)` supporting single element or array of element IDs.
+   - Preserves relative ordering among multiple selected elements while moving them to the end of the `elements` array (the top-most visual layer).
+   - Optimized with `isUnchanged` check: if the selected element(s) are already at the top, immediately returns `prev` without state changes, socket emissions, or redundant history actions.
+   - Broadcasts `EVENTS.ELEMENTS_REORDER` via socket to instantly elevate tokens on collaborators' screens.
+   - Pushes `'reorder'` actions to `historyStore` so Undo (`Ctrl+Z`) can restore the original layer index.
+   - Refactored `adjustElementLayer(id, 'front')` and `adjustSelectedElementsLayer('front')` to funnel through `adjustElementsToFront`.
+
+2. **Canvas Selection Wiring ([Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx) & [AppContent.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/AppContent.jsx))**:
+   - Passed `adjustElementsToFront` through `AppContent.jsx` to `<Canvas>`.
+   - Wired into `handlePointerDown` on single token click (`adjustElementsToFront([element.id])`).
+   - Wired into `Shift+Click` additive token selection (`adjustElementsToFront([element.id])`).
+   - Wired into multi-selection group move (`adjustElementsToFront(selectedElementIds)`).
+   - Wired into marquee drag-select box (`adjustElementsToFront(intersectingIds)`).
+   - Wired into Locate & Center button (👁️) in [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx) (`adjustElementLayer(el.id, 'front')`).
+
+3. **Behavioral Automated Tests**:
+   - Added [useElementActions.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/__tests__/useElementActions.test.js) (5 tests) verifying bottom element elevation, top element no-op, multi-element relative order preservation, delegation, and graceful handling of empty/invalid IDs.
+
+### Verification Suite:
+- **Client Tests**: 14/14 test files passed, 82/82 tests passed.
+- **Server Tests**: 10/10 tests passed.
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production build bundled successfully in 2.10s.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
+
 
 
 

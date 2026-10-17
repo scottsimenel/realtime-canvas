@@ -181,3 +181,14 @@
 - `[x]` 21.5 Update `STRUCTURE.md` and `README.md` to document operational scripts and `RUNBOOK.md`.
 - `[x]` 21.6 Verification loop: test scripts, verify linting, Vitest tests, server syntax, and build.
 - `[x]` 21.7 Sync artifacts (`task.md`, `walkthrough.md`, `implementation_plan.md`), commit, and push.
+
+## 📦 WS22 — Automatic Token Layer Elevation on Selection
+- `[x]` 22.1 Implement `adjustElementsToFront(elementIds)` in `client/src/app/hooks/useElementActions.js` with optimistic state update, `isUnchanged` no-op check, Socket.io `ELEMENTS_REORDER` emission, and history recording.
+- `[x]` 22.2 Refactor `adjustElementLayer(..., 'front')` and `adjustSelectedElementsLayer('front')` in `useElementActions.js` to funnel through `adjustElementsToFront`.
+- `[x]` 22.3 Pass `adjustElementsToFront` through `client/src/app/AppContent.jsx` to `<Canvas>`.
+- `[x]` 22.4 Wire `adjustElementsToFront` in `client/src/components/canvas/Canvas.jsx` across single token selection (`pointerdown`), shift-click token selection, multi-selection group move, and marquee drag-box selection.
+- `[x]` 22.5 Update Locate button (👁️) in `client/src/components/sidebar/RightSidebar.jsx` to elevate token to front upon locate.
+- `[x]` 22.6 Add unit test suite `client/src/app/hooks/__tests__/useElementActions.test.js` covering element elevation, no-op when already at top, multi-element preservation, and delegation.
+- `[x]` 22.7 Verify linting (0 errors, 0 warnings), client Vitest tests (82/82), server tests (10/10), and Vite production build.
+- `[x]` 22.8 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
+

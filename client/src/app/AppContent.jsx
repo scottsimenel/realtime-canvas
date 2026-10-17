@@ -133,6 +133,7 @@ export default function AppContent({
     handleSpawnImage,
     adjustElementLayer,
     adjustSelectedElementsLayer,
+    adjustElementsToFront,
     handleDragStart,
     handleDragOver,
     handleDragLeave,
@@ -375,6 +376,7 @@ export default function AppContent({
               locateElementTrigger={locateElementTrigger}
               setLocateElementTrigger={setLocateElementTrigger}
               handleSpawnImage={handleSpawnImage}
+              adjustElementsToFront={adjustElementsToFront}
             />
           </div>
         </main>

@@ -150,17 +150,58 @@ export function useElementActions() {
     [setElements, pushHistoryAction, activeTabId, activeVirtualDimensions]
   );
 
+  /**
+   * Moves specified elements to the front (top) of the layer stack.
+   * Preserves relative ordering among the selected elements.
+   * Emits ELEMENTS_REORDER event and tracks reorder action in history.
+   * @param {string|string[]} elementIds - Element ID or array of element IDs.
+   */
+  const adjustElementsToFront = useCallback(
+    (elementIds) => {
+      if (!elementIds) return;
+      const targetIds = Array.isArray(elementIds) ? elementIds : [elementIds];
+      if (targetIds.length === 0) return;
+
+      setElements((prev) => {
+        const selected = prev.filter((el) => targetIds.includes(el.id));
+        if (selected.length === 0) return prev;
+        const unselected = prev.filter((el) => !targetIds.includes(el.id));
+
+        const next = [...unselected, ...selected];
+
+        const isUnchanged = prev.length === next.length && prev.every((el, i) => el.id === next[i].id);
+        if (isUnchanged) return prev;
+
+        const socket = getSocket();
+        if (socket && socket.connected) {
+          socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: next.map((el) => el.id), tabId: activeTabId });
+        }
+
+        pushHistoryAction({
+          type: 'reorder',
+          orderedIdsBefore: prev.map((el) => el.id),
+          orderedIdsAfter: next.map((el) => el.id),
+          tabId: activeTabId,
+        });
+
+        return next;
+      });
+    },
+    [setElements, pushHistoryAction, activeTabId]
+  );
+
   const adjustElementLayer = useCallback((elementId, direction) => {
+    if (direction === 'front') {
+      adjustElementsToFront([elementId]);
+      return;
+    }
+
     setElements((prev) => {
       const next = [...prev];
       const index = next.findIndex((el) => el.id === elementId);
       if (index === -1) return prev;
 
-      if (direction === 'front') {
-        const temp = next[index];
-        next.splice(index, 1);
-        next.push(temp);
-      } else if (direction === 'back') {
+      if (direction === 'back') {
         const temp = next[index];
         next.splice(index, 1);
         next.unshift(temp);
@@ -193,10 +234,15 @@ export function useElementActions() {
 
       return next;
     });
-  }, [setElements, pushHistoryAction, activeTabId]);
+  }, [setElements, pushHistoryAction, activeTabId, adjustElementsToFront]);
 
   const adjustSelectedElementsLayer = useCallback((direction) => {
     if (selectedElementIds.length === 0) return;
+
+    if (direction === 'front') {
+      adjustElementsToFront(selectedElementIds);
+      return;
+    }
 
     setElements((prev) => {
       const next = [...prev];
@@ -205,12 +251,7 @@ export function useElementActions() {
         .filter((idx) => idx !== -1)
         .sort((a, b) => a - b);
 
-      if (direction === 'front') {
-        const unselected = next.filter((el) => !selectedElementIds.includes(el.id));
-        const selected = next.filter((el) => selectedElementIds.includes(el.id));
-        next.length = 0;
-        next.push(...unselected, ...selected);
-      } else if (direction === 'back') {
+      if (direction === 'back') {
         const unselected = next.filter((el) => !selectedElementIds.includes(el.id));
         const selected = next.filter((el) => selectedElementIds.includes(el.id));
         next.length = 0;
@@ -254,7 +295,7 @@ export function useElementActions() {
 
       return next;
     });
-  }, [selectedElementIds, setElements, pushHistoryAction, activeTabId]);
+  }, [selectedElementIds, setElements, pushHistoryAction, activeTabId, adjustElementsToFront]);
 
   const handleDragStart = useCallback((e, id) => {
     e.dataTransfer.setData('text/plain', id);
@@ -316,6 +357,7 @@ export function useElementActions() {
     handleSpawnImage,
     adjustElementLayer,
     adjustSelectedElementsLayer,
+    adjustElementsToFront,
     handleDragStart,
     handleDragOver,
     handleDragLeave,
