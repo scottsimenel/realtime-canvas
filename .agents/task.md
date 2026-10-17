@@ -167,3 +167,17 @@
 - `[x]` 20.9 Verification Loop: Run ESLint, client Vitest test suite, server Node test runner, and Vite production bundle.
 - `[x]` 20.10 Documentation & Git: Update `STRUCTURE.md` for `folderTree.js`, update `walkthrough.md`, sync artifacts, commit, and push.
 
+## 📦 WS21 — Server & Cloudflare Tunnel Operationalization
+- `[x]` 21.1 Soft backend server restart executed while maintaining Cloudflare tunnel.
+- `[x]` 21.2 Add `.run/` directory to `.gitignore` for PID and log files.
+- `[x]` 21.3 Implement operational scripts in `/scripts`:
+  - `start-server.ps1` & `start-server.sh`: Start Express server in background, track PID in `.run/server.pid`, log output to `.run/server.log`, verify `/health`.
+  - `start-tunnel.ps1` & `start-tunnel.sh`: Discover `cloudflared`, launch tunnel to `http://localhost:5000`, track PID in `.run/tunnel.pid`, log to `.run/tunnel.log`, capture URL in `.run/tunnel.url`.
+  - `restart-server.ps1` & `restart-server.sh`: Soft server restart with optional `-Rebuild` flag, preserving tunnel, verifying health via local port and tunnel URL.
+  - `stop-server.ps1` & `stop-server.sh`: Graceful shutdown of server process.
+  - `stop-all.ps1` & `stop-all.sh`: Graceful turn-down of both server and tunnel.
+  - `status.ps1` & `status.sh`: Display live health, PIDs, ports, and active Cloudflare tunnel URL.
+- `[x]` 21.4 Author `RUNBOOK.md` with operational procedures, architecture, troubleshooting, and production guidelines.
+- `[x]` 21.5 Update `STRUCTURE.md` and `README.md` to document operational scripts and `RUNBOOK.md`.
+- `[x]` 21.6 Verification loop: test scripts, verify linting, Vitest tests, server syntax, and build.
+- `[x]` 21.7 Sync artifacts (`task.md`, `walkthrough.md`, `implementation_plan.md`), commit, and push.

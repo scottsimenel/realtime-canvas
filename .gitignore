@@ -35,3 +35,6 @@ server/saves/
 /nul
 nul
 
+# Runtime process state and operational logs
+.run/
+

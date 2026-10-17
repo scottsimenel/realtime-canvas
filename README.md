@@ -277,9 +277,21 @@ Note: You can turn off AirPlay Receiver in **System Settings -> General -> AirDr
 
 ## 📦 Production Builds & Deployment
 
-In production, the application is served from a single port. The Express backend serves the compiled React client static files directly, avoiding CORS and multi-origin connection routing.
+> [!TIP]
+> For production lifecycle management, soft server restarts with tunnel preservation, and troubleshooting, refer to the full [Operations Runbook (RUNBOOK.md)](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/RUNBOOK.md).
 
-### 1. Build and Run Statically
+### ⚡ Automated Operational Scripts (`/scripts`)
+Automated scripts are provided for both Windows PowerShell and Unix Bash:
+* **Start Server**: `.\scripts\start-server.ps1` (or `./scripts/start-server.sh`) — starts backend in background with PID tracking in `.run/server.pid`.
+* **Start Tunnel**: `.\scripts\start-tunnel.ps1` (or `./scripts/start-tunnel.sh`) — starts Cloudflare Tunnel and saves public URL in `.run/tunnel.url`.
+* **Soft Restart (Preserving Tunnel)**: `.\scripts\restart-server.ps1` (or `./scripts/restart-server.sh`) — restarts the Node server **without severing the Cloudflare tunnel**, re-validating connectivity through the existing public URL. Pass `-Rebuild` (or `--rebuild`) to compile fresh client assets.
+* **Inspect Status**: `.\scripts\status.ps1` (or `./scripts/status.sh`) — displays process status, memory, ports, local health, and public tunnel edge reachability.
+* **Stop Server**: `.\scripts\stop-server.ps1` (or `./scripts/stop-server.sh`) — cleanly stops the Node server.
+* **Turn Down All**: `.\scripts\stop-all.ps1` (or `./scripts/stop-all.sh`) — terminates both the server and the Cloudflare tunnel.
+
+---
+
+### 1. Manual Build and Run Statically
 
 #### Compile and Start (Windows/Linux - Port 5000):
 ```bash

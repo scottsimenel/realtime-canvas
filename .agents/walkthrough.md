@@ -626,6 +626,37 @@ We implemented hierarchical folder nesting (subfolders) for images in the asset 
 - **Vite Build**: Production build bundled successfully in 1.99s.
 - **Server Syntax**: `node --check server/server.js` passed with exit code 0.
 
+---
+
+## ⚡ WS21 — Server & Cloudflare Tunnel Operationalization
+
+We designed, tested, and operationalized the Antigravity Canvas server lifecycle and Cloudflare Tunnel management into an automated scripts suite and a standard operating procedures runbook ([RUNBOOK.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/RUNBOOK.md)):
+
+### 1. Dual-Process Architecture & Tunnel Continuity
+- Analyzed the decoupled lifecycle: `cloudflared` operates an outbound control connection to Cloudflare Anycast edge, leasing the public hostname independently of the local Node.js process.
+- Executed and verified a live soft server restart while connected clients were actively communicating; confirmed `cloudflared` retained edge registration and traffic resumed seamlessly with zero URL churn or reconnect failures.
+- Auto-restoration: `roomManager` automatically reloaded the latest room snapshot (`Autosave (Auto)`), restoring elements and tabs instantly upon restart.
+
+### 2. Operational Automation Scripts (`/scripts`)
+Implemented cross-platform operations scripts for both PowerShell (`.ps1`) and Bash (`.sh`):
+- `start-server.ps1` / `start-server.sh`: Background Node process launch with fnm/Node discovery, client production bundle compilation check, process ID tracking in `.run/server.pid`, and automated `/health` polling.
+- `start-tunnel.ps1` / `start-tunnel.sh`: Cloudflare binary discovery across PATH and standard install directories, background launch with PID tracking in `.run/tunnel.pid`, log output capture, and automated regex extraction of assigned `trycloudflare.com` URLs to `.run/tunnel.url`.
+- `restart-server.ps1` / `restart-server.sh`: Soft server restart that stops only the Node server (leaving `cloudflared` connected), verifies port 5000 release, restarts Node, verifies local `/health`, and tests the live public Cloudflare URL. Supports optional `-Rebuild` flag.
+- `stop-server.ps1` / `stop-server.sh`: Safe, single-service shutdown of the server.
+- `stop-all.ps1` / `stop-all.sh`: Graceful complete teardown of both server and tunnel.
+- `status.ps1` / `status.sh`: Color-coded operational card reporting server PID, port 5000 state, memory usage, local health status, Cloudflare daemon PID, public URL, and edge connectivity.
+
+### 3. Comprehensive Operations Runbook (`RUNBOOK.md`)
+- Authored [RUNBOOK.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/RUNBOOK.md) documenting lifecycle workflows, architecture diagrams, script references, manual fallback procedures, port conflict resolution (`EADDRINUSE`), QUIC protocol workarounds, and autosave locations.
+- Documented operational scripts and `RUNBOOK.md` in [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md) and [README.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/README.md).
+- Added `.run/` to `.gitignore` to protect runtime process states, PIDs, and logs.
+
+### 4. Verification Suite
+- **Linter**: ESLint passed with 0 errors and 0 warnings.
+- **Client Tests**: 13/13 test files passed, 77/77 tests passed.
+- **Server Tests**: 10/10 room manager and multi-room isolation tests passed.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
 
 
 

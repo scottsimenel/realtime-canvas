@@ -26,12 +26,21 @@ graph TD
 
 ### 1. Root Configurations
 *   [README.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/README.md): Operational guide detailing local startup commands, build steps, and production self-hosting via Cloudflare Tunnels.
+*   [RUNBOOK.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/RUNBOOK.md): Comprehensive operations runbook: lifecycle workflows, decoupled server/tunnel architecture, soft restarts, and diagnostics.
 *   [ROADMAP.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md): Product features planner and event schemas specifications.
 *   [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md): This architectural guide.
 *   [shared/protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js): Standardized event strings and payload protocols used between client and server.
 *   [shared/folderTree.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/folderTree.js): Pure hierarchical folder math and lineage algorithms: `MAX_FOLDER_DEPTH = 5` validation, cycle detection, move validation, tree grouping, flattening for dropdowns, and non-cascading deletion sibling collision resolution.
 
-### 2. Backend Server (`/server`)
+### 2. Operational Scripts (`/scripts`)
+*   `start-server.ps1` / `start-server.sh`: Background startup with client dist check, PID tracking in `.run/server.pid`.
+*   `start-tunnel.ps1` / `start-tunnel.sh`: Cloudflare tunnel startup, tracking in `.run/tunnel.pid`, URL logging in `.run/tunnel.url`.
+*   `restart-server.ps1` / `restart-server.sh`: Soft server restart with optional `-Rebuild`, preserving tunnel, verifying health via local port and tunnel URL.
+*   `stop-server.ps1` / `stop-server.sh`: Graceful shutdown of server process.
+*   `stop-all.ps1` / `stop-all.sh`: Complete turn-down of server and Cloudflare tunnel.
+*   `status.ps1` / `status.sh`: Real-time health, memory, ports, and edge connectivity inspection.
+
+### 3. Backend Server (`/server`)
 *   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js): Entry point that instantiates Express, room-scoped `/api/upload` endpoint, `/api/rooms` discovery API, and passes `roomManager` to socket sub-handlers.
 *   [roomManager.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/roomManager.js): Central multi-room orchestrator managing a collection of isolated `CanvasRegistry` instances, room ID sanitization, automatic per-room save discovery, and periodic autosaves.
 *   [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js): The per-room transactional state database. Houses isolated users, canvas elements, tab instances, assets, folders, and element locks scoped to `this.savesDir`.
