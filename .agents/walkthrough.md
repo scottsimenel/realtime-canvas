@@ -573,5 +573,59 @@ We added full customization of grid overlay line weight (thickness) and line col
 - **ESLint**: 0 errors, 0 warnings.
 - **Vite Build**: Production build bundled successfully in 2.06s.
 
+---
+
+## 📁 WS20 — Collaborative Image Folder Nesting
+
+We implemented hierarchical folder nesting (subfolders) for images in the asset library with real-time multi-user synchronization, drag-and-drop hierarchy management, sibling-scoped uniqueness, and non-cascading deletion with collision resolution:
+
+1. **Pure Tree Math & Lineage Engine ([shared/folderTree.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/folderTree.js) & [client/src/lib/folderTree.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/lib/folderTree.js))**:
+   - `MAX_FOLDER_DEPTH = 5`: Hard limit on folder nesting depth.
+   - `getFolderDepth(folderId, folders)`: Computes 1-indexed hierarchy depth with cycle protection.
+   - `getMaxSubtreeDepthOffset(folderId, folders)`: Computes downward height of a folder's subtree.
+   - `isDescendantFolder(candidateId, targetAncestorId, folders)`: Detects cycles and subtrees.
+   - `getAncestorFolderIds(folderId, folders)` & `getDescendantFolderIds(folderId, folders)`: Lineage traversal.
+   - `canMoveFolder(folderId, targetParentId, folders)`: Validates moves ensuring no cycle creation, depth $\le 5$, and no sibling duplicate name collision.
+   - `buildFolderTree(folders)`: Converts flat folder list into nested tree nodes with `depth` and `children`.
+   - `flattenFolderTree(folders)`: Creates depth-first list with visual indentation prefixes (e.g., `  ↳ `) for `<select>` dropdowns.
+   - `resolveUniqueSiblingName(name, parentId, folders, excludeId)`: Suffixes collisions deterministically (e.g. `"Maps (1)"`, `"Maps (2)"`).
+   - `getSubtreeAssetIds(folderId, folders, assets)`: Queries all assets under a folder and all its descendant subfolders.
+   - **Unit Tests**: [folderTree.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/lib/__tests/folderTree.test.js) (10 tests) covering depth, cycles, moves, sibling uniqueness, flattening, and deduplication.
+
+2. **Real-Time Protocol & Server Implementation ([shared/protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js), [server/registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js), [server/handlers/elementHandler.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/handlers/elementHandler.js))**:
+   - Added `FOLDER_MOVE: 'folder-move'` and `FOLDER_MOVED: 'folder-moved'` to protocol.
+   - `createFolder`: Enforces `parentId` and `MAX_FOLDER_DEPTH`.
+   - `moveFolder`: Validates cycle prevention and depth limits via `canMoveFolder`.
+   - `deleteFolder`: Non-cascading deletion that promotes direct child folders and assets to the deleted folder's parent (or root `null`), resolving sibling name collisions via `resolveUniqueSiblingName`.
+   - `saveState` & `loadState`: Persists `parentId` and sanitizes circular or dangling references.
+   - Handlers broadcast `folder-moved`, `folder-renamed`, and `folder-deleted` with `promotedFolders`.
+
+3. **Client State Store & Events ([client/src/state/uploadStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uploadStore.js) & [client/src/app/hooks/useElementEvents.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementEvents.js))**:
+   - `handleCreateFolder(name, parentId)`: Sibling-scoped uniqueness check with optimistic rollback.
+   - `handleMoveFolder(folderId, targetParentId)`: Validates move and rolls back on server rejection.
+   - `handleDeleteFolder(folderId)`: Optimistically promotes child folders and assets, resolves collisions, and reconciles with server broadcast.
+   - `visibleAssets` / `hiddenAssets`: Searches match asset names, direct folder names, and any ancestor folder names in deep hierarchies.
+   - Event listeners sync `folder-moved` and promoted child folders/assets on `folder-deleted`.
+
+4. **Hierarchical UI & Drag-and-Drop Interaction ([client/src/components/sidebar/LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx))**:
+   - Recursive `renderFolderNode` helper with nested visual indentation guides (`border-l-2 border-slate-700/60`).
+   - Inline `+` subfolder creation button on folder headers (disabled at max depth 5).
+   - Draggable folder headers: Drag a folder onto another folder to nest, or onto the root dropzone to move back to root.
+   - Touch fallback: Asset card `<select>` dropdown populated by `flattenFolderTree` with visual branch prefixes.
+   - Context-aware deletion confirmation informing users that child folders and assets will be promoted to the parent level.
+
+5. **Behavioral Automated Tests**:
+   - [folderTree.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/lib/__tests/folderTree.test.js): 10 tests for tree math, depth, cycles, moves, flattening, and collision resolution.
+   - [uploadStore.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/__tests/uploadStore.test.js): 6 tests covering nested folder creation, moving, sibling scoping, cycle prevention, promotion collision suffixing, and deep ancestor search matching.
+   - [roomManager.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/__tests__/roomManager.test.js): 10 tests covering nested folder creation, move validation, cycle rejection, non-cascading delete promotion, and disk save/load persistence.
+
+### Verification Suite:
+- **Client Tests**: 13/13 test files passed, 77/77 tests passed.
+- **Server Tests**: 10/10 tests passed.
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production build bundled successfully in 1.99s.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
+
 
 

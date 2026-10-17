@@ -1,7 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { SAMPLE_IMAGES } from '../../constants.js';
 import ActiveUsersWidget from './ActiveUsersWidget.jsx';
 import { useUploadStore } from '../../state/uploadStore.js';
+import {
+  MAX_FOLDER_DEPTH,
+  buildFolderTree,
+  flattenFolderTree,
+  canMoveFolder,
+  getSubtreeAssetIds
+} from '../../lib/folderTree.js';
 
 export default function LeftSidebar({
   showLeftSidebar,
@@ -46,12 +53,19 @@ export default function LeftSidebar({
     folders,
     handleCreateFolder,
     handleRenameFolder,
+    handleMoveFolder,
     handleDeleteFolder,
     handleMoveAsset
   } = useUploadStore();
 
   const [showNewFolderForm, setShowNewFolderForm] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [creatingSubfolderParentId, setCreatingSubfolderParentId] = useState(null);
+  const [subfolderName, setSubfolderName] = useState('');
+
+  const folderTreeNodes = useMemo(() => buildFolderTree(folders), [folders]);
+  const flattenedFolders = useMemo(() => flattenFolderTree(folders), [folders]);
+
   const [collapsedFolderIds, setCollapsedFolderIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('canvas_collapsed_folders') || '[]');
@@ -125,6 +139,7 @@ export default function LeftSidebar({
 
   const handleDragLeaveFolder = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setDragOverFolderId(null);
     }
@@ -147,6 +162,18 @@ export default function LeftSidebar({
       if (!textData) return;
       const data = JSON.parse(textData);
       if (!data) return;
+
+      if (data.type === 'folder') {
+        if (data.folderId === folderId) return;
+        const check = canMoveFolder(data.folderId, folderId, folders);
+        if (check.valid) {
+          handleMoveFolder(data.folderId, folderId);
+          setCollapsedFolderIds((prev) => prev.filter((id) => id !== folderId));
+        } else if (check.error) {
+          alert(check.error);
+        }
+        return;
+      }
 
       if (data.isPreset) return;
       if (data.sourceFolderId === folderId) return;
@@ -192,6 +219,17 @@ export default function LeftSidebar({
       if (!textData) return;
       const data = JSON.parse(textData);
       if (!data) return;
+
+      if (data.type === 'folder') {
+        if (!data.sourceFolderId) return; // already root
+        const check = canMoveFolder(data.folderId, null, folders);
+        if (check.valid) {
+          handleMoveFolder(data.folderId, null);
+        } else if (check.error) {
+          alert(check.error);
+        }
+        return;
+      }
 
       if (data.isPreset) return;
       if (!data.sourceFolderId) return; // already root
@@ -339,9 +377,9 @@ export default function LeftSidebar({
             title="Move to folder"
           >
             <option value="">📁 Root</option>
-            {folders.map((f) => (
+            {flattenedFolders.map((f) => (
               <option key={f.id} value={f.id}>
-                📁 {f.name}
+                {f.indentPrefix}📁 {f.name}
               </option>
             ))}
           </select>
@@ -349,6 +387,243 @@ export default function LeftSidebar({
       )}
     </div>
   );
+
+  const renderFolderNode = (folder) => {
+    const folderAssets = visibleAssets.filter((a) => a.folderId === folder.id);
+    const subtreeAssetIds = getSubtreeAssetIds(folder.id, folders, visibleAssets);
+    const hasSearch = !!searchQuery.trim();
+    const searchTrimmed = searchQuery.trim().toLowerCase();
+    const folderNameMatches = folder.name.toLowerCase().includes(searchTrimmed);
+
+    // When searching, hide folders that have no matches in themselves or any descendant folders
+    if (hasSearch && folderAssets.length === 0 && subtreeAssetIds.length === 0 && !folderNameMatches) {
+      return null;
+    }
+
+    // Auto-expand folder if active search returned matches
+    const isCollapsed = hasSearch ? false : collapsedFolderIds.includes(folder.id);
+    const isDragOver = dragOverFolderId === folder.id;
+    const isAtMaxDepth = (folder.depth || 1) >= MAX_FOLDER_DEPTH;
+
+    return (
+      <div
+        key={folder.id}
+        onDragOver={(e) => handleDragOverFolder(e, folder.id)}
+        onDragLeave={handleDragLeaveFolder}
+        onDrop={(e) => handleDropOnFolder(e, folder.id)}
+        className={`border rounded-xl overflow-hidden transition duration-150 ${
+          folder.depth > 1 ? 'ml-2.5 border-l-2 border-slate-700/60' : ''
+        } ${
+          isDragOver
+            ? 'border-sky-500 bg-sky-500/10 shadow-sm shadow-sky-500/20 ring-1 ring-sky-500/40'
+            : 'border-slate-900/60 bg-slate-950/20'
+        }`}
+      >
+        {/* Folder Header */}
+        <div
+          draggable="true"
+          onDragStart={(e) => {
+            e.stopPropagation();
+            const payload = {
+              type: 'folder',
+              folderId: folder.id,
+              sourceFolderId: folder.parentId || null
+            };
+            e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+            e.dataTransfer.setData('application/json', JSON.stringify(payload));
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onClick={() => toggleFolderCollapsed(folder.id)}
+          className="flex items-center justify-between p-2 bg-slate-950/40 hover:bg-slate-950/70 transition cursor-pointer select-none border-b border-slate-900/40"
+        >
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-[10px] text-slate-500 shrink-0">
+              {isCollapsed ? '▶' : '▼'}
+            </span>
+            <span className="text-xs shrink-0">📁</span>
+            {editingFolderId === folder.id ? (
+              <input
+                type="text"
+                maxLength={40}
+                value={editingFolderName}
+                onChange={(e) => setEditingFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveFolderRename(folder.id);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setEditingFolderId(null);
+                    setEditingFolderName('');
+                  }
+                }}
+                onBlur={() => saveFolderRename(folder.id)}
+                autoFocus
+                className="text-xs bg-slate-900 border border-slate-750 text-slate-200 px-1.5 py-0.5 rounded focus:outline-none focus:border-sky-500 max-w-[120px]"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="text-xs font-bold text-slate-300 truncate max-w-[120px]" title={folder.name}>
+                {folder.name}
+              </span>
+            )}
+            <span className="text-[10px] text-slate-500 font-bold shrink-0">
+              {isCollapsed && folder.children && folder.children.length > 0
+                ? `(${folderAssets.length} · ${subtreeAssetIds.length})`
+                : `(${folderAssets.length})`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 pointer-events-auto">
+            {!isAtMaxDepth && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCreatingSubfolderParentId((prev) => (prev === folder.id ? null : folder.id));
+                  setSubfolderName('');
+                  if (collapsedFolderIds.includes(folder.id)) {
+                    toggleFolderCollapsed(folder.id);
+                  }
+                }}
+                className="text-slate-500 hover:text-sky-400 transition cursor-pointer p-0.5"
+                title="Add Subfolder"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => startEditingFolder(e, folder)}
+              className="text-slate-500 hover:text-slate-300 transition cursor-pointer p-0.5"
+              title="Rename Folder"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const hasChildren = folder.children && folder.children.length > 0;
+                const confirmMessage = (folderAssets.length > 0 || hasChildren)
+                  ? `Are you sure you want to delete folder "${folder.name}"? Subfolders and ${folderAssets.length} asset(s) inside will be moved up to the parent level.`
+                  : `Are you sure you want to delete empty folder "${folder.name}"?`;
+                if (confirm(confirmMessage)) {
+                  handleDeleteFolder(folder.id);
+                }
+              }}
+              className="text-slate-500 hover:text-rose-500 transition cursor-pointer p-0.5"
+              title="Delete Folder"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Folder Body */}
+        {!isCollapsed && (
+          <div className="p-2 space-y-2">
+            {/* Inline Subfolder Creation Form */}
+            {creatingSubfolderParentId === folder.id && (
+              <div className="p-2 rounded-lg border border-sky-500/30 bg-slate-900/60 mb-2">
+                <div className="text-[10px] font-bold text-sky-400 mb-1">
+                  New Subfolder in {folder.name}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Subfolder name..."
+                  maxLength={40}
+                  value={subfolderName}
+                  onChange={(e) => setSubfolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const trimmed = subfolderName.trim();
+                      if (!trimmed) return;
+                      const siblingConflict = (folder.children || []).some(
+                        (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+                      );
+                      if (siblingConflict) {
+                        alert('A folder with that name already exists in this folder.');
+                        return;
+                      }
+                      handleCreateFolder(trimmed, folder.id);
+                      setSubfolderName('');
+                      setCreatingSubfolderParentId(null);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setCreatingSubfolderParentId(null);
+                      setSubfolderName('');
+                    }
+                  }}
+                  className="w-full text-xs bg-slate-900 border border-slate-750 text-slate-200 px-2 py-1 rounded-lg focus:outline-none focus:border-sky-500 mb-1.5"
+                  autoFocus
+                />
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatingSubfolderParentId(null);
+                      setSubfolderName('');
+                    }}
+                    className="px-2 py-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-350 transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = subfolderName.trim();
+                      if (!trimmed) return;
+                      const siblingConflict = (folder.children || []).some(
+                        (c) => c.name.toLowerCase() === trimmed.toLowerCase()
+                      );
+                      if (siblingConflict) {
+                        alert('A folder with that name already exists in this folder.');
+                        return;
+                      }
+                      handleCreateFolder(trimmed, folder.id);
+                      setSubfolderName('');
+                      setCreatingSubfolderParentId(null);
+                    }}
+                    className="px-2 py-0.5 text-[10px] font-bold bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 border border-sky-500/30 rounded-lg transition cursor-pointer"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Nested Subfolders List */}
+            {folder.children && folder.children.length > 0 && (
+              <div className="space-y-2">
+                {folder.children.map((childNode) => renderFolderNode(childNode))}
+              </div>
+            )}
+
+            {/* Direct Assets Grid */}
+            {folderAssets.length === 0 ? (
+              (!folder.children || folder.children.length === 0) && (
+                <p className="text-[10px] text-slate-500 text-center py-2.5 italic">
+                  Drag custom uploads or drop files here.
+                </p>
+              )
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                {folderAssets.map((img) => renderAssetCard(img))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const [spawnShapeType, setSpawnShapeType] = useState('rectangle');
   const [spawnFillColor, setSpawnFillColor] = useState('#3b82f6');
@@ -780,11 +1055,11 @@ export default function LeftSidebar({
                           onClick={() => {
                             const trimmed = newFolderName.trim();
                             if (!trimmed) return;
-                            if (folders.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
-                              alert('A folder with that name already exists.');
+                            if (folders.filter((f) => !f.parentId).some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+                              alert('A folder with that name already exists in this folder.');
                               return;
                             }
-                            handleCreateFolder(trimmed);
+                            handleCreateFolder(trimmed, null);
                             setNewFolderName('');
                             setShowNewFolderForm(false);
                           }}
@@ -809,123 +1084,8 @@ export default function LeftSidebar({
               )}
 
               <div className="pr-1 space-y-3">
-                {/* Collapsible Folders List */}
-                {!showHiddenMode && activeFilter !== 'presets' && folders.map((folder) => {
-                  const folderAssets = visibleAssets.filter((a) => a.folderId === folder.id);
-                  const hasSearch = !!searchQuery.trim();
-                  const folderNameMatches = folder.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
-
-                  // When searching, hide folders that have no matches and don't match the query
-                  if (hasSearch && folderAssets.length === 0 && !folderNameMatches) {
-                    return null;
-                  }
-
-                  // Auto-expand folder if active search returned matches
-                  const isCollapsed = hasSearch ? false : collapsedFolderIds.includes(folder.id);
-                  const isDragOver = dragOverFolderId === folder.id;
-
-                  return (
-                    <div
-                      key={folder.id}
-                      onDragOver={(e) => handleDragOverFolder(e, folder.id)}
-                      onDragLeave={handleDragLeaveFolder}
-                      onDrop={(e) => handleDropOnFolder(e, folder.id)}
-                      className={`border rounded-xl overflow-hidden transition duration-150 ${
-                        isDragOver
-                          ? 'border-sky-500 bg-sky-500/10 shadow-sm shadow-sky-500/20 ring-1 ring-sky-500/40'
-                          : 'border-slate-900/60 bg-slate-950/20'
-                      }`}
-                    >
-                      {/* Folder Header */}
-                      <div
-                        onClick={() => toggleFolderCollapsed(folder.id)}
-                        className="flex items-center justify-between p-2 bg-slate-950/40 hover:bg-slate-950/70 transition cursor-pointer select-none border-b border-slate-900/40"
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-[10px] text-slate-500 shrink-0">
-                            {isCollapsed ? '▶' : '▼'}
-                          </span>
-                          <span className="text-xs shrink-0">📁</span>
-                          {editingFolderId === folder.id ? (
-                            <input
-                              type="text"
-                              maxLength={40}
-                              value={editingFolderName}
-                              onChange={(e) => setEditingFolderName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  saveFolderRename(folder.id);
-                                } else if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  setEditingFolderId(null);
-                                  setEditingFolderName('');
-                                }
-                              }}
-                              onBlur={() => saveFolderRename(folder.id)}
-                              autoFocus
-                              className="text-xs bg-slate-900 border border-slate-750 text-slate-200 px-1.5 py-0.5 rounded focus:outline-none focus:border-sky-500 max-w-[140px]"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className="text-xs font-bold text-slate-300 truncate max-w-[130px]" title={folder.name}>
-                              {folder.name}
-                            </span>
-                          )}
-                          <span className="text-[10px] text-slate-500 font-bold shrink-0">
-                            ({folderAssets.length})
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 pointer-events-auto">
-                          <button
-                            type="button"
-                            onClick={(e) => startEditingFolder(e, folder)}
-                            className="text-slate-500 hover:text-slate-300 transition cursor-pointer p-0.5"
-                            title="Rename Folder"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const confirmMessage = folderAssets.length > 0
-                                ? `Are you sure you want to delete folder "${folder.name}"? The ${folderAssets.length} asset(s) inside will remain in your library.`
-                                : `Are you sure you want to delete empty folder "${folder.name}"?`;
-                              if (confirm(confirmMessage)) {
-                                handleDeleteFolder(folder.id);
-                              }
-                            }}
-                            className="text-slate-500 hover:text-rose-500 transition cursor-pointer p-0.5"
-                            title="Delete Folder"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Folder Content Grid */}
-                      {!isCollapsed && (
-                        <div className="p-2.5">
-                          {folderAssets.length === 0 ? (
-                            <p className="text-[10px] text-slate-500 text-center py-2.5 italic">
-                              Drag custom uploads or drop files here.
-                            </p>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-2.5">
-                              {folderAssets.map((img) => renderAssetCard(img))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {/* Collapsible Folders Tree */}
+                {!showHiddenMode && activeFilter !== 'presets' && folderTreeNodes.map((rootNode) => renderFolderNode(rootNode))}
 
                 {/* Root / Uncategorized Dropzone Header */}
                 {!showHiddenMode && activeFilter !== 'presets' && folders.length > 0 && (

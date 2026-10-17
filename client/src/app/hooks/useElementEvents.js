@@ -121,10 +121,23 @@ export function useElementEvents() {
       setFolders((prev) => prev.map((f) => (f.id === folder.id ? folder : f)));
     };
 
-    const onFolderDeleted = ({ folderId }) => {
-      setFolders((prev) => prev.filter((f) => f.id !== folderId));
+    const onFolderMoved = ({ folder }) => {
+      setFolders((prev) => prev.map((f) => (f.id === folder.id ? folder : f)));
+    };
+
+    const onFolderDeleted = ({ folderId, fallbackParentId = null, promotedFolders }) => {
+      setFolders((prev) => {
+        const withoutDeleted = prev.filter((f) => f.id !== folderId);
+        if (Array.isArray(promotedFolders) && promotedFolders.length > 0) {
+          const promotedMap = new Map(promotedFolders.map((p) => [p.id, p]));
+          return withoutDeleted.map((f) => promotedMap.get(f.id) || f);
+        }
+        return withoutDeleted.map((f) =>
+          f.parentId === folderId ? { ...f, parentId: fallbackParentId } : f
+        );
+      });
       setAssets((prev) =>
-        prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
+        prev.map((a) => (a.folderId === folderId ? { ...a, folderId: fallbackParentId } : a))
       );
     };
 
@@ -181,6 +194,7 @@ export function useElementEvents() {
     s.on(EVENTS.ASSET_RENAMED, onAssetRenamed);
     s.on(EVENTS.FOLDER_CREATED, onFolderCreated);
     s.on(EVENTS.FOLDER_RENAMED, onFolderRenamed);
+    s.on(EVENTS.FOLDER_MOVED, onFolderMoved);
     s.on(EVENTS.FOLDER_DELETED, onFolderDeleted);
     s.on(EVENTS.ASSET_MOVED, onAssetMoved);
     s.on(EVENTS.ELEMENTS_REORDERED, onElementsReordered);
@@ -198,6 +212,7 @@ export function useElementEvents() {
       s.off(EVENTS.ASSET_RENAMED, onAssetRenamed);
       s.off(EVENTS.FOLDER_CREATED, onFolderCreated);
       s.off(EVENTS.FOLDER_RENAMED, onFolderRenamed);
+      s.off(EVENTS.FOLDER_MOVED, onFolderMoved);
       s.off(EVENTS.FOLDER_DELETED, onFolderDeleted);
       s.off(EVENTS.ASSET_MOVED, onAssetMoved);
       s.off(EVENTS.ELEMENTS_REORDERED, onElementsReordered);

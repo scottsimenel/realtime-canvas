@@ -356,6 +356,35 @@ export function registerElementHandlers(io, socket, roomManager) {
   });
 
   /**
+   * Handle moving a folder to another parent or root.
+   */
+  socket.on(EVENTS.FOLDER_MOVE, (data, callback) => {
+    const { folderId, parentId } = data || {};
+    const { room, registry } = getRoomContext();
+    if (!folderId) {
+      if (typeof callback === 'function') callback({ success: false, error: 'folderId is required' });
+      return;
+    }
+
+    const updatedFolder = registry.moveFolder(folderId, parentId || null);
+    if (!updatedFolder) {
+      if (typeof callback === 'function') {
+        callback({ success: false, error: 'Cannot move folder: invalid destination, cycle, or exceeds depth limit' });
+      }
+      return;
+    }
+
+    socket.to(room).emit(EVENTS.FOLDER_MOVED, {
+      folder: updatedFolder,
+      userId: socket.id
+    });
+
+    if (typeof callback === 'function') {
+      callback({ success: true, folder: updatedFolder });
+    }
+  });
+
+  /**
    * Handle folder deletion.
    */
   socket.on(EVENTS.FOLDER_DELETE, (data, callback) => {
@@ -366,19 +395,26 @@ export function registerElementHandlers(io, socket, roomManager) {
       return;
     }
 
-    const success = registry.deleteFolder(folderId);
-    if (!success) {
+    const res = registry.deleteFolder(folderId);
+    if (!res || !res.success) {
       if (typeof callback === 'function') callback({ success: false, error: 'Folder not found' });
       return;
     }
 
     socket.to(room).emit(EVENTS.FOLDER_DELETED, {
       folderId,
+      fallbackParentId: res.fallbackParentId,
+      promotedFolders: res.promotedFolders,
       userId: socket.id
     });
 
     if (typeof callback === 'function') {
-      callback({ success: true, folderId });
+      callback({
+        success: true,
+        folderId,
+        fallbackParentId: res.fallbackParentId,
+        promotedFolders: res.promotedFolders
+      });
     }
   });
 

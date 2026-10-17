@@ -1,6 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  MAX_FOLDER_DEPTH,
+  getFolderDepth,
+  isDescendantFolder,
+  canMoveFolder,
+  resolveUniqueSiblingName
+} from '../shared/folderTree.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -356,9 +363,20 @@ export class CanvasRegistry {
    * @returns {Object} The saved folder.
    */
   createFolder(folder) {
+    const parentId = folder.parentId || null;
+    let safeParentId = null;
+    if (parentId && this.folders.has(parentId)) {
+      const foldersArray = Array.from(this.folders.values());
+      const depth = getFolderDepth(parentId, foldersArray);
+      if (depth < MAX_FOLDER_DEPTH) {
+        safeParentId = parentId;
+      }
+    }
+
     const newFolder = {
       id: folder.id,
-      name: folder.name
+      name: folder.name,
+      parentId: safeParentId
     };
     this.folders.set(folder.id, newFolder);
     return newFolder;
@@ -381,23 +399,84 @@ export class CanvasRegistry {
   }
 
   /**
-   * Deletes a folder and resets any assets inside to root.
+   * Moves a folder to a new parent folder (or root).
+   * Validates cycles, depth limits, and sibling duplicate names.
+   * 
+   * @param {string} folderId - The ID of the folder to move.
+   * @param {string|null} targetParentId - Target parent folder ID (null for root).
+   * @returns {Object|null} The updated folder details, or null if rejected.
+   */
+  moveFolder(folderId, targetParentId) {
+    const folder = this.folders.get(folderId);
+    if (!folder) return null;
+
+    const safeTargetParentId = targetParentId || null;
+    const foldersArray = Array.from(this.folders.values());
+    const validation = canMoveFolder(folderId, safeTargetParentId, foldersArray);
+    if (!validation.valid) {
+      return null;
+    }
+
+    folder.parentId = safeTargetParentId;
+    return folder;
+  }
+
+  /**
+   * Deletes a folder without cascading deletion of subfolders.
+   * Promotes direct child folders and assets to the deleted folder's parentId,
+   * resolving any duplicate sibling name collisions upon promotion.
    * 
    * @param {string} folderId - The ID of the folder to delete.
-   * @returns {boolean} True if successfully deleted.
+   * @returns {{ success: boolean, deletedFolderId?: string, fallbackParentId?: string|null, promotedFolders?: Array<Object> }}
    */
   deleteFolder(folderId) {
-    if (this.folders.has(folderId)) {
-      this.folders.delete(folderId);
-      // Reset folderId to null for all assets in this folder
-      for (const asset of this.assets.values()) {
-        if (asset.folderId === folderId) {
-          asset.folderId = null;
-        }
-      }
-      return true;
+    const folder = this.folders.get(folderId);
+    if (!folder) {
+      return { success: false };
     }
-    return false;
+
+    const targetParentId = folder.parentId || null;
+    const promotedFolders = [];
+
+    // Find all direct child folders
+    const childFolders = [];
+    for (const f of this.folders.values()) {
+      if (f.parentId === folderId) {
+        childFolders.push(f);
+      }
+    }
+
+    // Delete folder from map before computing unique sibling names among remaining siblings
+    this.folders.delete(folderId);
+
+    // Promote child folders to targetParentId, resolving name collisions
+    for (const child of childFolders) {
+      const currentFolders = Array.from(this.folders.values());
+      const uniqueName = resolveUniqueSiblingName(
+        child.name,
+        targetParentId,
+        currentFolders,
+        child.id
+      );
+
+      child.name = uniqueName;
+      child.parentId = targetParentId;
+      promotedFolders.push(child);
+    }
+
+    // Re-parent direct assets from folderId to targetParentId
+    for (const asset of this.assets.values()) {
+      if (asset.folderId === folderId) {
+        asset.folderId = targetParentId;
+      }
+    }
+
+    return {
+      success: true,
+      deletedFolderId: folderId,
+      fallbackParentId: targetParentId,
+      promotedFolders
+    };
   }
 
   /**
@@ -858,8 +937,22 @@ export class CanvasRegistry {
       // Reconstruct folders Map
       this.folders.clear();
       (data.folders || []).forEach(folder => {
-        this.folders.set(folder.id, folder);
+        this.folders.set(folder.id, {
+          id: folder.id,
+          name: folder.name,
+          parentId: folder.parentId || null
+        });
       });
+
+      // Sanitize any circular or dangling parent references from loaded save
+      const loadedFolders = Array.from(this.folders.values());
+      for (const f of this.folders.values()) {
+        if (f.parentId) {
+          if (!this.folders.has(f.parentId) || isDescendantFolder(f.parentId, f.id, loadedFolders)) {
+            f.parentId = null;
+          }
+        }
+      }
       
       return true;
     } catch (err) {

@@ -29,6 +29,7 @@ graph TD
 *   [ROADMAP.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/ROADMAP.md): Product features planner and event schemas specifications.
 *   [STRUCTURE.md](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/STRUCTURE.md): This architectural guide.
 *   [shared/protocol.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/protocol.js): Standardized event strings and payload protocols used between client and server.
+*   [shared/folderTree.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/shared/folderTree.js): Pure hierarchical folder math and lineage algorithms: `MAX_FOLDER_DEPTH = 5` validation, cycle detection, move validation, tree grouping, flattening for dropdowns, and non-cascading deletion sibling collision resolution.
 
 ### 2. Backend Server (`/server`)
 *   [server.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/server.js): Entry point that instantiates Express, room-scoped `/api/upload` endpoint, `/api/rooms` discovery API, and passes `roomManager` to socket sub-handlers.
@@ -36,17 +37,18 @@ graph TD
 *   [registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js): The per-room transactional state database. Houses isolated users, canvas elements, tab instances, assets, folders, and element locks scoped to `this.savesDir`.
 *   `/server/handlers/`:
     *   `connectionHandler.js`: Manages socket connections, room creation/joining (`join-room`), room discovery queries (`rooms-list`), room leaves (`leave-room`), throttled real-time cursor updates (`cursor-move`), and disconnection cleanup routines.
-    *   `elementHandler.js`: Manages element manipulation events: locking (`element-lock`), unlocking (`element-unlock`), spawning new shapes/images (`element-create`), moving/scaling/rotating (`element-update` / `elements-reorder`), and deleting elements (`element-delete`).
+    *   `elementHandler.js`: Manages element manipulation events: locking (`element-lock`), unlocking (`element-unlock`), spawning new shapes/images (`element-create`), moving/scaling/rotating (`element-update` / `elements-reorder`), deleting elements (`element-delete`), and folder operations (`folder-create`, `folder-rename`, `folder-move`, `folder-delete`).
     *   `tabHandler.js`: Manages multi-tab operations: creating tabs (`tab-create`), deleting tabs (`tab-delete`), renaming (`tab-rename`), and switching active viewports (`tab-switch`).
     *   `diceHandler.js`: Handles backend RPG dice rolls. Receives dice count, type, and roll mode (Normal, Advantage, Disadvantage), calculates values, and broadcasts the resolved payload.
     *   `saveHandler.js`: Scopes save creation, listing, loading, and deletion to `socket.roomId`.
 *   `/server/__tests__/`:
-    *   `roomManager.test.js`: Suite of unit tests covering room isolation, user separation, save scoping, ID sanitization, and room listing.
+    *   `roomManager.test.js`: Suite of unit tests covering room isolation, user separation, save scoping, ID sanitization, room listing, and nested folder lifecycle/persistence.
 
 ### 3. Frontend Client (`/client`)
 *   `App.jsx`: The layout orchestrator. Manages parent React state bindings, establishes Socket.io event receivers, handles optimistic local merges, and arranges the grid panels.
 *   `constants.js`: Holds application config tokens (preset colors, default sidebar items, sample background images).
 *   `/client/src/lib/`: Custom utility libraries.
+    *   `folderTree.js`: Client-side tree utilities and re-exports of `shared/folderTree.js`.
     *   `socket.js`: Lazy socket resolver and URL setup.
     *   `url.js`: Normalizes path variables to absolute socket asset URLs.
     *   `locks.js`: Maps raw array lock logs `[eId, uId][]` to index maps `{[eId]: uId}`.

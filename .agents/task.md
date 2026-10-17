@@ -155,3 +155,15 @@
 - `[x]` 19.6 Run ESLint, client Vitest suite, server Node test suite, and Vite production build.
 - `[x]` 19.7 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
 
+## 📦 WS20 — Collaborative Image Folder Nesting
+- `[x]` 20.1 Protocol: Define `FOLDER_MOVE` and `FOLDER_MOVED` in `shared/protocol.js` with JSDoc contracts for `parentId` on folders.
+- `[x]` 20.2 Pure Tree Logic: Implement `client/src/lib/folderTree.js` and `shared/folderTree.js` with pure functions (`MAX_FOLDER_DEPTH = 5`, `getFolderDepth`, `getMaxSubtreeDepthOffset`, `isDescendantFolder`, `getAncestorFolderIds`, `getDescendantFolderIds`, `canMoveFolder`, `buildFolderTree`, `flattenFolderTree`, `resolveUniqueSiblingName`, `getSubtreeAssetIds`) and unit test suite `client/src/lib/__tests/folderTree.test.js`.
+- `[x]` 20.3 Server Registry: Update `server/registry.js` to support `parentId`, `moveFolder`, cycle/depth validation, backward-compatible save/load migration, and `deleteFolder` with non-cascading promotion of child folders & assets (using unique sibling name collision resolution `resolveUniqueSiblingName` upon promotion).
+- `[x]` 20.4 Server Handlers: Update `server/handlers/elementHandler.js` to handle `EVENTS.FOLDER_MOVE` (with broadcast of `EVENTS.FOLDER_MOVED`), and update `FOLDER_CREATE` and `FOLDER_DELETE` (broadcasting promoted/renamed folders).
+- `[x]` 20.5 Client Store: Update `client/src/state/uploadStore.js` with `handleMoveFolder`, `handleCreateFolder(name, parentId)`, sibling-scoped duplicate name validation, optimistic updates with rollback, and ancestor-aware search matching in `visibleAssets` / `hiddenAssets`.
+- `[x]` 20.6 Client Event Listeners: Update `client/src/app/hooks/useElementEvents.js` to listen to `EVENTS.FOLDER_MOVED` and handle promoted child folders/assets on `EVENTS.FOLDER_DELETED`.
+- `[x]` 20.7 LeftSidebar UI: Update `client/src/components/sidebar/LeftSidebar.jsx` with recursive folder tree rendering, inline subfolder creation (`📁+`), folder-on-folder and folder-to-root Drag-and-Drop, and indented hierarchical path labels in the mobile `<select>` "Move to folder" dropdown.
+- `[x]` 20.8 Testing: Update `client/src/state/__tests/uploadStore.test.js` and `server/__tests__/roomManager.test.js` for nested folders, promotion name deduplication, cycle detection, and max depth 5.
+- `[x]` 20.9 Verification Loop: Run ESLint, client Vitest test suite, server Node test runner, and Vite production bundle.
+- `[x]` 20.10 Documentation & Git: Update `STRUCTURE.md` for `folderTree.js`, update `walkthrough.md`, sync artifacts, commit, and push.
+

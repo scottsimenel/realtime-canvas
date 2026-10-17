@@ -3,6 +3,13 @@ import { createContext, useContext, useState, useCallback, useMemo, createElemen
 import { SOCKET_URL, getSocket } from '../lib/socket.js';
 import { newAssetId, newFolderId } from '../lib/ids.js';
 import { SAMPLE_IMAGES } from '../constants.js';
+import {
+  MAX_FOLDER_DEPTH,
+  getFolderDepth,
+  canMoveFolder,
+  resolveUniqueSiblingName,
+  getAncestorFolderIds
+} from '../lib/folderTree.js';
 
 const UploadContext = createContext(null);
 
@@ -152,25 +159,42 @@ export function UploadProvider({ children }) {
     }
   }, []);
 
-  const handleCreateFolder = useCallback((name) => {
+  const handleCreateFolder = useCallback((name, parentId = null) => {
     const trimmed = name ? name.trim() : '';
     if (!trimmed) return;
-    if (folders.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
-      setUploadError('A folder with that name already exists.');
+    const safeParentId = parentId || null;
+
+    if (safeParentId) {
+      const depth = getFolderDepth(safeParentId, folders);
+      if (depth >= MAX_FOLDER_DEPTH) {
+        setUploadError(`Maximum folder nesting limit of ${MAX_FOLDER_DEPTH} levels reached.`);
+        return;
+      }
+    }
+
+    if (folders.some((f) => (f.parentId || null) === safeParentId && f.name.toLowerCase() === trimmed.toLowerCase())) {
+      setUploadError('A folder with that name already exists in this folder.');
       return;
     }
     setUploadError('');
+
     const socket = getSocket();
     const folderId = newFolderId();
-    const newFolder = { id: folderId, name: trimmed };
+    const newFolder = { id: folderId, name: trimmed, parentId: safeParentId };
+
+    // Optimistic update
+    setFolders((prev) => [...prev.filter((f) => f.id !== folderId), newFolder]);
+
     if (socket && socket.connected) {
       socket.emit(EVENTS.FOLDER_CREATE, { folder: newFolder }, (res) => {
         if (res && res.success && res.folder) {
           setFolders((prev) => [...prev.filter((f) => f.id !== res.folder.id), res.folder]);
+        } else {
+          // Rollback on failure
+          setFolders((prev) => prev.filter((f) => f.id !== folderId));
+          if (res?.error) setUploadError(res.error);
         }
       });
-    } else {
-      setFolders((prev) => [...prev, newFolder]);
     }
   }, [folders]);
 
@@ -178,44 +202,113 @@ export function UploadProvider({ children }) {
     const trimmed = name ? name.trim() : '';
     if (!trimmed) return;
     const current = folders.find((f) => f.id === folderId);
-    if (current && current.name === trimmed) return;
-    if (folders.some((f) => f.id !== folderId && f.name.toLowerCase() === trimmed.toLowerCase())) {
-      setUploadError('A folder with that name already exists.');
+    if (!current || current.name === trimmed) return;
+
+    const safeParentId = current.parentId || null;
+    if (folders.some((f) => f.id !== folderId && (f.parentId || null) === safeParentId && f.name.toLowerCase() === trimmed.toLowerCase())) {
+      setUploadError('A folder with that name already exists in this folder.');
       return;
     }
     setUploadError('');
+
+    const previousFolders = folders;
+    // Optimistic update
+    setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f)));
+
     const socket = getSocket();
     if (socket && socket.connected) {
       socket.emit(EVENTS.FOLDER_RENAME, { folderId, name: trimmed }, (res) => {
         if (res && res.success && res.folder) {
-          setFolders((prev) => prev.map((f) => (f.id === folderId ? res.folder : f)));
+          setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, ...res.folder } : f)));
+        } else {
+          // Rollback on failure
+          setFolders(previousFolders);
+          if (res?.error) setUploadError(res.error);
         }
       });
-    } else {
-      setFolders((prev) =>
-        prev.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f))
-      );
+    }
+  }, [folders]);
+
+  const handleMoveFolder = useCallback((folderId, targetParentId = null) => {
+    const safeTargetParentId = targetParentId || null;
+    const validation = canMoveFolder(folderId, safeTargetParentId, folders);
+    if (!validation.valid) {
+      if (validation.error) setUploadError(validation.error);
+      return;
+    }
+    setUploadError('');
+
+    const previousFolders = folders;
+    // Optimistic update
+    setFolders((prev) =>
+      prev.map((f) => (f.id === folderId ? { ...f, parentId: safeTargetParentId } : f))
+    );
+
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      socket.emit(EVENTS.FOLDER_MOVE, { folderId, parentId: safeTargetParentId }, (res) => {
+        if (res && res.success && res.folder) {
+          setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, ...res.folder } : f)));
+        } else {
+          // Rollback on failure
+          setFolders(previousFolders);
+          if (res?.error) setUploadError(res.error);
+        }
+      });
     }
   }, [folders]);
 
   const handleDeleteFolder = useCallback((folderId) => {
+    const target = folders.find((f) => f.id === folderId);
+    if (!target) return;
+    const fallbackParentId = target.parentId || null;
+
+    const previousFolders = folders;
+    const previousAssets = assets;
+
+    // Optimistic non-cascading promotion of child folders and assets
+    const childFolders = folders.filter((f) => f.parentId === folderId);
+    const remainingFolders = folders.filter((f) => f.id !== folderId);
+
+    const promotedChildren = childFolders.map((child) => {
+      const uniqueName = resolveUniqueSiblingName(
+        child.name,
+        fallbackParentId,
+        remainingFolders,
+        child.id
+      );
+      return { ...child, name: uniqueName, parentId: fallbackParentId };
+    });
+
+    const nextFolders = [
+      ...remainingFolders.filter((f) => f.parentId !== folderId),
+      ...promotedChildren
+    ];
+
+    setFolders(nextFolders);
+    setAssets((prev) =>
+      prev.map((a) => (a.folderId === folderId ? { ...a, folderId: fallbackParentId } : a))
+    );
+
     const socket = getSocket();
     if (socket && socket.connected) {
       socket.emit(EVENTS.FOLDER_DELETE, { folderId }, (res) => {
         if (res && res.success) {
-          setFolders((prev) => prev.filter((f) => f.id !== folderId));
-          setAssets((prev) =>
-            prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
-          );
+          if (Array.isArray(res.promotedFolders)) {
+            setFolders((prev) => {
+              const promotedMap = new Map(res.promotedFolders.map((p) => [p.id, p]));
+              return prev.map((f) => promotedMap.get(f.id) || f);
+            });
+          }
+        } else {
+          // Rollback on failure
+          setFolders(previousFolders);
+          setAssets(previousAssets);
+          if (res?.error) setUploadError(res.error);
         }
       });
-    } else {
-      setFolders((prev) => prev.filter((f) => f.id !== folderId));
-      setAssets((prev) =>
-        prev.map((a) => (a.folderId === folderId ? { ...a, folderId: null } : a))
-      );
     }
-  }, []);
+  }, [folders, assets]);
 
   const handleMoveAsset = useCallback((assetId, folderId) => {
     const socket = getSocket();
@@ -250,7 +343,7 @@ export function UploadProvider({ children }) {
 
   const visibleAssets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const folderMap = new Map(folders.map((f) => [f.id, f.name.toLowerCase()]));
+    const folderMap = new Map(folders.map((f) => [f.id, f]));
 
     return allImageAssets.filter((a) => {
       if (hiddenAssetUrls.includes(a.url)) return false;
@@ -258,9 +351,21 @@ export function UploadProvider({ children }) {
       if (activeFilter === 'uploads' && a.isPreset) return false;
       if (query) {
         const assetNameMatch = a.name.toLowerCase().includes(query);
-        const folderName = a.folderId ? folderMap.get(a.folderId) : null;
-        const folderMatch = folderName ? folderName.includes(query) : false;
-        if (!assetNameMatch && !folderMatch) return false;
+        if (assetNameMatch) return true;
+
+        if (a.folderId) {
+          const selfFolder = folderMap.get(a.folderId);
+          if (selfFolder && selfFolder.name.toLowerCase().includes(query)) {
+            return true;
+          }
+          const ancestorIds = getAncestorFolderIds(a.folderId, folders);
+          const ancestorMatch = ancestorIds.some((ancId) => {
+            const anc = folderMap.get(ancId);
+            return anc && anc.name.toLowerCase().includes(query);
+          });
+          if (ancestorMatch) return true;
+        }
+        return false;
       }
       return true;
     });
@@ -268,7 +373,7 @@ export function UploadProvider({ children }) {
 
   const hiddenAssets = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const folderMap = new Map(folders.map((f) => [f.id, f.name.toLowerCase()]));
+    const folderMap = new Map(folders.map((f) => [f.id, f]));
 
     return allImageAssets.filter((a) => {
       if (!hiddenAssetUrls.includes(a.url)) return false;
@@ -276,9 +381,21 @@ export function UploadProvider({ children }) {
       if (activeFilter === 'uploads' && a.isPreset) return false;
       if (query) {
         const assetNameMatch = a.name.toLowerCase().includes(query);
-        const folderName = a.folderId ? folderMap.get(a.folderId) : null;
-        const folderMatch = folderName ? folderName.includes(query) : false;
-        if (!assetNameMatch && !folderMatch) return false;
+        if (assetNameMatch) return true;
+
+        if (a.folderId) {
+          const selfFolder = folderMap.get(a.folderId);
+          if (selfFolder && selfFolder.name.toLowerCase().includes(query)) {
+            return true;
+          }
+          const ancestorIds = getAncestorFolderIds(a.folderId, folders);
+          const ancestorMatch = ancestorIds.some((ancId) => {
+            const anc = folderMap.get(ancId);
+            return anc && anc.name.toLowerCase().includes(query);
+          });
+          if (ancestorMatch) return true;
+        }
+        return false;
       }
       return true;
     });
@@ -314,6 +431,7 @@ export function UploadProvider({ children }) {
     setFolders,
     handleCreateFolder,
     handleRenameFolder,
+    handleMoveFolder,
     handleDeleteFolder,
     handleMoveAsset,
     currentRoomId,
@@ -338,6 +456,7 @@ export function UploadProvider({ children }) {
     folders,
     handleCreateFolder,
     handleRenameFolder,
+    handleMoveFolder,
     handleDeleteFolder,
     handleMoveAsset,
     currentRoomId
