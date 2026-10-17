@@ -380,3 +380,170 @@ dist/assets/index-3qOOIw3W.js   980.06 kB │ gzip: 262.66 kB
 ✓ built in 2.18s
 ```
 
+---
+
+## 🎨 WS14 — Theme Tokens, Responsive Viewport, Dock & Sidebars
+
+### 1. Theme Palette Tokens & Viewport Fixes
+- Added all missing Tailwind v4 palette stops (`slate-850`, `slate-750`, `slate-650`, `slate-550`, `slate-455`, `slate-450`, `slate-405`, `slate-355`, `slate-350`, `slate-205`, `slate-905`, `indigo-650`, `indigo-205`, `rose-455`, `rose-350`, `sky-350`) in [client/src/index.css](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/index.css) `@theme` block.
+- Standardized `#root` and `AppContent` viewport height to `100dvh` (`100vh` fallback) with `viewport-fit=cover` and `<title>Antigravity Canvas</title>` in [client/index.html](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/index.html).
+- Set responsive padding (`p-1.5 sm:p-5`) in [AppContent.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/AppContent.jsx).
+
+### 2. Canvas Dock & Zoom Control
+- Made [CanvasDock.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasDock.jsx) horizontally scrollable on mobile screens (`max-w-[calc(100vw-1rem)] overflow-x-auto no-scrollbar`) with tightened mobile button padding (`px-2 py-1.5 sm:px-3 sm:py-2`).
+- Elevated the Canvas zoom control pill to `bottom-20 sm:bottom-4` in [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx) to eliminate overlap with the bottom navigation dock on touch devices.
+
+### 3. Responsive Sidebars & Mobile Mutual Exclusion
+- Converted [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx) and [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx) to responsive margins/widths: `left-3 right-3 sm:left-6 sm:right-auto sm:w-80` and `left-3 right-3 sm:left-auto sm:right-6 sm:w-80`.
+- Implemented mutual exclusion under `<1024px`: opening one panel smoothly closes the other.
+- In [uiStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uiStore.js), tapping the canvas on mobile closes all open sidebars cleanly.
+- Fixed `Lobby.jsx` mobile horizontal glow orb scrolling via `overflow-x-hidden` on the outer container.
+
+---
+
+## 🧭 WS15 — Header, Tabs, Asset Folder Mobile Fallback & Popovers
+
+### 1. Header & User Profile
+- In [Header.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/header/Header.jsx), hid text labels for Undo, Redo, and Saves on mobile viewports (`hidden md:inline`).
+- Replaced invisible hover-only profile rename triggers with a persistent tap-to-edit name trigger and enlarged color picker touch target on mobile viewports.
+- Enhanced the "Online Users" popover with a bridge wrapper to prevent mouseleave hover flickering on desktop, alongside click/tap toggle and outside-click dismissal for touch screens.
+
+### 2. Tabs Usability & Validation
+- In [TabButton.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/TabButton.jsx), exposed rename (`✏️`) and delete (`✕`) controls visibly on active tabs on touch screens, avoiding invisible `opacity-0` click traps.
+- In [useTabs.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useTabs.js), added delete confirmation dialogs and duplicate tab name prevention.
+
+### 3. Mobile Asset Folder Assignment & Viewport Spawning
+- In [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx), added a touch-friendly "Move to Folder" dropdown on uploaded asset cards so mobile users (without HTML5 Drag & Drop) can categorize assets into folders.
+- In [useElementActions.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementActions.js), updated shape and image spawning to center elements within the user's current viewport coordinates (`activeVirtualDimensions.width / 2`, `activeVirtualDimensions.height / 2`).
+
+### 4. Dice Notifications, Effects & Modals
+- Fixed [ActiveRollsIndicator.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/dice/ActiveRollsIndicator.jsx) fixed right positioning bug and cleared orphaned state.
+- In [DiceEffects.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/dice/DiceEffects.jsx), processed all batched rolls in the queue to guarantee 3D physics rendering for every roll.
+- Enhanced [SavesModal.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/saves/SavesModal.jsx) with keyboard `Escape` closing, backdrop click dismissal, and automatic modal closure upon save load.
+
+---
+
+## 🖐️ WS16 — Core Canvas Touch Gestures, Lock Race, Ruler, Cursors & Pen/Eraser Fixes
+
+### 1. Pure Focal Zoom Vector Math
+- Implemented and unit-tested `calculateFocalZoomPan` and `scalePanOffsetForZoom` pure functions in [CanvasSelection.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasSelection.js).
+- Wired `calculateFocalZoomPan` into multi-touch pinch gestures and mouse wheel zoom, guaranteeing zero focal drift relative to finger midpoints.
+- Wired `scalePanOffsetForZoom` into the `+` and `−` Zoom buttons to keep viewport center stationary during button zoom.
+
+### 2. Multi-Touch Discrimination & Fast-Flick Lock Race Protection
+- In touch mode, deferred single-finger Eraser deletes and Ruler anchor points until move/release, cancelling pending ruler anchors if a 2-finger pinch initiates.
+- Fixed async `ELEMENT_LOCK` fast-flick race condition in [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx): if the pointer is released before `ELEMENT_LOCK` callback resolves, the callback immediately emits `ELEMENT_UPDATE` (final coordinates) and `ELEMENT_UNLOCK` so locks are never orphaned on the server.
+- Handled `handleMouseUp` final update broadcast before `ELEMENT_UNLOCK`.
+
+### 3. Ruler, Handles, Tooltips & Drawing Enhancements
+- Updated Ruler tool to support both click-and-drag (desktop & touch) and traditional click-move-click.
+- Enlarged resize and rotation handle hit tolerance radius (`16 / scale`) in `CanvasSelection.js` and visuals (`8.5 / scale`) in `CanvasRenderer.js`.
+- Counter-rotated the `'i'` tooltip badge glyph in [CanvasRenderer.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasRenderer.js) (`if (rad) ctx.rotate(-rad)`).
+- Bound tooltip display to touch single-selection with screen-edge clamping `[136, canvasSize.width - 136]`.
+- Respected `el.properties?.locked` in Eraser tool and added confirmation dialog to "Clear All Drawings".
+- Expanded single-tap Pen dots into 2-point micro-lines and added contextual canvas cursors with window blur reset.
+
+---
+
+## 🎛️ WS17 — Inspector, Layer Manager, RightSidebar Delete & Undo/Redo Fixes
+
+### 1. RightSidebar Layer Management & Multi-Selection
+- Passed `activeTabId` into [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx), ensuring layer deletes target the current active tab and record `_layerIndex` in undo history.
+- Removed redundant `max-h-[calc(100vh-320px)] overflow-y-auto` from the layers list to eliminate nested dual scrollbars.
+- Supported `Shift+Click`, `Ctrl+Click`, and `Cmd+Click` (`e.metaKey`) for layer multi-selection.
+
+### 2. Multi-Select Layer Ordering Boundary Fix
+- In [useElementActions.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useElementActions.js) `adjustSelectedElementsLayer`:
+  - Fixed boundary swapping bug where adjacent selected items swapped places at the top or bottom of the stack.
+  - Guarded `forward` and `backward` so selected items only swap with non-selected adjacent items.
+  - Added `isUnchanged` checks in both `adjustElementLayer` and `adjustSelectedElementsLayer` to suppress no-op socket emissions and history pushes.
+
+### 3. Inspector Clamping, Lock Cleanup & Tooltip Numeric Healing
+- In [InspectorWidget.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/InspectorWidget.jsx), clamped live Width and Height values `[10, 2000]` before emitting `ELEMENT_UPDATE`.
+- Wired lock acquisition and release onto Fill Opacity, Outline Width, and Outline Opacity sliders.
+- In [useSelectionActions.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/hooks/useSelectionActions.js), added unmount and window `pointerup` cleanup listeners so slider locks are never orphaned.
+- In [TooltipInspector.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/TooltipInspector.jsx), converted tracker values to numbers in `handleQuickAdjust` to eliminate string concatenation bugs on Heal (`+`), and bound `Enter` key to commit character titles.
+
+### 4. Full Property & Layer Undo/Redo Tracking
+- In [historyStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/historyStore.js), enhanced `transform` undo/redo to capture and restore `type` and nested `properties`.
+- Restored deleted and erased elements at their original layer positions (`_layerIndex`) using array splicing and emitted `ELEMENTS_REORDER` to synchronize server insertion order.
+- In [server/registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js), added `if (updates.type !== undefined) element.type = updates.type;` to allow server-persisted shape morphing.
+
+---
+
+## 🧪 WS18 — Automated Verification Suite & Test Logs
+
+### 1. Client Unit Tests (`vitest run`)
+All 59 client unit tests across 11 test suites passed:
+```bash
+> client@0.0.0 test
+> vitest run
+
+ RUN  v4.1.9 C:/Users/Scott Simenel/.gemini/antigravity/scratch/realtime-canvas/client
+
+ ✓ src/lib/__tests/smoke.test.js (1 test)
+ ✓ src/components/dice/__tests__/DiceMath.test.js (7 tests)
+ ✓ src/lib/__tests/locks.test.js (2 tests)
+ ✓ src/lib/__tests/mergeElement.test.js (4 tests)
+ ✓ src/components/canvas/__tests__/CanvasSelection.test.js (13 tests)
+ ✓ src/lib/__tests/ids.test.js (5 tests)
+ ✓ src/state/__tests/stores.test.js (5 tests)
+ ✓ src/state/__tests/historyStore.test.js (13 tests)
+ ✓ src/state/__tests/uploadStore.test.js (4 tests)
+ ✓ src/components/sidebar/__tests__/InspectorWidget.test.jsx (2 tests)
+ ✓ src/lib/__tests/url.test.js (3 tests)
+
+ Test Files  11 passed (11)
+      Tests  59 passed (59)
+   Duration  435ms
+```
+
+### 2. Server Unit Tests (`node --test`)
+Node.js test runner passed 100% of room manager and isolation tests:
+```bash
+> realtime-canvas-server@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: RoomManager & Multi-Room Isolation Tests
+    ok 1 - sanitizeRoomId removes invalid characters and limits length
+    ok 2 - getOrCreateRoom creates and caches registry instances
+    ok 3 - isolates user sessions and elements between rooms
+    ok 4 - isolates saves on disk per room
+    ok 5 - listRooms accurately aggregates active rooms and disk saves
+    ok 6 - removeUser disconnects user and releases locks for specified room
+    ok 7 - autosaveAllRooms saves active rooms
+1..1
+# tests 7
+# suites 1
+# pass 7
+# fail 0
+```
+
+### 3. ESLint Verification (`eslint .`)
+ESLint verified cleanly with 0 errors and 0 warnings:
+```bash
+> client@0.0.0 lint
+> eslint .
+
+(Completed with exit code 0)
+```
+
+### 4. Production Build (`vite build`)
+Vite compiled the client bundle in 2.07s:
+```bash
+> client@0.0.0 build
+> vite build
+
+vite v6.4.2 building for production...
+✓ 109 modules transformed.
+dist/index.html                   0.49 kB │ gzip:   0.31 kB
+dist/assets/index-D2s4YKXh.css   81.76 kB │ gzip:  12.52 kB
+dist/assets/index-B4kn3zSA.js   990.33 kB │ gzip: 265.76 kB
+✓ built in 2.07s
+```
+
+### 5. Server Syntax Check (`node --check server/server.js`)
+Node syntax check passed with exit code 0.
+
+

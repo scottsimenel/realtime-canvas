@@ -189,6 +189,37 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     expect(mockSocket.emit).toHaveBeenCalled();
   });
 
+  test('UiProvider handleCanvasInteraction closes sidebars on mobile (<1024px)', () => {
+    const originalWindow = globalThis.window;
+    globalThis.window = { innerWidth: 400 };
+
+    try {
+      UiProvider({ children: null });
+      let value = reactMockValueCapture.captured;
+
+      value.setShowLeftSidebar(true);
+      value.setShowRightSidebar(true);
+      stateIndex = 0;
+      UiProvider({ children: null });
+      value = reactMockValueCapture.captured;
+
+      expect(value.showLeftSidebar).toBe(true);
+      expect(value.showRightSidebar).toBe(true);
+
+      // Mobile canvas interaction
+      value.handleCanvasInteraction();
+      stateIndex = 0;
+      UiProvider({ children: null });
+      value = reactMockValueCapture.captured;
+
+      // Both sidebars should now be closed on mobile canvas tap
+      expect(value.showLeftSidebar).toBe(false);
+      expect(value.showRightSidebar).toBe(false);
+    } finally {
+      globalThis.window = originalWindow;
+    }
+  });
+
   test('useUiStore throws error when used outside provider', () => {
     reactMockValueCapture.captured = null;
     expect(() => useUiStore()).toThrowError('useUiStore must be used within a UiProvider');

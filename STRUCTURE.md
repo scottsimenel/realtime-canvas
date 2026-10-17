@@ -92,7 +92,7 @@ graph TD
 *   `/client/src/components/canvas/`:
     *   `Canvas.jsx`: Core viewport wrapper. Tracks mouse/pointer event listeners, keydown presses, viewport scales, pan offsets, and pinch-to-zoom multi-touch gestures.
     *   `CanvasRenderer.js`: Pure functions containing HTML5 2D Canvas context rendering steps (`drawGrid`, `drawShapes`, `drawSelectionFrame`, `drawCursorTags`).
-    *   `CanvasSelection.js`: Pure hit-detection and vector math functions (rotated coordinate translations, corner scale handle detection).
+    *   `CanvasSelection.js`: Pure hit-detection and vector math functions (rotated coordinate translations, corner scale handle detection, focal-point-preserving pinch-to-zoom calculation `calculateFocalZoomPan`, and viewport zoom pan scaling `scalePanOffsetForZoom`).
 *   `/client/src/components/dice/`:
     *   `DiceEffects.jsx`: WebGL Three.js overlay initializer. Manages perspective projection setups, mesh lists, and runs the animation loop using high-precision frame rate decoupled delta time (`dt`).
     *   `DiceMath.js`: Pure quaternion mathematics modules (multiplication, normalization, interpolation `qLerp`, rotation calculations).

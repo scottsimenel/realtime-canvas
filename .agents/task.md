@@ -141,7 +141,7 @@
 - `[x]` 17.5 Run verification loop (lint, tests, build), commit, and push WS17.
 
 ## 📦 WS18 — Automated Tests, Verification & Documentation Sync
-- `[ ]` 18.1 Add unit tests in `CanvasSelection.test.js`, `historyStore.test.js`, and `stores.test.js` covering focal-point zoom math, property/type undo-redo, and mobile sidebar state transitions.
-- `[ ]` 18.2 Run ESLint, Vitest coverage suite, server tests, and Vite production build.
-- `[ ]` 18.3 Update `STRUCTURE.md` if any helpers were added, and document full achievements in `walkthrough.md`.
-- `[ ]` 18.4 Final git commit and push.
+- `[x]` 18.1 Add unit tests in `CanvasSelection.test.js`, `historyStore.test.js`, and `stores.test.js` covering focal-point zoom math, property/type undo-redo, and mobile sidebar state transitions.
+- `[x]` 18.2 Run ESLint, Vitest coverage suite, server tests, and Vite production build.
+- `[x]` 18.3 Update `STRUCTURE.md` if any helpers were added, and document full achievements in `walkthrough.md`.
+- `[x]` 18.4 Final git commit and push.
