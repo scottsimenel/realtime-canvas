@@ -354,6 +354,9 @@ export const drawElements = (ctx, elements, locks, users, currentUser, getOrLoad
     if (element.properties?.tooltip?.enabled) {
       ctx.save();
       ctx.translate(w / 2 - 10 / scale, -h / 2 + 10 / scale);
+      if (rad) {
+        ctx.rotate(-rad);
+      }
       
       ctx.beginPath();
       ctx.arc(0, 0, 7 / scale, 0, 2 * Math.PI);
@@ -448,11 +451,11 @@ export const drawSelectionOutlines = (ctx, selectedElementIds, elements, getGrou
       ctx.strokeStyle = outlineColor;
       ctx.lineWidth = 1.5 / scale;
       ctx.beginPath();
-      ctx.arc(0, -h / 2 - 24 / scale, 5 / scale, 0, 2 * Math.PI);
+      ctx.arc(0, -h / 2 - 24 / scale, 6 / scale, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
-      const handleSize = 7 / scale;
+      const handleSize = 8.5 / scale;
       const offset = 4 / scale;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = outlineColor;
@@ -495,11 +498,11 @@ export const drawSelectionOutlines = (ctx, selectedElementIds, elements, getGrou
       ctx.strokeStyle = '#0ea5e9';
       ctx.lineWidth = 1.5 / scale;
       ctx.beginPath();
-      ctx.arc(bbox.cx, bbox.y - 24 / scale, 5 / scale, 0, 2 * Math.PI);
+      ctx.arc(bbox.cx, bbox.y - 24 / scale, 6 / scale, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
 
-      const handleSize = 7 / scale;
+      const handleSize = 8.5 / scale;
       const offset = 4 / scale;
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#0ea5e9';

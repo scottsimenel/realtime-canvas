@@ -223,25 +223,23 @@ export function useSelectionActions(currentUser) {
   }, [selectedElementIds, elements, locks, currentUser, pushHistoryAction, setSelectedElementIds, setTabs, activeTabId]);
 
   const handleClearDrawings = useCallback(() => {
-    const drawingElementIds = elements
-      .filter((el) => el.type === 'path')
-      .map((el) => el.id);
-
-    if (drawingElementIds.length === 0) return;
-
-    const socket = getSocket();
-    if (socket && socket.connected) {
-      const unlockableDrawingIds = drawingElementIds.filter((id) => {
-        const lockHolderId = locks[id];
+    const unlockableDrawingElements = elements
+      .filter((el) => el.type === 'path' && !el.properties?.locked)
+      .filter((el) => {
+        const lockHolderId = locks[el.id];
         return !lockHolderId || lockHolderId === currentUser?.id;
       });
 
-      if (unlockableDrawingIds.length === 0) return;
+    if (unlockableDrawingElements.length === 0) return;
 
-      const elementsToDelete = unlockableDrawingIds
-        .map((id) => elements.find((item) => item.id === id))
-        .filter(Boolean)
-        .map((el) => JSON.parse(JSON.stringify(el)));
+    if (!window.confirm('Are you sure you want to clear all unlocked drawings on this canvas?')) {
+      return;
+    }
+
+    const socket = getSocket();
+    if (socket && socket.connected) {
+      const unlockableDrawingIds = unlockableDrawingElements.map((el) => el.id);
+      const elementsToDelete = unlockableDrawingElements.map((el) => JSON.parse(JSON.stringify(el)));
 
       socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockableDrawingIds, tabId: activeTabId }, (res) => {
         if (res && res.success) {

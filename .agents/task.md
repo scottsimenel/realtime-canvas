@@ -125,13 +125,13 @@
 - `[x]` 15.6 Run verification loop (lint, tests, build), commit, and push WS15.
 
 ## 📦 WS16 — Core Canvas Touch Gestures, Lock Race, Ruler, Cursors & Pen/Eraser Fixes
-- `[ ]` 16.1 Extract focal-point-preserving pinch-to-zoom math and zoom-button pan scaling into `CanvasSelection.js` (with unit tests) and wire into `Canvas.jsx`.
-- `[ ]` 16.2 Prevent Finger-1 `pointerdown` from triggering immediate Eraser deletions before a 2-finger pinch is recognized.
-- `[ ]` 16.3 Fix the async `ELEMENT_LOCK` fast-flick race condition in `Canvas.jsx` so locks are never orphaned and final coordinates are always emitted.
-- `[ ]` 16.4 Update Ruler (`measure`) tool to support both click-and-drag (touch & desktop) and click-move-click.
-- `[ ]` 16.5 Enlarge resize/rotate handle hit targets in `CanvasSelection.js`, show element tooltips on touch selection, clamp horizontal tooltip coordinates, and counter-rotate `'i'` badge in `CanvasRenderer.js`.
-- `[ ]` 16.6 Respect `el.properties?.locked` in Eraser tool and "Clear All Drawings" (plus confirmation), support single-tap Pen dots, add contextual canvas cursors, and reset Spacebar pan on window `blur`.
-- `[ ]` 16.7 Run verification loop (lint, tests, build), commit, and push WS16.
+- `[x]` 16.1 Extract focal-point-preserving pinch-to-zoom math and zoom-button pan scaling into `CanvasSelection.js` (with unit tests) and wire into `Canvas.jsx`.
+- `[x]` 16.2 Prevent Finger-1 `pointerdown` from triggering immediate Eraser deletions before a 2-finger pinch is recognized.
+- `[x]` 16.3 Fix the async `ELEMENT_LOCK` fast-flick race condition in `Canvas.jsx` so locks are never orphaned and final coordinates are always emitted.
+- `[x]` 16.4 Update Ruler (`measure`) tool to support both click-and-drag (touch & desktop) and click-move-click.
+- `[x]` 16.5 Enlarge resize/rotate handle hit targets in `CanvasSelection.js`, show element tooltips on touch selection, clamp horizontal tooltip coordinates, and counter-rotate `'i'` badge in `CanvasRenderer.js`.
+- `[x]` 16.6 Respect `el.properties?.locked` in Eraser tool and "Clear All Drawings" (plus confirmation), support single-tap Pen dots, add contextual canvas cursors, and reset Spacebar pan on window `blur`.
+- `[x]` 16.7 Run verification loop (lint, tests, build), commit, and push WS16.
 
 ## 📦 WS17 — Inspector, Layer Manager, RightSidebar Delete & Undo/Redo Fixes
 - `[ ]` 17.1 Fix `RightSidebar.jsx` layer delete to pass `tabId: activeTabId` and `elementIds: [el.id]`, remove nested scrollbar, and support `Ctrl/Cmd+Click` multi-selection.

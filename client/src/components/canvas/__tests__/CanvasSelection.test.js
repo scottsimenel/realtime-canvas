@@ -8,7 +8,9 @@ import {
   getHoveredElement,
   getGroupBoundingBox,
   getGroupHandleAtCoords,
-  checkElementIntersectsBox
+  checkElementIntersectsBox,
+  calculateFocalZoomPan,
+  scalePanOffsetForZoom,
 } from '../CanvasSelection.js';
 
 describe('CanvasSelection math', () => {
@@ -195,5 +197,59 @@ describe('CanvasSelection math', () => {
     expect(checkElementIntersectsBox(el, 50, 200, 50, 200)).toBe(true);
     // Completely outside
     expect(checkElementIntersectsBox(el, 0, 10, 0, 10)).toBe(false);
+  });
+
+  test('calculateFocalZoomPan preserves screen position of focal point under zoom', () => {
+    const canvasSize = { width: 800, height: 600 };
+    const currentPan = { x: 50, y: -30 };
+    const currentZoom = 1.0;
+    const nextZoom = 2.0;
+
+    // Zooming around screen center (400, 300) should scale the existing pan
+    const centerZoomPan = calculateFocalZoomPan(
+      currentPan,
+      currentZoom,
+      nextZoom,
+      { x: 400, y: 300 },
+      { x: 400, y: 300 },
+      canvasSize
+    );
+    expect(centerZoomPan.x).toBeCloseTo(currentPan.x * 2, 5);
+    expect(centerZoomPan.y).toBeCloseTo(currentPan.y * 2, 5);
+
+    // Zooming with focal point at top-left corner (0, 0)
+    // At zoom 1.0: virtual offset from center under (0, 0) is (0 - 400 - 50) = -450
+    // At zoom 2.0: focal point remains at (0, 0), so (0 - 400) - 2 * (-450) = -400 + 900 = 500
+    const cornerZoomPan = calculateFocalZoomPan(
+      currentPan,
+      currentZoom,
+      nextZoom,
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      canvasSize
+    );
+    expect(cornerZoomPan.x).toBeCloseTo(500, 5);
+
+    // Pinch with midpoint displacement (dx = 20, dy = 10)
+    const movingPinchPan = calculateFocalZoomPan(
+      { x: 0, y: 0 },
+      1.0,
+      1.5,
+      { x: 200, y: 200 },
+      { x: 220, y: 210 },
+      canvasSize
+    );
+    // x: (220 - 400) - 1.5 * (200 - 400 - 0) = -180 - 1.5 * (-200) = -180 + 300 = 120
+    // y: (210 - 300) - 1.5 * (200 - 300 - 0) = -90 - 1.5 * (-100) = -90 + 150 = 60
+    expect(movingPinchPan.x).toBeCloseTo(120, 5);
+    expect(movingPinchPan.y).toBeCloseTo(60, 5);
+  });
+
+  test('scalePanOffsetForZoom scales pan proportionally and handles edge cases', () => {
+    expect(scalePanOffsetForZoom({ x: 100, y: -50 }, 1.0, 1.2)).toEqual({ x: 120, y: -60 });
+    expect(scalePanOffsetForZoom({ x: 100, y: -50 }, 2.0, 1.0)).toEqual({ x: 50, y: -25 });
+    // Invalid zoom returns current pan safely
+    expect(scalePanOffsetForZoom({ x: 10, y: 20 }, 0, 1.5)).toEqual({ x: 10, y: 20 });
+    expect(scalePanOffsetForZoom({ x: 10, y: 20 }, 1.0, 0)).toEqual({ x: 10, y: 20 });
   });
 });

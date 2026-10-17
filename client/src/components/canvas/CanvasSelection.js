@@ -23,7 +23,7 @@ export const getHandleAtCoords = (x, y, element, scale) => {
   const local = getLocalCoords(x, y, element);
   const w = element.width;
   const h = element.height;
-  const r = 10 / scale; // hit tolerance radius in virtual space
+  const r = 16 / scale; // hit tolerance radius in virtual space (enlarged for touch & precision)
   const offset = 4 / scale;
   const rotOffset = 24 / scale;
 
@@ -395,7 +395,7 @@ export const getGroupBoundingBox = (selectedIds, elements) => {
 
 export const getGroupHandleAtCoords = (mx, my, bbox, scale) => {
   if (!bbox) return null;
-  const r = 10 / scale;
+  const r = 16 / scale; // hit tolerance radius in virtual space (enlarged for touch & precision)
   const offset = 4 / scale;
   const rotOffset = 24 / scale;
 
@@ -463,3 +463,61 @@ export const checkElementIntersectsBox = (el, sMinX, sMaxX, sMinY, sMaxY) => {
 
   return false;
 };
+
+/**
+ * Calculates new pan offset keeping a focal point anchored on screen during pinch or wheel zoom.
+ *
+ * @param {Object} currentPan - Current pan offset { x, y }
+ * @param {number} currentZoom - Current zoom factor (e.g. 1.0)
+ * @param {number} nextZoom - Target zoom factor (clamped)
+ * @param {Object|null} oldFocalPoint - Screen focal point before zoom { x, y }
+ * @param {Object|null} newFocalPoint - Screen focal point after zoom/movement { x, y }
+ * @param {Object} canvasSize - Current viewport size { width, height }
+ * @returns {{ x: number, y: number }} New pan offset { x, y }
+ */
+export const calculateFocalZoomPan = (
+  currentPan,
+  currentZoom,
+  nextZoom,
+  oldFocalPoint,
+  newFocalPoint,
+  canvasSize
+) => {
+  if (!currentZoom || currentZoom <= 0 || !nextZoom || nextZoom <= 0) {
+    return currentPan || { x: 0, y: 0 };
+  }
+  const pan = currentPan || { x: 0, y: 0 };
+  const ratio = nextZoom / currentZoom;
+  const cx = (canvasSize?.width || 0) / 2;
+  const cy = (canvasSize?.height || 0) / 2;
+  const oldX = oldFocalPoint?.x ?? cx;
+  const oldY = oldFocalPoint?.y ?? cy;
+  const newX = newFocalPoint?.x ?? oldX;
+  const newY = newFocalPoint?.y ?? oldY;
+
+  return {
+    x: (newX - cx) - ratio * (oldX - cx - pan.x),
+    y: (newY - cy) - ratio * (oldY - cy - pan.y),
+  };
+};
+
+/**
+ * Scales pan offset proportionally when zooming around viewport center (e.g. Zoom +/- buttons).
+ *
+ * @param {Object} currentPan - Current pan offset { x, y }
+ * @param {number} currentZoom - Current zoom factor
+ * @param {number} nextZoom - Target zoom factor
+ * @returns {{ x: number, y: number }} Scaled pan offset
+ */
+export const scalePanOffsetForZoom = (currentPan, currentZoom, nextZoom) => {
+  if (!currentZoom || currentZoom <= 0 || !nextZoom || nextZoom <= 0) {
+    return currentPan || { x: 0, y: 0 };
+  }
+  const pan = currentPan || { x: 0, y: 0 };
+  const ratio = nextZoom / currentZoom;
+  return {
+    x: pan.x * ratio,
+    y: pan.y * ratio,
+  };
+};
+

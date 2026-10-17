@@ -8,7 +8,9 @@ import {
   getHoveredElement,
   getGroupBoundingBox,
   getGroupHandleAtCoords,
-  checkElementIntersectsBox
+  checkElementIntersectsBox,
+  calculateFocalZoomPan,
+  scalePanOffsetForZoom
 } from './CanvasSelection.js';
 import {
   drawBackground,
@@ -79,6 +81,21 @@ const hasElementsChanged = (before, after) => {
     }
   }
   return false;
+};
+
+const getCanvasCursorClass = (activeTool, isSpacePressed, activeDragMode, hoverCursor) => {
+  if (activeTool === 'eraser') return 'cursor-none';
+  if (activeTool === 'pen' || activeTool === 'measure') return 'cursor-crosshair';
+  if (activeDragMode) {
+    if (activeDragMode === 'pan' || activeDragMode === 'touch-gesture') return 'cursor-grabbing';
+    if (activeDragMode === 'move' || activeDragMode === 'group-move') return 'cursor-move';
+    if (activeDragMode === 'rotate' || activeDragMode === 'group-rotate') return 'cursor-grabbing';
+    if (activeDragMode.includes('resize')) return 'cursor-crosshair';
+    if (activeDragMode === 'select') return 'cursor-crosshair';
+  }
+  if (activeTool === 'pan' || isSpacePressed) return 'cursor-grab';
+  if (hoverCursor) return hoverCursor;
+  return 'cursor-default';
 };
 
 export default function Canvas({
@@ -161,6 +178,21 @@ export default function Canvas({
   }, [locateElementTrigger, elements, canvasSize, virtualDimensions, userZoom, setLocateElementTrigger]);
   const touchStartRef = useRef(null); // { distance, midpoint, userZoom, panOffset }
   const isSpacePressedRef = useRef(false);
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [hoverCursor, setHoverCursor] = useState(null);
+  const [activeDragMode, setActiveDragMode] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const setDragState = useCallback((state) => {
+    dragStateRef.current = state;
+    setActiveDragMode(state ? state.mode : null);
+    setIsDragging(Boolean(state));
+  }, []);
+
+  const elementsRef = useRef(elements);
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
 
   // Load background image to set virtual dimensions state
   useEffect(() => {
@@ -434,18 +466,26 @@ export default function Canvas({
         }
         e.preventDefault();
         isSpacePressedRef.current = true;
+        setIsSpacePressed(true);
       }
     };
     const handleKeyUp = (e) => {
       if (e.code === 'Space') {
         isSpacePressedRef.current = false;
+        setIsSpacePressed(false);
       }
+    };
+    const handleBlur = () => {
+      isSpacePressedRef.current = false;
+      setIsSpacePressed(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
   }, []);
 
@@ -487,6 +527,9 @@ export default function Canvas({
       if (dragStateRef.current && dragStateRef.current.mode === 'draw') {
         tempDrawingPathRef.current = null;
       }
+      if (dragStateRef.current && dragStateRef.current.mode === 'measure') {
+        setMeasurePoints(null);
+      }
       if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds.length > 0) {
         socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: dragStateRef.current.lockedIds, tabId });
         setLocks((prev) => {
@@ -513,19 +556,19 @@ export default function Canvas({
         userZoom,
         panOffset: { ...panOffset }
       };
-      dragStateRef.current = { mode: 'touch-gesture' };
+      setDragState({ mode: 'touch-gesture' });
       triggerRedraw();
       return;
     }
 
     if (activePointerIds.length === 1) {
       if (activeTool === 'pan' || isSpacePressedRef.current || e.button === 1 || e.button === 4) {
-        dragStateRef.current = {
+        setDragState({
           mode: 'pan',
           startX: e.clientX,
           startY: e.clientY,
           startPanOffset: { ...panOffset }
-        };
+        });
         return;
       }
 
@@ -552,14 +595,17 @@ export default function Canvas({
           const zoomFactor = newDistance / start.distance;
           const nextZoom = Math.min(8.0, Math.max(0.5, start.userZoom * zoomFactor));
 
-          const dx = newMidpoint.x - start.midpoint.x;
-          const dy = newMidpoint.y - start.midpoint.y;
+          const newPan = calculateFocalZoomPan(
+            start.panOffset,
+            start.userZoom,
+            nextZoom,
+            start.midpoint,
+            newMidpoint,
+            canvasSize
+          );
 
           setUserZoom(nextZoom);
-          setPanOffset({
-            x: start.panOffset.x + dx,
-            y: start.panOffset.y + dy
-          });
+          setPanOffset(newPan);
           triggerRedraw();
         }
         return;
@@ -576,6 +622,28 @@ export default function Canvas({
         return;
       }
 
+      if (drag.mode === 'measure') {
+        const coords = getCanvasCoords(e);
+        const dx = coords.x - drag.startX;
+        const dy = coords.y - drag.startY;
+        if (Math.hypot(dx, dy) > 5) {
+          drag.hasMoved = true;
+        }
+        const globalGridSnapping = roomSettings?.gridSnapping === true;
+        const showGrid = roomSettings?.showGrid === true;
+        const snappedCoords = (globalGridSnapping && showGrid)
+          ? getSnappedCenter(coords.x, coords.y, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40)
+          : coords;
+
+        setMeasurePoints((prev) => {
+          if (!prev) return prev;
+          if (prev.current.x === snappedCoords.x && prev.current.y === snappedCoords.y) return prev;
+          return { ...prev, current: snappedCoords };
+        });
+        triggerRedraw();
+        return;
+      }
+
       handleMouseMove(e);
     } else {
       const coords = getCanvasCoords(e);
@@ -586,7 +654,46 @@ export default function Canvas({
         triggerRedraw();
       }
 
-      if (activeTool === 'select' || activeTool === 'pan') {
+      let nextCursor = null;
+      const { scale } = getViewportTransform();
+
+      if (activeTool === 'select') {
+        if (selectedElementIds.length === 1) {
+          const activeElement = elements.find((el) => el.id === selectedElementIds[0]);
+          if (activeElement && !activeElement.properties?.locked) {
+            const handle = getHandleAtCoords(coords.x, coords.y, activeElement, scale);
+            if (handle === 'nw' || handle === 'se') nextCursor = 'cursor-nwse-resize';
+            else if (handle === 'ne' || handle === 'sw') nextCursor = 'cursor-nesw-resize';
+            else if (handle === 'rotate') nextCursor = 'cursor-grab';
+          }
+        } else if (selectedElementIds.length > 1) {
+          const bbox = getGroupBoundingBox(selectedElementIds, elements);
+          if (bbox) {
+            const handle = getGroupHandleAtCoords(coords.x, coords.y, bbox, scale);
+            if (handle === 'nw' || handle === 'se') nextCursor = 'cursor-nwse-resize';
+            else if (handle === 'ne' || handle === 'sw') nextCursor = 'cursor-nesw-resize';
+            else if (handle === 'rotate') nextCursor = 'cursor-grab';
+          }
+        }
+
+        const hovered = getHoveredElement(coords.x, coords.y, elements);
+        if (hovered) {
+          if (hovered.properties?.tooltip?.enabled) {
+            setHoveredElementId(hovered.id);
+          } else {
+            setHoveredElementId(null);
+          }
+          if (!nextCursor) {
+            if (selectedElementIds.includes(hovered.id) && !hovered.properties?.locked) {
+              nextCursor = 'cursor-move';
+            } else {
+              nextCursor = 'cursor-pointer';
+            }
+          }
+        } else {
+          setHoveredElementId(null);
+        }
+      } else if (activeTool === 'pan') {
         const hovered = getHoveredElement(coords.x, coords.y, elements);
         if (hovered && hovered.properties?.tooltip?.enabled) {
           setHoveredElementId(hovered.id);
@@ -594,6 +701,8 @@ export default function Canvas({
           setHoveredElementId(null);
         }
       }
+
+      setHoverCursor((prev) => (prev !== nextCursor ? nextCursor : prev));
 
       if (activeTool === 'measure' && measurePoints && !measurePoints.isEstablished) {
         const globalGridSnapping = roomSettings?.gridSnapping === true;
@@ -625,7 +734,7 @@ export default function Canvas({
     const drag = dragStateRef.current;
     if (drag) {
       if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
-        dragStateRef.current = null;
+        setDragState(null);
         triggerRedraw();
         return;
       }
@@ -643,11 +752,12 @@ export default function Canvas({
       // Ignore release capture errors
     }
     delete activePointersRef.current[e.pointerId];
+    setHoverCursor(null);
 
     const drag = dragStateRef.current;
     if (drag) {
       if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
-        dragStateRef.current = null;
+        setDragState(null);
         triggerRedraw();
         return;
       }
@@ -663,11 +773,12 @@ export default function Canvas({
     }
 
     delete activePointersRef.current[e.pointerId];
+    setHoverCursor(null);
 
     const drag = dragStateRef.current;
     if (drag) {
       if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
-        dragStateRef.current = null;
+        setDragState(null);
         triggerRedraw();
         return;
       }
@@ -690,22 +801,17 @@ export default function Canvas({
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      const { scale, offsetX, offsetY } = getViewportTransform();
-      const virtualX = (mouseX - offsetX) / scale;
-      const virtualY = (mouseY - offsetY) / scale;
+      const newPan = calculateFocalZoomPan(
+        panOffset,
+        userZoom,
+        nextZoom,
+        { x: mouseX, y: mouseY },
+        { x: mouseX, y: mouseY },
+        canvasSize
+      );
 
       setUserZoom(nextZoom);
-
-      const baseScale = Math.min(canvasSize.width / virtualDimensions.width, canvasSize.height / virtualDimensions.height) || 1;
-      const newScale = baseScale * nextZoom;
-
-      const newBaseOffsetX = (canvasSize.width - virtualDimensions.width * newScale) / 2;
-      const newBaseOffsetY = (canvasSize.height - virtualDimensions.height * newScale) / 2;
-
-      setPanOffset({
-        x: mouseX - virtualX * newScale - newBaseOffsetX,
-        y: mouseY - virtualY * newScale - newBaseOffsetY
-      });
+      setPanOffset(newPan);
     }
 
     triggerRedraw();
@@ -724,6 +830,13 @@ export default function Canvas({
       const snappedCoords = (globalGridSnapping && showGrid)
         ? getSnappedCenter(coords.x, coords.y, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40)
         : coords;
+
+      setDragState({
+        mode: 'measure',
+        startX: coords.x,
+        startY: coords.y,
+        hasMoved: false,
+      });
 
       if (!measurePoints || measurePoints.isEstablished) {
         setMeasurePoints({
@@ -748,9 +861,9 @@ export default function Canvas({
         stroke: penColor,
         strokeWidth: penSize,
       };
-      dragStateRef.current = {
+      setDragState({
         mode: 'draw',
-      };
+      });
       triggerRedraw();
       return;
     }
@@ -759,15 +872,25 @@ export default function Canvas({
       const deletedIds = [];
       const createdElements = [];
 
-      dragStateRef.current = {
+      setDragState({
         mode: 'erase',
         deletedIds,
         createdElements,
+        startX: coords.x,
+        startY: coords.y,
+        isTouch: e.pointerType === 'touch',
         originalElementsMap: new Map(
           elements.filter((el) => el.type === 'path').map((el) => [el.id, JSON.parse(JSON.stringify(el))])
         ),
-      };
+      });
       eraserHoverRef.current = coords;
+
+      // On touch devices, defer destructive path deletions until movement or tap-up
+      // so the first finger of a 2-finger pinch gesture does not accidentally delete paths.
+      if (e.pointerType === 'touch') {
+        triggerRedraw();
+        return;
+      }
 
       const eraserRad = eraserSize / 2;
       const elementsToErase = elements.filter(
@@ -776,6 +899,7 @@ export default function Canvas({
 
       if (elementsToErase.length > 0) {
         const unlockableElements = elementsToErase.filter((el) => {
+          if (el.properties?.locked) return false;
           const lockHolderId = locks[el.id];
           return !lockHolderId || lockHolderId === currentUser?.id;
         });
@@ -818,7 +942,7 @@ export default function Canvas({
       if (bbox) {
         const handle = getGroupHandleAtCoords(coords.x, coords.y, bbox, scale);
         if (handle) {
-          dragStateRef.current = {
+          setDragState({
             mode: handle === 'rotate' ? 'group-rotate' : 'group-resize',
             handleType: handle,
             bbox,
@@ -830,7 +954,7 @@ export default function Canvas({
               .map((id) => elements.find((el) => el.id === id))
               .filter(Boolean)
               .map((el) => JSON.parse(JSON.stringify(el))),
-          };
+          });
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
           socket.emit(EVENTS.ELEMENT_LOCK, { elementIds: targetIds, tabId }, (response) => {
@@ -861,7 +985,7 @@ export default function Canvas({
         if (!isLockedBySomeoneElse) {
           const handle = getHandleAtCoords(coords.x, coords.y, activeElement, scale);
           if (handle) {
-            dragStateRef.current = {
+            setDragState({
               elementId: activeElement.id,
               mode: handle === 'rotate' ? 'rotate' : 'resize',
               handleType: handle,
@@ -875,16 +999,25 @@ export default function Canvas({
               aspectRatio: activeElement.width / activeElement.height,
               hasLock: false,
               originalElements: [JSON.parse(JSON.stringify(activeElement))],
-            };
+            });
 
-            socket.emit(EVENTS.ELEMENT_LOCK, { elementId: activeElement.id, tabId }, (response) => {
+            const activeId = activeElement.id;
+            socket.emit(EVENTS.ELEMENT_LOCK, { elementId: activeId, tabId }, (response) => {
               if (response && response.success) {
-                if (dragStateRef.current && dragStateRef.current.elementId === activeElement.id) {
+                if (dragStateRef.current && dragStateRef.current.elementId === activeId) {
                   dragStateRef.current.hasLock = true;
-                  setLocks((prev) => ({ ...prev, [activeElement.id]: currentUser.id }));
+                  setLocks((prev) => ({ ...prev, [activeId]: currentUser.id }));
+                } else {
+                  const currentElement = elementsRef.current.find((el) => el.id === activeId);
+                  if (currentElement) {
+                    socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+                  }
+                  socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: activeId, tabId });
                 }
               } else {
-                dragStateRef.current = null;
+                if (dragStateRef.current && dragStateRef.current.elementId === activeId) {
+                  setDragState(null);
+                }
               }
             });
             return;
@@ -913,7 +1046,7 @@ export default function Canvas({
       if (selectedElementIds.includes(element.id) && selectedElementIds.length > 1) {
         const bbox = getGroupBoundingBox(selectedElementIds, elements);
         if (bbox) {
-          dragStateRef.current = {
+          setDragState({
             mode: 'group-move',
             bbox,
             elementId: element.id,
@@ -925,7 +1058,7 @@ export default function Canvas({
               .map((id) => elements.find((el) => el.id === id))
               .filter(Boolean)
               .map((el) => JSON.parse(JSON.stringify(el))),
-          };
+          });
 
           const targetIds = selectedElementIds.filter(id => !locks[id] || locks[id] === currentUser?.id);
           socket.emit(EVENTS.ELEMENT_LOCK, { elementIds: targetIds, tabId }, (response) => {
@@ -948,24 +1081,31 @@ export default function Canvas({
 
       setSelectedElementIds([element.id]);
 
-      dragStateRef.current = {
+      setDragState({
         elementId: element.id,
         mode: 'move',
         offsetX: coords.x - element.x,
         offsetY: coords.y - element.y,
         hasLock: false,
         originalElements: [JSON.parse(JSON.stringify(element))],
-      };
+      });
 
-      socket.emit(EVENTS.ELEMENT_LOCK, { elementId: element.id, tabId }, (response) => {
+      const targetId = element.id;
+      socket.emit(EVENTS.ELEMENT_LOCK, { elementId: targetId, tabId }, (response) => {
         if (response && response.success) {
-          if (dragStateRef.current && dragStateRef.current.elementId === element.id) {
+          if (dragStateRef.current && dragStateRef.current.elementId === targetId) {
             dragStateRef.current.hasLock = true;
-            setLocks((prev) => ({ ...prev, [element.id]: currentUser.id }));
+            setLocks((prev) => ({ ...prev, [targetId]: currentUser.id }));
+          } else {
+            const currentElement = elementsRef.current.find((el) => el.id === targetId);
+            if (currentElement) {
+              socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+            }
+            socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: targetId, tabId });
           }
         } else {
-          if (dragStateRef.current && dragStateRef.current.elementId === element.id) {
-            dragStateRef.current = null;
+          if (dragStateRef.current && dragStateRef.current.elementId === targetId) {
+            setDragState(null);
           }
         }
       });
@@ -974,7 +1114,7 @@ export default function Canvas({
         setSelectedElementIds([]);
       }
 
-      dragStateRef.current = {
+      setDragState({
         mode: 'select',
         startX: coords.x,
         startY: coords.y,
@@ -982,7 +1122,7 @@ export default function Canvas({
         currentY: coords.y,
         isAddingSelection: e.shiftKey,
         initialSelection: [...selectedElementIds],
-      };
+      });
     }
   };
 
@@ -1017,6 +1157,7 @@ export default function Canvas({
 
         if (elementsToErase.length > 0) {
           const unlockableElements = elementsToErase.filter((el) => {
+            if (el.properties?.locked) return false;
             const lockHolderId = locks[el.id];
             return !lockHolderId || lockHolderId === currentUser?.id;
           });
@@ -1333,15 +1474,31 @@ export default function Canvas({
   const handleMouseUp = () => {
     const drag = dragStateRef.current;
     if (drag) {
+      if (drag.mode === 'measure') {
+        if (drag.hasMoved) {
+          setMeasurePoints((prev) => {
+            if (!prev) return prev;
+            return { ...prev, isEstablished: true };
+          });
+        }
+        setDragState(null);
+        triggerRedraw();
+        return;
+      }
+
       if (drag.mode === 'draw') {
         const strokePath = tempDrawingPathRef.current;
-        if (strokePath && strokePath.points && strokePath.points.length > 1) {
+        if (strokePath && strokePath.points && strokePath.points.length >= 1) {
+          const rawPoints = strokePath.points.length === 1
+            ? [strokePath.points[0], { x: strokePath.points[0].x + 0.1, y: strokePath.points[0].y + 0.1 }]
+            : strokePath.points;
+
           let minX = Infinity;
           let maxX = -Infinity;
           let minY = Infinity;
           let maxY = -Infinity;
 
-          strokePath.points.forEach((p) => {
+          rawPoints.forEach((p) => {
             if (p.x < minX) minX = p.x;
             if (p.x > maxX) maxX = p.x;
             if (p.y < minY) minY = p.y;
@@ -1351,7 +1508,7 @@ export default function Canvas({
           const w = Math.max(maxX - minX, 4);
           const h = Math.max(maxY - minY, 4);
 
-          const normalizedPoints = strokePath.points.map((p) => ({
+          const normalizedPoints = rawPoints.map((p) => ({
             x: (p.x - minX) / w,
             y: (p.y - minY) / h,
           }));
@@ -1388,12 +1545,59 @@ export default function Canvas({
           }
         }
         tempDrawingPathRef.current = null;
-        dragStateRef.current = null;
+        setDragState(null);
         triggerRedraw();
         return;
       }
 
       if (drag.mode === 'erase') {
+        if (drag.deletedIds && drag.deletedIds.length === 0 && drag.startX !== undefined) {
+          const eraserRad = eraserSize / 2;
+          const elementsToErase = elements.filter(
+            (el) => el.type === 'path' && checkEraserIntersectsPath(drag.startX, drag.startY, eraserRad, el)
+          );
+
+          if (elementsToErase.length > 0) {
+            const unlockableElements = elementsToErase.filter((el) => {
+              if (el.properties?.locked) return false;
+              const lockHolderId = locks[el.id];
+              return !lockHolderId || lockHolderId === currentUser?.id;
+            });
+
+            if (unlockableElements.length > 0) {
+              const toDeleteIds = [];
+              const toCreateElements = [];
+
+              unlockableElements.forEach((el) => {
+                const subPaths = splitPathElement(drag.startX, drag.startY, eraserRad, el);
+                toDeleteIds.push(el.id);
+                toCreateElements.push(...subPaths);
+              });
+
+              if (toDeleteIds.length > 0) {
+                setElements((prev) => [
+                  ...prev.filter((el) => !toDeleteIds.includes(el.id)),
+                  ...toCreateElements,
+                ]);
+                setSelectedElementIds((prev) =>
+                  prev.filter((id) => !toDeleteIds.includes(id))
+                );
+
+                const socket = socketRef.current;
+                if (socket && socket.connected) {
+                  socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: toDeleteIds, tabId });
+                  toCreateElements.forEach((newEl) => {
+                    socket.emit(EVENTS.ELEMENT_CREATE, { element: newEl, tabId });
+                  });
+                }
+
+                drag.deletedIds.push(...toDeleteIds);
+                drag.createdElements.push(...toCreateElements);
+              }
+            }
+          }
+        }
+
         if (pushHistoryAction && drag.deletedIds && drag.deletedIds.length > 0) {
           const elementsBefore = drag.deletedIds
             .map((id) => drag.originalElementsMap.get(id))
@@ -1408,7 +1612,7 @@ export default function Canvas({
             tabId,
           });
         }
-        dragStateRef.current = null;
+        setDragState(null);
         triggerRedraw();
         return;
       }
@@ -1484,9 +1688,13 @@ export default function Canvas({
             });
           }
         }
-      } else if (drag.hasLock || drag.mode === 'move') {
+      } else if (drag.hasLock || drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate') {
         const socket = socketRef.current;
         if (socket && socket.connected && drag.hasLock) {
+          const currentElement = elements.find((el) => el.id === drag.elementId);
+          if (currentElement) {
+            socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+          }
           socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: drag.elementId, tabId });
         }
         setLocks((prev) => {
@@ -1510,7 +1718,7 @@ export default function Canvas({
           }
         }
       }
-      dragStateRef.current = null;
+      setDragState(null);
       triggerRedraw();
     }
   };
@@ -1548,20 +1756,22 @@ export default function Canvas({
 
   const { scale, offsetX, offsetY } = getViewportTransform();
 
-  const hoveredElement = hoveredElementId ? elements.find((el) => el.id === hoveredElementId) : null;
-  const showTooltip = hoveredElement && hoveredElement.properties?.tooltip?.enabled;
+  const activeTooltipElId = hoveredElementId || (selectedElementIds.length === 1 && !isDragging ? selectedElementIds[0] : null);
+  const activeTooltipElement = activeTooltipElId ? elements.find((el) => el.id === activeTooltipElId) : null;
+  const showTooltip = Boolean(activeTooltipElement && activeTooltipElement.properties?.tooltip?.enabled);
 
   let tooltipLeft = 0;
   let tooltipTop = 0;
   let isFlipped = false;
 
   if (showTooltip) {
-    const cx = hoveredElement.x + hoveredElement.width / 2;
+    const cx = activeTooltipElement.x + activeTooltipElement.width / 2;
     const screenCx = offsetX + cx * scale;
-    const screenTopY = offsetY + hoveredElement.y * scale;
-    const screenH = hoveredElement.height * scale;
+    const screenTopY = offsetY + activeTooltipElement.y * scale;
+    const screenH = activeTooltipElement.height * scale;
 
-    tooltipLeft = screenCx;
+    const halfTooltipWidth = 136;
+    tooltipLeft = Math.max(halfTooltipWidth, Math.min(canvasSize.width - halfTooltipWidth, screenCx));
 
     if (screenTopY < 165) {
       tooltipTop = screenTopY + screenH + 10;
@@ -1575,13 +1785,7 @@ export default function Canvas({
     <div
       ref={containerRef}
       style={{ touchAction: 'none' }}
-      className={`touch-none relative w-full h-full bg-[#0b0f19] select-none overflow-hidden border border-slate-800/80 rounded-xl shadow-inner shadow-black/50 ${
-        activeTool === 'pen'
-          ? 'cursor-crosshair'
-          : activeTool === 'eraser'
-          ? 'cursor-none'
-          : 'cursor-default'
-      }`}
+      className={`touch-none relative w-full h-full bg-[#0b0f19] select-none overflow-hidden border border-slate-800/80 rounded-xl shadow-inner shadow-black/50 ${getCanvasCursorClass(activeTool, isSpacePressed, activeDragMode, hoverCursor)}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1612,16 +1816,16 @@ export default function Canvas({
         >
           <div className="border-b border-slate-800/85 pb-1.5 flex items-center justify-between">
             <span className="font-bold text-slate-100 text-sm truncate max-w-[190px]">
-              {hoveredElement.properties.tooltip.title || (hoveredElement.type.charAt(0).toUpperCase() + hoveredElement.type.slice(1))}
+              {activeTooltipElement.properties.tooltip.title || (activeTooltipElement.type.charAt(0).toUpperCase() + activeTooltipElement.type.slice(1))}
             </span>
             <span className="text-[9px] text-sky-400/80 bg-sky-500/10 px-1.5 py-0.5 rounded font-mono uppercase">
-              {hoveredElement.type}
+              {activeTooltipElement.type}
             </span>
           </div>
 
-          {hoveredElement.properties.tooltip.trackers && hoveredElement.properties.tooltip.trackers.length > 0 && (
+          {activeTooltipElement.properties.tooltip.trackers && activeTooltipElement.properties.tooltip.trackers.length > 0 && (
             <div className="space-y-2.5">
-              {hoveredElement.properties.tooltip.trackers.map((tracker) => {
+              {activeTooltipElement.properties.tooltip.trackers.map((tracker) => {
                 const val = Number(tracker.value) || 0;
                 const max = Number(tracker.max) || 10;
                 const pct = max > 0 ? Math.min(Math.max(val / max, 0), 1) : 0;
@@ -1655,9 +1859,9 @@ export default function Canvas({
             </div>
           )}
 
-          {hoveredElement.properties.tooltip.stats && hoveredElement.properties.tooltip.stats.length > 0 && (
+          {activeTooltipElement.properties.tooltip.stats && activeTooltipElement.properties.tooltip.stats.length > 0 && (
             <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-800/50">
-              {hoveredElement.properties.tooltip.stats.map((stat) => (
+              {activeTooltipElement.properties.tooltip.stats.map((stat) => (
                 <div
                   key={stat.id}
                   className="px-2 py-1.5 rounded-lg bg-slate-900/50 border border-slate-800/60 flex flex-col min-w-0"
@@ -1734,7 +1938,11 @@ export default function Canvas({
         <button
           type="button"
           onClick={() => {
-            setUserZoom((prev) => Math.max(0.5, prev - 0.1));
+            setUserZoom((prev) => {
+              const next = Math.max(0.5, prev - 0.1);
+              setPanOffset((pan) => scalePanOffsetForZoom(pan, prev, next));
+              return next;
+            });
             triggerRedraw();
           }}
           className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center justify-center font-bold text-lg select-none cursor-pointer active:scale-95"
@@ -1757,7 +1965,11 @@ export default function Canvas({
         <button
           type="button"
           onClick={() => {
-            setUserZoom((prev) => Math.min(8.0, prev + 0.1));
+            setUserZoom((prev) => {
+              const next = Math.min(8.0, prev + 0.1);
+              setPanOffset((pan) => scalePanOffsetForZoom(pan, prev, next));
+              return next;
+            });
             triggerRedraw();
           }}
           className="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition flex items-center justify-center font-bold text-lg select-none cursor-pointer active:scale-95"
