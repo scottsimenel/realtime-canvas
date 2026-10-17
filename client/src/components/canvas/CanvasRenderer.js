@@ -17,12 +17,13 @@ export const drawBackground = (ctx, showBackground, backgroundImageUrl, getOrLoa
 };
 
 // Draw grid background if enabled
-export const drawGrid = (ctx, showGrid, gridType, gridSize, isBackgroundDrawn, virtualWidth, virtualHeight, scale) => {
+export const drawGrid = (ctx, showGrid, gridType, gridSize, isBackgroundDrawn, virtualWidth, virtualHeight, scale, gridColor = null, gridLineWidth = 1) => {
   if (!showGrid) return;
   
   ctx.save();
-  ctx.strokeStyle = isBackgroundDrawn ? '#47556960' : '#1e293b';
-  ctx.lineWidth = 1 / scale;
+  ctx.strokeStyle = gridColor || (isBackgroundDrawn ? '#47556960' : '#1e293b');
+  const weight = typeof gridLineWidth === 'number' && gridLineWidth > 0 ? gridLineWidth : 1;
+  ctx.lineWidth = weight / scale;
 
   if (gridType === 'hexagon') {
     const R = gridSize;

@@ -546,4 +546,32 @@ dist/assets/index-B4kn3zSA.js   990.33 kB │ gzip: 265.76 kB
 ### 5. Server Syntax Check (`node --check server/server.js`)
 Node syntax check passed with exit code 0.
 
+---
+
+## 🎨 WS19 — Grid Customization: Line Weight & Color
+
+We added full customization of grid overlay line weight (thickness) and line color per tab, synchronized in real time across all connected clients:
+
+1. **Server-Side Settings Persistence ([registry.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/registry.js))**:
+   - Default tab settings in constructor, `createTab()`, and `loadState()` now initialize `gridColor: null` and `gridLineWidth: 1`.
+   - `updateRoomSettings()` now parses and persists `gridColor`, `gridLineWidth`, and alias `gridLineWeight`.
+2. **Client State Store ([canvasStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/canvasStore.js))**:
+   - Initialized fallback tab `roomSettings` with `gridColor: null` and `gridLineWidth: 1`.
+3. **HTML5 Canvas 2D Rendering Engine ([CanvasRenderer.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasRenderer.js) & [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx))**:
+   - `drawGrid` renders custom `gridColor` when provided, falling back dynamically to `#47556960` when a background image is active and `#1e293b` on a dark canvas.
+   - `ctx.lineWidth` scales inversely with zoom (`weight / scale`), ensuring crisp rendering across any zoom level.
+4. **Left Sidebar UI ([LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx))**:
+   - Added **Line Weight** slider (1px to 10px) with live numeric value badge.
+   - Added **Line Color** controls with 10 preset swatches, active ring highlight, "Reset Default" button, and native color picker input.
+5. **Automated Behavioral Tests**:
+   - Added [CanvasRenderer.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/__tests__/CanvasRenderer.test.js) (6 unit tests) testing default vs custom line weights, custom colors, scale division, non-positive fallback, and square vs hexagon grid path execution.
+   - Added server test in [roomManager.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/server/__tests__/roomManager.test.js) verifying `updateRoomSettings` handles and stores `gridColor`, `gridLineWidth`, and `gridLineWeight`.
+
+### Verification Suite:
+- **Client Tests**: 12/12 test files passed, 65/65 tests passed.
+- **Server Tests**: 8/8 tests passed.
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production build bundled successfully in 2.06s.
+
+
 

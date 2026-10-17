@@ -24,6 +24,8 @@ export function CanvasProvider({ children }) {
         customBackgroundHeight: null,
         gridScaleNumber: 5,
         gridScaleUnit: 'ft',
+        gridColor: null,
+        gridLineWidth: 1,
       },
     },
   ]);

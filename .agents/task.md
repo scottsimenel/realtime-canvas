@@ -145,3 +145,13 @@
 - `[x]` 18.2 Run ESLint, Vitest coverage suite, server tests, and Vite production build.
 - `[x]` 18.3 Update `STRUCTURE.md` if any helpers were added, and document full achievements in `walkthrough.md`.
 - `[x]` 18.4 Final git commit and push.
+
+## 📦 WS19 — Grid Customization: Line Weight & Color
+- `[x]` 19.1 Server registry updates: add `gridColor: null` and `gridLineWidth: 1` to default `roomSettings` in constructor, `createTab`, and `loadState`, and support `gridColor`, `gridLineWidth`, and `gridLineWeight` in `updateRoomSettings`.
+- `[x]` 19.2 Client state updates: add `gridColor: null` and `gridLineWidth: 1` to fallback tab `roomSettings` in `canvasStore.js`.
+- `[x]` 19.3 Canvas rendering updates: update `drawGrid` in `CanvasRenderer.js` and invocation in `Canvas.jsx` to render custom `gridColor` and scale-divided `gridLineWidth` with default fallbacks.
+- `[x]` 19.4 LeftSidebar UI updates: add Grid Line Weight slider (1-10px) with numeric display and Grid Color preset swatches, reset button, and native color picker to the Grid Overlay section in `LeftSidebar.jsx`.
+- `[x]` 19.5 Unit testing: add `client/src/components/canvas/__tests__/CanvasRenderer.test.js` covering `drawGrid` custom weights, custom colors, scale division, fallbacks, and hexagon/square paths, and add server test in `server/__tests__/roomManager.test.js`.
+- `[x]` 19.6 Run ESLint, client Vitest suite, server Node test suite, and Vite production build.
+- `[x]` 19.7 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
+

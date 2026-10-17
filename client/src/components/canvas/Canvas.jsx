@@ -353,6 +353,8 @@ export default function Canvas({
       showGrid = true,
       gridType = 'square',
       gridSize = 40,
+      gridColor = null,
+      gridLineWidth = 1,
     } = roomSettings || {};
 
     const { scale, offsetX, offsetY, virtualWidth, virtualHeight } = getViewportTransform();
@@ -365,7 +367,7 @@ export default function Canvas({
 
     const isBackgroundDrawn = drawBackground(ctx, showBackground, backgroundImageUrl, getOrLoadImage, virtualWidth, virtualHeight);
 
-    drawGrid(ctx, showGrid, gridType, gridSize, isBackgroundDrawn, virtualWidth, virtualHeight, scale);
+    drawGrid(ctx, showGrid, gridType, gridSize, isBackgroundDrawn, virtualWidth, virtualHeight, scale, gridColor, gridLineWidth);
 
     drawElements(ctx, elements, locks, users, currentUser, getOrLoadImage, scale);
 

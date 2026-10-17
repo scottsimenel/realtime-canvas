@@ -123,7 +123,9 @@ export class CanvasRegistry {
         customBackgroundWidth: null,
         customBackgroundHeight: null,
         gridScaleNumber: 5,
-        gridScaleUnit: 'ft'
+        gridScaleUnit: 'ft',
+        gridColor: null,
+        gridLineWidth: 1
       }
     });
   }
@@ -198,7 +200,9 @@ export class CanvasRegistry {
         customBackgroundWidth: null,
         customBackgroundHeight: null,
         gridScaleNumber: 5,
-        gridScaleUnit: 'ft'
+        gridScaleUnit: 'ft',
+        gridColor: null,
+        gridLineWidth: 1
       }
     };
     this.tabs.set(tabId, newTab);
@@ -291,6 +295,9 @@ export class CanvasRegistry {
     if (updates.customBackgroundHeight !== undefined) settings.customBackgroundHeight = updates.customBackgroundHeight;
     if (updates.gridScaleNumber !== undefined) settings.gridScaleNumber = updates.gridScaleNumber;
     if (updates.gridScaleUnit !== undefined) settings.gridScaleUnit = updates.gridScaleUnit;
+    if (updates.gridColor !== undefined) settings.gridColor = updates.gridColor;
+    if (updates.gridLineWidth !== undefined) settings.gridLineWidth = updates.gridLineWidth;
+    if (updates.gridLineWeight !== undefined) settings.gridLineWidth = updates.gridLineWeight;
     return settings;
   }
 
@@ -821,7 +828,7 @@ export class CanvasRegistry {
           name: tabData.name,
           elements: elementsMap,
           locks: new Map(),
-          roomSettings: tabData.roomSettings || {
+          roomSettings: {
             backgroundImageUrl: null,
             showBackground: true,
             showGrid: true,
@@ -831,7 +838,10 @@ export class CanvasRegistry {
             customBackgroundWidth: null,
             customBackgroundHeight: null,
             gridScaleNumber: 5,
-            gridScaleUnit: 'ft'
+            gridScaleUnit: 'ft',
+            gridColor: null,
+            gridLineWidth: 1,
+            ...(tabData.roomSettings || {})
           }
         });
       });

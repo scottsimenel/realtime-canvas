@@ -1395,6 +1395,67 @@ export default function LeftSidebar({
                     />
                   </div>
 
+                  {/* Grid Line Weight */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                      <span>Line Weight</span>
+                      <span className="font-mono text-slate-200">{roomSettings.gridLineWidth || 1}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="10"
+                      step="1"
+                      value={roomSettings.gridLineWidth || 1}
+                      onChange={(e) => handleUpdateRoomSettings({ gridLineWidth: parseInt(e.target.value, 10) })}
+                      className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    />
+                  </div>
+
+                  {/* Grid Line Color */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Line Color</span>
+                      {roomSettings.gridColor && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateRoomSettings({ gridColor: null })}
+                          className="text-[10px] text-sky-400 hover:text-sky-300 font-bold transition cursor-pointer"
+                        >
+                          Reset Default
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {PRESET_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => handleUpdateRoomSettings({ gridColor: c })}
+                          className={`w-6 h-6 rounded-full border transition-all duration-150 cursor-pointer hover:scale-110 active:scale-95 ${
+                            roomSettings.gridColor === c
+                              ? 'ring-2 ring-sky-500 border-white scale-105'
+                              : 'border-slate-800'
+                          }`}
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      ))}
+                      <div
+                        className="relative w-6 h-6 rounded-full border border-slate-800 overflow-hidden cursor-pointer bg-slate-950 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                        title="Custom Color Picker"
+                      >
+                        <input
+                          type="color"
+                          value={roomSettings.gridColor || '#475569'}
+                          onChange={(e) => handleUpdateRoomSettings({ gridColor: e.target.value })}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Grid Scale Configuration */}
                   <div className="space-y-1.5 border-t border-slate-800/40 pt-3">
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Measurement Scale</span>

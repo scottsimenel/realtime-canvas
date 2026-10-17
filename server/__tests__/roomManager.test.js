@@ -147,4 +147,28 @@ describe('RoomManager & Multi-Room Isolation Tests', () => {
     const count = manager.autosaveAllRooms();
     assert.ok(count >= 1);
   });
+
+  it('updates and persists custom grid settings in room registry', () => {
+    const manager = new RoomManager();
+    const reg = manager.getOrCreateRoom(testRoomA);
+    const tabId = reg.tabs.keys().next().value;
+
+    const initial = reg.tabs.get(tabId).roomSettings;
+    assert.strictEqual(initial.gridColor, null);
+    assert.strictEqual(initial.gridLineWidth, 1);
+
+    const updated = reg.updateRoomSettings(tabId, {
+      gridColor: '#38bdf8',
+      gridLineWidth: 3,
+    });
+
+    assert.strictEqual(updated.gridColor, '#38bdf8');
+    assert.strictEqual(updated.gridLineWidth, 3);
+
+    // Also supports gridLineWeight alias
+    const updatedAlias = reg.updateRoomSettings(tabId, {
+      gridLineWeight: 5,
+    });
+    assert.strictEqual(updatedAlias.gridLineWidth, 5);
+  });
 });
