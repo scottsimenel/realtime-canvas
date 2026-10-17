@@ -80,11 +80,14 @@ export default function TooltipInspector({ element, onChange }) {
     const tracker = (tooltip.trackers || []).find((t) => t.id === trackerId);
     if (!tracker) return;
 
-    let newValue = tracker.value;
+    const currentVal = typeof tracker.value === 'number' ? tracker.value : (parseInt(tracker.value, 10) || 0);
+    const maxVal = typeof tracker.max === 'number' ? tracker.max : (parseInt(tracker.max, 10) || 10);
+
+    let newValue = currentVal;
     if (type === 'damage') {
-      newValue = Math.max(0, tracker.value - adjustVal);
+      newValue = Math.max(0, currentVal - adjustVal);
     } else if (type === 'heal') {
-      newValue = Math.min(tracker.max, tracker.value + adjustVal);
+      newValue = Math.min(maxVal, currentVal + adjustVal);
     }
 
     handleUpdateTracker(trackerId, { value: newValue });
@@ -145,6 +148,11 @@ export default function TooltipInspector({ element, onChange }) {
               value={localTitle}
               onChange={(e) => setLocalTitle(e.target.value)}
               onBlur={handleTitleBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="e.g. Grog the Barbarian"
               className="w-full px-2.5 py-1.5 bg-slate-950/80 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
             />

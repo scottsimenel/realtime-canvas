@@ -61,19 +61,47 @@ export function HistoryProvider({ children }) {
         break;
       }
       case 'delete': {
-        action.elements.forEach((element) => {
-          socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
+        const sortedElements = [...action.elements].sort(
+          (a, b) => (a._layerIndex ?? 999999) - (b._layerIndex ?? 999999)
+        );
+        let restoredCount = 0;
+        sortedElements.forEach((element) => {
+          const cleanElement = { ...element };
+          const targetIndex = cleanElement._layerIndex;
+          delete cleanElement._layerIndex;
+
+          socket.emit(EVENTS.ELEMENT_CREATE, { element: cleanElement, tabId: targetTabId }, (res) => {
             if (res && res.success) {
               setTabs((prev) =>
-                prev.map((t) =>
-                  t.id === targetTabId
-                    ? {
-                        ...t,
-                        elements: [...t.elements.filter((el) => el.id !== element.id), element],
-                      }
-                    : t
-                )
+                prev.map((t) => {
+                  if (t.id !== targetTabId) return t;
+                  const nextElements = [...t.elements.filter((el) => el.id !== cleanElement.id)];
+                  if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextElements.length) {
+                    nextElements.splice(targetIndex, 0, cleanElement);
+                  } else {
+                    nextElements.push(cleanElement);
+                  }
+                  return {
+                    ...t,
+                    elements: nextElements,
+                  };
+                })
               );
+              restoredCount++;
+              if (restoredCount === sortedElements.length && sortedElements.some((e) => typeof e._layerIndex === 'number')) {
+                setTimeout(() => {
+                  setTabs((currentTabs) => {
+                    const currentTab = currentTabs.find((t) => t.id === targetTabId);
+                    if (currentTab) {
+                      socket.emit(EVENTS.ELEMENTS_REORDER, {
+                        orderedIds: currentTab.elements.map((el) => el.id),
+                        tabId: targetTabId,
+                      });
+                    }
+                    return currentTabs;
+                  });
+                }, 50);
+              }
             }
           });
         });
@@ -81,15 +109,19 @@ export function HistoryProvider({ children }) {
       }
       case 'transform': {
         const batch = action.elementsBefore.map((el) => {
+          const updates = {
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            properties: el.properties,
+          };
+          if (el.type !== undefined) {
+            updates.type = el.type;
+          }
           return {
             elementId: el.id,
-            updates: {
-              x: el.x,
-              y: el.y,
-              width: el.width,
-              height: el.height,
-              properties: el.properties,
-            },
+            updates,
           };
         });
         socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: targetTabId }, (res) => {
@@ -102,7 +134,9 @@ export function HistoryProvider({ children }) {
                       elements: t.elements.map((el) => {
                         const before = action.elementsBefore.find((b) => b.id === el.id);
                         if (before) {
-                          return JSON.parse(JSON.stringify(before));
+                          const clean = { ...before };
+                          delete clean._layerIndex;
+                          return JSON.parse(JSON.stringify(clean));
                         }
                         return el;
                       }),
@@ -128,18 +162,30 @@ export function HistoryProvider({ children }) {
               })
             );
 
-            action.elementsBefore.forEach((element) => {
-              socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
+            const sortedBefore = [...action.elementsBefore].sort(
+              (a, b) => (a._layerIndex ?? 999999) - (b._layerIndex ?? 999999)
+            );
+            sortedBefore.forEach((element) => {
+              const cleanElement = { ...element };
+              const targetIndex = cleanElement._layerIndex;
+              delete cleanElement._layerIndex;
+
+              socket.emit(EVENTS.ELEMENT_CREATE, { element: cleanElement, tabId: targetTabId }, (res) => {
                 if (res && res.success) {
                   setTabs((prev) =>
-                    prev.map((t) =>
-                      t.id === targetTabId
-                        ? {
-                            ...t,
-                            elements: [...t.elements.filter((el) => el.id !== element.id), element],
-                          }
-                        : t
-                    )
+                    prev.map((t) => {
+                      if (t.id !== targetTabId) return t;
+                      const nextElements = [...t.elements.filter((el) => el.id !== cleanElement.id)];
+                      if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextElements.length) {
+                        nextElements.splice(targetIndex, 0, cleanElement);
+                      } else {
+                        nextElements.push(cleanElement);
+                      }
+                      return {
+                        ...t,
+                        elements: nextElements,
+                      };
+                    })
                   );
                 }
               });
@@ -200,14 +246,16 @@ export function HistoryProvider({ children }) {
     switch (action.type) {
       case 'create': {
         action.elements.forEach((element) => {
-          socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
+          const cleanElement = { ...element };
+          delete cleanElement._layerIndex;
+          socket.emit(EVENTS.ELEMENT_CREATE, { element: cleanElement, tabId: targetTabId }, (res) => {
             if (res && res.success) {
               setTabs((prev) =>
                 prev.map((t) =>
                   t.id === targetTabId
                     ? {
                         ...t,
-                        elements: [...t.elements.filter((el) => el.id !== element.id), element],
+                        elements: [...t.elements.filter((el) => el.id !== cleanElement.id), cleanElement],
                       }
                     : t
                 )
@@ -238,15 +286,19 @@ export function HistoryProvider({ children }) {
       }
       case 'transform': {
         const batch = action.elementsAfter.map((el) => {
+          const updates = {
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            properties: el.properties,
+          };
+          if (el.type !== undefined) {
+            updates.type = el.type;
+          }
           return {
             elementId: el.id,
-            updates: {
-              x: el.x,
-              y: el.y,
-              width: el.width,
-              height: el.height,
-              properties: el.properties,
-            },
+            updates,
           };
         });
         socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: targetTabId }, (res) => {
@@ -259,7 +311,9 @@ export function HistoryProvider({ children }) {
                       elements: t.elements.map((el) => {
                         const after = action.elementsAfter.find((b) => b.id === el.id);
                         if (after) {
-                          return JSON.parse(JSON.stringify(after));
+                          const clean = { ...after };
+                          delete clean._layerIndex;
+                          return JSON.parse(JSON.stringify(clean));
                         }
                         return el;
                       }),
@@ -286,14 +340,16 @@ export function HistoryProvider({ children }) {
             );
 
             action.elementsAfter.forEach((element) => {
-              socket.emit(EVENTS.ELEMENT_CREATE, { element, tabId: targetTabId }, (res) => {
+              const cleanElement = { ...element };
+              delete cleanElement._layerIndex;
+              socket.emit(EVENTS.ELEMENT_CREATE, { element: cleanElement, tabId: targetTabId }, (res) => {
                 if (res && res.success) {
                   setTabs((prev) =>
                     prev.map((t) =>
                       t.id === targetTabId
                         ? {
                             ...t,
-                            elements: [...t.elements.filter((el) => el.id !== element.id), element],
+                            elements: [...t.elements.filter((el) => el.id !== cleanElement.id), cleanElement],
                           }
                         : t
                     )

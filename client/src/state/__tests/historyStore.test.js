@@ -300,6 +300,103 @@ describe('historyStore behavioral unit tests', () => {
     expect(mockSocket.emit).toHaveBeenCalledWith('elements-reorder', { orderedIds: ['el2', 'el1'], tabId: 'tab-default' }, expect.any(Function));
   });
 
+  test('undo "delete" action with _layerIndex restores element at original layer index', () => {
+    // Setup initial tabs with [elA, elB]
+    currentTabs = [{
+      id: 'tab-default',
+      elements: [
+        { id: 'elA', type: 'rectangle', x: 0, y: 0 },
+        { id: 'elB', type: 'circle', x: 10, y: 10 }
+      ]
+    }];
+
+    const store = getStoreInstance();
+    // Action where elMiddle had _layerIndex: 1
+    const action = {
+      type: 'delete',
+      tabId: 'tab-default',
+      elements: [{ id: 'elMiddle', type: 'star', x: 5, y: 5, _layerIndex: 1 }]
+    };
+    store.pushHistoryAction(action);
+
+    const currentStore = getStoreInstance();
+    currentStore.handleUndo();
+
+    // Verify element-create was emitted with clean element (no _layerIndex)
+    expect(mockSocket.emit).toHaveBeenCalledWith(
+      'element-create',
+      { element: { id: 'elMiddle', type: 'star', x: 5, y: 5 }, tabId: 'tab-default' },
+      expect.any(Function)
+    );
+
+    // Verify element was inserted at index 1 between elA and elB
+    const updatedTab = currentTabs.find(t => t.id === 'tab-default');
+    expect(updatedTab.elements.map(e => e.id)).toEqual(['elA', 'elMiddle', 'elB']);
+  });
+
+  test('undo and redo for "transform" action preserves element type and nested properties', () => {
+    const store = getStoreInstance();
+    const action = {
+      type: 'transform',
+      tabId: 'tab-default',
+      elementsBefore: [{
+        id: 'el1',
+        type: 'rectangle',
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 80,
+        properties: { fill: '#ff0000', strokeWidth: 2, tooltip: { title: 'Chest' } }
+      }],
+      elementsAfter: [{
+        id: 'el1',
+        type: 'circle',
+        x: 50,
+        y: 50,
+        width: 120,
+        height: 120,
+        properties: { fill: '#00ff00', strokeWidth: 4, tooltip: { title: 'Mimic' } }
+      }]
+    };
+    store.pushHistoryAction(action);
+
+    // Undo: should emit updates with type 'rectangle' and original properties
+    let currentStore = getStoreInstance();
+    currentStore.handleUndo();
+    expect(mockSocket.emit).toHaveBeenCalledWith('element-update', {
+      batch: [{
+        elementId: 'el1',
+        updates: {
+          type: 'rectangle',
+          x: 50,
+          y: 50,
+          width: 100,
+          height: 80,
+          properties: { fill: '#ff0000', strokeWidth: 2, tooltip: { title: 'Chest' } }
+        }
+      }],
+      tabId: 'tab-default'
+    }, expect.any(Function));
+
+    // Redo: should emit updates with type 'circle' and updated properties
+    currentStore = getStoreInstance();
+    currentStore.handleRedo();
+    expect(mockSocket.emit).toHaveBeenCalledWith('element-update', {
+      batch: [{
+        elementId: 'el1',
+        updates: {
+          type: 'circle',
+          x: 50,
+          y: 50,
+          width: 120,
+          height: 120,
+          properties: { fill: '#00ff00', strokeWidth: 4, tooltip: { title: 'Mimic' } }
+        }
+      }],
+      tabId: 'tab-default'
+    }, expect.any(Function));
+  });
+
   test('useHistoryStore throws error when used outside HistoryProvider', () => {
     // Temporarily clear captured react values
     reactMockValueCapture.captured = null;

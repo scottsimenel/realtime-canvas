@@ -494,6 +494,7 @@ export class CanvasRegistry {
     }
 
     // Apply updates
+    if (updates.type !== undefined) element.type = updates.type;
     if (updates.x !== undefined) element.x = updates.x;
     if (updates.y !== undefined) element.y = updates.y;
     if (updates.width !== undefined) element.width = updates.width;

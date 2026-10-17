@@ -1,5 +1,5 @@
 import { EVENTS } from '../../../../shared/protocol.js';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { getSocket } from '../../lib/socket.js';
 import { mergeElement } from '../../lib/mergeElement.js';
 import { useCanvasStore } from '../../state/canvasStore.js';
@@ -23,6 +23,7 @@ export function useSelectionActions(currentUser) {
   const {
     selectedElementIds,
     setSelectedElementIds,
+    isInspectorFocused,
     setIsInspectorFocused,
     inspectorLockRef,
     originalInspectorElementsRef
@@ -90,7 +91,9 @@ export function useSelectionActions(currentUser) {
             before.y !== after.y ||
             before.width !== after.width ||
             before.height !== after.height ||
-            (before.properties?.rotation || 0) !== (after.properties?.rotation || 0)
+            (before.properties?.rotation || 0) !== (after.properties?.rotation || 0) ||
+            before.type !== after.type ||
+            JSON.stringify(before.properties) !== JSON.stringify(after.properties)
           );
         });
 
@@ -119,6 +122,13 @@ export function useSelectionActions(currentUser) {
 
       if (activeIds.length === 0) return;
 
+      const elementsBefore = !inspectorLockRef.current
+        ? activeIds
+            .map((id) => elements.find((item) => item.id === id))
+            .filter(Boolean)
+            .map((el) => JSON.parse(JSON.stringify(el)))
+        : null;
+
       const batch = activeIds.map((id) => {
         const el = elements.find((item) => item.id === id);
         const updates = typeof updatesMap === 'function' ? updatesMap(el) : updatesMap;
@@ -139,8 +149,35 @@ export function useSelectionActions(currentUser) {
       );
 
       socket.emit(EVENTS.ELEMENT_UPDATE, { batch, tabId: activeTabId });
+
+      if (!inspectorLockRef.current && elementsBefore && elementsBefore.length > 0) {
+        const elementsAfter = elementsBefore.map((before) => {
+          const match = batch.find((b) => b.elementId === before.id);
+          return match ? mergeElement(before, match.updates) : before;
+        });
+
+        const hasChanged = elementsBefore.some((before) => {
+          const after = elementsAfter.find((a) => a.id === before.id);
+          if (!after) return true;
+          return (
+            before.type !== after.type ||
+            before.width !== after.width ||
+            before.height !== after.height ||
+            JSON.stringify(before.properties) !== JSON.stringify(after.properties)
+          );
+        });
+
+        if (hasChanged) {
+          pushHistoryAction({
+            type: 'transform',
+            elementsBefore,
+            elementsAfter,
+            tabId: activeTabId,
+          });
+        }
+      }
     },
-    [selectedElementIds, elements, locks, currentUser, setTabs, activeTabId]
+    [selectedElementIds, elements, locks, currentUser, setTabs, activeTabId, inspectorLockRef, pushHistoryAction]
   );
 
   const handleToggleSelectionLock = useCallback((elementId) => {
@@ -197,9 +234,16 @@ export function useSelectionActions(currentUser) {
     if (unlockedIds.length === 0) return;
 
     const elementsToDelete = unlockedIds
-      .map((id) => elements.find((item) => item.id === id))
-      .filter(Boolean)
-      .map((el) => JSON.parse(JSON.stringify(el)));
+      .map((id) => {
+        const el = elements.find((item) => item.id === id);
+        if (!el) return null;
+        const index = elements.findIndex((item) => item.id === id);
+        return {
+          ...JSON.parse(JSON.stringify(el)),
+          _layerIndex: index !== -1 ? index : undefined,
+        };
+      })
+      .filter(Boolean);
 
     socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockedIds, tabId: activeTabId }, (res) => {
       if (res && res.success) {
@@ -239,7 +283,13 @@ export function useSelectionActions(currentUser) {
     const socket = getSocket();
     if (socket && socket.connected) {
       const unlockableDrawingIds = unlockableDrawingElements.map((el) => el.id);
-      const elementsToDelete = unlockableDrawingElements.map((el) => JSON.parse(JSON.stringify(el)));
+      const elementsToDelete = unlockableDrawingElements.map((el) => {
+        const index = elements.findIndex((item) => item.id === el.id);
+        return {
+          ...JSON.parse(JSON.stringify(el)),
+          _layerIndex: index !== -1 ? index : undefined,
+        };
+      });
 
       socket.emit(EVENTS.ELEMENT_DELETE, { elementIds: unlockableDrawingIds, tabId: activeTabId }, (res) => {
         if (res && res.success) {
@@ -262,6 +312,26 @@ export function useSelectionActions(currentUser) {
       });
     }
   }, [elements, locks, currentUser, setSelectedElementIds, pushHistoryAction, setTabs, activeTabId]);
+
+  // Cleanup inspector locks on unmount
+  useEffect(() => {
+    return () => {
+      if (inspectorLockRef.current) {
+        handleEndInspectorTransform();
+      }
+    };
+  }, [handleEndInspectorTransform, inspectorLockRef]);
+
+  // Global pointerup to release slider drags if mouse leaves slider
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (inspectorLockRef.current && !isInspectorFocused) {
+        handleEndInspectorTransform();
+      }
+    };
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+  }, [handleEndInspectorTransform, inspectorLockRef, isInspectorFocused]);
 
   return {
     handleStartInspectorTransform,

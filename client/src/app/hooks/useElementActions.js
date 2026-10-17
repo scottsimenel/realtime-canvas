@@ -176,6 +176,9 @@ export function useElementActions() {
         return prev;
       }
 
+      const isUnchanged = prev.length === next.length && prev.every((el, i) => el.id === next[i].id);
+      if (isUnchanged) return prev;
+
       const socket = getSocket();
       if (socket && socket.connected) {
         socket.emit(EVENTS.ELEMENTS_REORDER, { orderedIds: next.map((el) => el.id), tabId: activeTabId });
@@ -215,7 +218,7 @@ export function useElementActions() {
       } else if (direction === 'forward') {
         for (let i = selectedIndices.length - 1; i >= 0; i--) {
           const idx = selectedIndices[i];
-          if (idx < next.length - 1) {
+          if (idx < next.length - 1 && !selectedElementIds.includes(next[idx + 1].id)) {
             const temp = next[idx];
             next[idx] = next[idx + 1];
             next[idx + 1] = temp;
@@ -224,7 +227,7 @@ export function useElementActions() {
       } else if (direction === 'backward') {
         for (let i = 0; i < selectedIndices.length; i++) {
           const idx = selectedIndices[i];
-          if (idx > 0) {
+          if (idx > 0 && !selectedElementIds.includes(next[idx - 1].id)) {
             const temp = next[idx];
             next[idx] = next[idx - 1];
             next[idx - 1] = temp;
@@ -233,6 +236,9 @@ export function useElementActions() {
       } else {
         return prev;
       }
+
+      const isUnchanged = prev.length === next.length && prev.every((el, i) => el.id === next[i].id);
+      if (isUnchanged) return prev;
 
       const socket = getSocket();
       if (socket && socket.connected) {

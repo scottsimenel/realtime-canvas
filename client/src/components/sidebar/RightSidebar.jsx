@@ -38,6 +38,7 @@ export default function RightSidebar({
   socketRef,
   pushHistoryAction,
   setLocateElementTrigger,
+  activeTabId,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'selected', 'images', 'shapes'
@@ -137,7 +138,7 @@ export default function RightSidebar({
               : "No items match your search or filter."}
           </p>
         ) : (
-          <div className="space-y-2.5 max-h-[calc(100vh-320px)] overflow-y-auto pr-1 custom-scrollbar">
+          <div className="space-y-2.5">
             {[...filteredElements].reverse().map((el) => {
               const lockHolderId = locks[el.id];
               const isLocked = !!lockHolderId;
@@ -201,7 +202,7 @@ export default function RightSidebar({
                   onDragEnd={handleDragEnd}
                   onDrop={(e) => handleDrop(e, el.id)}
                   onClick={(e) => {
-                    if (e.shiftKey) {
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
                       setSelectedElementIds((prev) =>
                         prev.includes(el.id)
                           ? prev.filter((id) => id !== el.id)
@@ -375,8 +376,12 @@ export default function RightSidebar({
                         e.stopPropagation();
                         const socket = socketRef.current;
                         if (socket && socket.connected) {
-                          const elementToDelete = JSON.parse(JSON.stringify(el));
-                          socket.emit(EVENTS.ELEMENT_DELETE, { elementId: el.id }, (response) => {
+                          const targetTabId = activeTabId || 'tab-default';
+                          const elementToDelete = {
+                            ...JSON.parse(JSON.stringify(el)),
+                            _layerIndex: originalIndex !== -1 ? originalIndex : elements.length - 1,
+                          };
+                          socket.emit(EVENTS.ELEMENT_DELETE, { elementId: el.id, elementIds: [el.id], tabId: targetTabId }, (response) => {
                             if (response && response.success) {
                               setElements((prev) => prev.filter((item) => item.id !== el.id));
                               setSelectedElementIds((prev) => prev.filter((id) => id !== el.id));
@@ -384,7 +389,7 @@ export default function RightSidebar({
                                 pushHistoryAction({
                                   type: 'delete',
                                   elements: [elementToDelete],
-                                  tabId: 'tab-default',
+                                  tabId: targetTabId,
                                 });
                               }
                             }

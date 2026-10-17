@@ -61,7 +61,8 @@ export default function InspectorWidget({
                 setInputWidth(e.target.value);
                 const val = parseInt(e.target.value, 10);
                 if (!isNaN(val)) {
-                  handleInspectorChange({ width: val });
+                  const clamped = Math.max(10, Math.min(2000, val));
+                  handleInspectorChange({ width: clamped });
                 }
               }}
               className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-205 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
@@ -91,7 +92,8 @@ export default function InspectorWidget({
                 setInputHeight(e.target.value);
                 const val = parseInt(e.target.value, 10);
                 if (!isNaN(val)) {
-                  handleInspectorChange({ height: val });
+                  const clamped = Math.max(10, Math.min(2000, val));
+                  handleInspectorChange({ height: clamped });
                 }
               }}
               className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-205 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition"
@@ -355,6 +357,10 @@ export default function InspectorWidget({
                   const allSameOpacity = shapesSelected.every(el => el.properties?.fillOpacity === firstFillOpacity);
                   return allSameOpacity ? (firstFillOpacity !== undefined ? firstFillOpacity : 1) : 1;
                 })()}
+                onMouseDown={handleStartInspectorTransform}
+                onTouchStart={handleStartInspectorTransform}
+                onMouseUp={handleEndInspectorTransform}
+                onTouchEnd={handleEndInspectorTransform}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   handleInspectorChange({
@@ -454,6 +460,10 @@ export default function InspectorWidget({
                         const allSameWidth = shapesSelected.every(el => el.properties?.strokeWidth === firstStrokeWidth);
                         return allSameWidth ? (firstStrokeWidth !== undefined ? firstStrokeWidth : 2) : 2;
                       })()}
+                      onMouseDown={handleStartInspectorTransform}
+                      onTouchStart={handleStartInspectorTransform}
+                      onMouseUp={handleEndInspectorTransform}
+                      onTouchEnd={handleEndInspectorTransform}
                       onChange={(e) => {
                         const val = parseInt(e.target.value, 10);
                         handleInspectorChange({
@@ -488,6 +498,10 @@ export default function InspectorWidget({
                         const allSameOpacity = shapesSelected.every(el => el.properties?.strokeOpacity === firstStrokeOpacity);
                         return allSameOpacity ? (firstStrokeOpacity !== undefined ? firstStrokeOpacity : 1) : 1;
                       })()}
+                      onMouseDown={handleStartInspectorTransform}
+                      onTouchStart={handleStartInspectorTransform}
+                      onMouseUp={handleEndInspectorTransform}
+                      onTouchEnd={handleEndInspectorTransform}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         handleInspectorChange({

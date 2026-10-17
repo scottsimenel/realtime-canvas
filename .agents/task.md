@@ -134,11 +134,11 @@
 - `[x]` 16.7 Run verification loop (lint, tests, build), commit, and push WS16.
 
 ## 📦 WS17 — Inspector, Layer Manager, RightSidebar Delete & Undo/Redo Fixes
-- `[ ]` 17.1 Fix `RightSidebar.jsx` layer delete to pass `tabId: activeTabId` and `elementIds: [el.id]`, remove nested scrollbar, and support `Ctrl/Cmd+Click` multi-selection.
-- `[ ]` 17.2 Fix multi-select "Bring Forward" / "Send Backward" boundary swapping and no-op emissions in `useElementActions.js`.
-- `[ ]` 17.3 Clamp live Width/Height broadcasts in `InspectorWidget.jsx`, fix inspector lock cleanup on selection change/slider release in `useSelectionActions.js`, and fix `TooltipInspector.jsx` empty-string concatenation & `Enter` key commit.
-- `[ ]` 17.4 Expand `historyStore.js` and `useSelectionActions.js` so inspector property/type/tooltip changes are tracked by Undo/Redo and deleted/erased elements restore their original layer index.
-- `[ ]` 17.5 Run verification loop (lint, tests, build), commit, and push WS17.
+- `[x]` 17.1 Fix `RightSidebar.jsx` layer delete to pass `tabId: activeTabId` and `elementIds: [el.id]`, remove nested scrollbar, and support `Ctrl/Cmd+Click` multi-selection.
+- `[x]` 17.2 Fix multi-select "Bring Forward" / "Send Backward" boundary swapping and no-op emissions in `useElementActions.js`.
+- `[x]` 17.3 Clamp live Width/Height broadcasts in `InspectorWidget.jsx`, fix inspector lock cleanup on selection change/slider release in `useSelectionActions.js`, and fix `TooltipInspector.jsx` empty-string concatenation & `Enter` key commit.
+- `[x]` 17.4 Expand `historyStore.js` and `useSelectionActions.js` so inspector property/type/tooltip changes are tracked by Undo/Redo and deleted/erased elements restore their original layer index.
+- `[x]` 17.5 Run verification loop (lint, tests, build), commit, and push WS17.
 
 ## 📦 WS18 — Automated Tests, Verification & Documentation Sync
 - `[ ]` 18.1 Add unit tests in `CanvasSelection.test.js`, `historyStore.test.js`, and `stores.test.js` covering focal-point zoom math, property/type undo-redo, and mobile sidebar state transitions.
