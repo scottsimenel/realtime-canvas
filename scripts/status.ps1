@@ -31,7 +31,8 @@ if (Test-Path $serverPidFile) {
 
 $conns = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
 if ($conns) {
-    $procId = ($conns | Select-Object -ExpandProperty OwningProcess -Unique)[0]
+    $listenConns = $conns | Where-Object { $_.State -eq "Listen" -and $_.OwningProcess -ne 0 }
+    $procId = if ($listenConns) { ($listenConns | Select-Object -ExpandProperty OwningProcess -Unique)[0] } elseif ($serverPid) { $serverPid } else { ($conns | Select-Object -ExpandProperty OwningProcess -Unique)[0] }
     $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
     $procName = if ($proc) { $proc.ProcessName } else { "Unknown" }
     
