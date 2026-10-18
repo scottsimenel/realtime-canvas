@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRESET_COLORS, RANDOM_NAMES, generateRandomRoomId } from '../../constants.js';
 import { SOCKET_URL, getSocket } from '../../lib/socket.js';
 import { EVENTS } from '../../../../shared/protocol.js';
+import Icon from '../common/Icon.jsx';
 
 /**
  * Formats a lastActive ISO timestamp into human-readable relative time.
@@ -216,7 +217,7 @@ export default function Lobby({
         {inviteRoom && (
           <div className="mb-6 p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-700/50 flex items-center justify-between gap-3 text-xs sm:text-sm">
             <div className="flex items-center gap-2 text-indigo-200">
-              <span className="text-base">✉️</span>
+              <Icon name="mail" className="w-4 h-4 text-indigo-300 shrink-0" />
               <span>
                 You were invited to join room: <span className="font-mono font-bold text-indigo-300">{inviteRoom}</span>
               </span>
@@ -264,7 +265,7 @@ export default function Lobby({
                       title="Generate random name"
                       className="absolute right-2.5 text-slate-400 hover:text-white transition p-1 cursor-pointer"
                     >
-                      🎲
+                      <Icon name="dices" className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -310,7 +311,7 @@ export default function Lobby({
                     onClick={handleGenerateRoomId}
                     className="text-[11px] text-blue-400 hover:text-blue-300 font-normal flex items-center gap-1 cursor-pointer"
                   >
-                    <span>🎲</span>
+                    <Icon name="dices" className="w-3.5 h-3.5" />
                     <span>Random ID</span>
                   </button>
                 </h2>
@@ -384,7 +385,7 @@ export default function Lobby({
                   title="Refresh room list"
                   className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer shrink-0"
                 >
-                  🔄
+                  <Icon name="refresh" className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -420,7 +421,7 @@ export default function Lobby({
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <span>💾</span>
+                <Icon name="save" className="w-3.5 h-3.5" />
                 <span>Has Saves</span>
               </button>
             </div>
@@ -429,12 +430,12 @@ export default function Lobby({
             <div className="flex-1 overflow-y-auto max-h-[540px] lg:max-h-[620px] pt-3 pr-1 space-y-2.5 custom-scrollbar">
               {loadingRooms ? (
                 <div className="flex flex-col items-center justify-center h-48 text-slate-500 text-xs">
-                  <span className="animate-spin text-xl mb-2">🌀</span>
+                  <Icon name="loader" className="w-6 h-6 animate-spin text-blue-500 mb-2" />
                   <span>Discovering available canvases...</span>
                 </div>
               ) : filteredRooms.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-slate-500 text-xs text-center p-4">
-                  <span className="text-2xl mb-2">🔍</span>
+                  <Icon name="search" className="w-8 h-8 text-slate-600 mb-2" />
                   <p className="font-semibold text-slate-400">No rooms found</p>
                   <p className="text-[11px] mt-1 text-slate-600">
                     No canvases matched your filter. You can create a new room using the form on the left.
@@ -487,7 +488,7 @@ export default function Lobby({
                           {/* Save status badge */}
                           {room.hasSave && (
                             <span className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 flex items-center gap-1">
-                              <span>💾</span>
+                              <Icon name="save" className="w-3 h-3 text-purple-300" />
                               <span>Saved</span>
                             </span>
                           )}

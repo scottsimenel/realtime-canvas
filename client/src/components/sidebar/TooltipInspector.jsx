@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from '../common/Icon.jsx';
 
 export default function TooltipInspector({ element, onChange }) {
   const tooltip = element.properties?.tooltip || {
@@ -124,7 +125,8 @@ export default function TooltipInspector({ element, onChange }) {
     <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-4">
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
         <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5 select-none">
-          <span>💬</span> Tooltip & Stats
+          <Icon name="message-square" className="w-3.5 h-3.5 text-slate-400" />
+          <span>Tooltip & Stats</span>
         </h2>
         <label className="relative inline-flex items-center cursor-pointer select-none">
           <input
@@ -170,7 +172,8 @@ export default function TooltipInspector({ element, onChange }) {
                 onClick={handleAddTracker}
                 className="text-[10px] text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 transition cursor-pointer"
               >
-                ＋ Add Bar
+                <Icon name="plus" className="w-3 h-3" />
+                <span>Add Bar</span>
               </button>
             </div>
 
@@ -227,10 +230,10 @@ export default function TooltipInspector({ element, onChange }) {
                       <button
                         type="button"
                         onClick={() => handleRemoveTracker(tracker.id)}
-                        className="text-slate-600 hover:text-rose-400 transition cursor-pointer text-xs"
+                        className="text-slate-600 hover:text-rose-400 transition cursor-pointer text-xs p-0.5"
                         title="Remove Tracker"
                       >
-                        🗑️
+                        <Icon name="trash" className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
@@ -317,7 +320,8 @@ export default function TooltipInspector({ element, onChange }) {
                 onClick={handleAddStat}
                 className="text-[10px] text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 transition cursor-pointer"
               >
-                ＋ Add Stat
+                <Icon name="plus" className="w-3 h-3" />
+                <span>Add Stat</span>
               </button>
             </div>
 
@@ -341,10 +345,10 @@ export default function TooltipInspector({ element, onChange }) {
                   <button
                     type="button"
                     onClick={() => handleRemoveStat(stat.id)}
-                    className="text-slate-600 hover:text-rose-400 transition cursor-pointer text-xs"
+                    className="text-slate-600 hover:text-rose-400 transition cursor-pointer text-xs p-0.5"
                     title="Remove Stat"
                   >
-                    🗑️
+                    <Icon name="trash" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               ))}

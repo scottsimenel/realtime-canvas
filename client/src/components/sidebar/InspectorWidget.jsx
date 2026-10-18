@@ -1,4 +1,5 @@
 import TooltipInspector from './TooltipInspector.jsx';
+import Icon from '../common/Icon.jsx';
 
 export default function InspectorWidget({
   selectedElementIds,
@@ -236,7 +237,8 @@ export default function InspectorWidget({
               className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               title="Bring to Front"
             >
-              ⏫ Bring to Front
+              <Icon name="chevrons-up" className="w-3.5 h-3.5" />
+              <span>Bring to Front</span>
             </button>
             <button
               type="button"
@@ -244,7 +246,8 @@ export default function InspectorWidget({
               className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               title="Bring Forward"
             >
-              ▲ Bring Forward
+              <Icon name="chevron-up" className="w-3.5 h-3.5" />
+              <span>Bring Forward</span>
             </button>
             <button
               type="button"
@@ -252,7 +255,8 @@ export default function InspectorWidget({
               className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               title="Send Backward"
             >
-              ▼ Send Backward
+              <Icon name="chevron-down" className="w-3.5 h-3.5" />
+              <span>Send Backward</span>
             </button>
             <button
               type="button"
@@ -260,7 +264,8 @@ export default function InspectorWidget({
               className="py-2 px-2.5 rounded-lg bg-slate-950/60 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-xs text-slate-300 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               title="Send to Back"
             >
-              ⏬ Send to Back
+              <Icon name="chevrons-down" className="w-3.5 h-3.5" />
+              <span>Send to Back</span>
             </button>
           </div>
         </div>
@@ -286,11 +291,11 @@ export default function InspectorWidget({
                 className="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-205 focus:outline-none focus:border-sky-500 transition cursor-pointer"
               >
                 <option value="" disabled>-- Mixed Shapes --</option>
-                <option value="rectangle">Rectangle ⬜</option>
-                <option value="circle">Circle ⚪</option>
-                <option value="triangle">Triangle 🔺</option>
-                <option value="star">Star ⭐</option>
-                <option value="hexagon">Hexagon ⬢</option>
+                <option value="rectangle">Rectangle</option>
+                <option value="circle">Circle</option>
+                <option value="triangle">Triangle</option>
+                <option value="star">Star</option>
+                <option value="hexagon">Hexagon</option>
               </select>
             </div>
 
@@ -342,7 +347,7 @@ export default function InspectorWidget({
                     }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  <span className="text-[9px] pointer-events-none select-none text-slate-400">🎨</span>
+                  <Icon name="pipette" className="w-3 h-3 text-slate-400 pointer-events-none select-none" />
                 </div>
               </div>
 
@@ -434,7 +439,7 @@ export default function InspectorWidget({
                         }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
-                      <span className="text-[9px] pointer-events-none select-none text-slate-400">🎨</span>
+                      <Icon name="pipette" className="w-3 h-3 text-slate-400 pointer-events-none select-none" />
                     </div>
                   </div>
 
@@ -525,7 +530,8 @@ export default function InspectorWidget({
           onClick={handleDeleteSelected}
           className="w-full py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/35 hover:border-rose-500/60 text-xs text-rose-455 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
         >
-          🗑️ Delete Selected
+          <Icon name="trash" className="w-3.5 h-3.5" />
+          <span>Delete Selected</span>
         </button>
       </div>
 

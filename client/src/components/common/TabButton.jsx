@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Icon from './Icon.jsx';
 
 export default function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete, onRename, isDeleteDisabled }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -62,10 +63,10 @@ export default function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete,
             e.stopPropagation();
             setIsEditing(true);
           }}
-          className="text-slate-400 hover:text-sky-300 text-[10px] cursor-pointer transition p-0.5"
+          className="text-slate-400 hover:text-sky-300 cursor-pointer transition p-0.5"
           title="Rename Canvas"
         >
-          ✏️
+          <Icon name="pencil" className="w-2.5 h-2.5" />
         </button>
       )}
 
@@ -100,7 +101,7 @@ export default function TabButton({ tab, isActive, tabUsers, onSwitch, onDelete,
           }`}
           title="Delete Canvas"
         >
-          ✕
+          <Icon name="x" className="w-3 h-3" />
         </button>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Icon from '../common/Icon.jsx';
 
 export default function ActiveUsersWidget({
   users,
@@ -87,14 +88,15 @@ export default function ActiveUsersWidget({
         className="w-full flex items-center justify-between pb-1 text-left cursor-pointer select-none focus:outline-none"
       >
         <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-          <span>👥 Active Users</span>
+          <Icon name="users" className="w-3.5 h-3.5" />
+          <span>Active Users</span>
         </h2>
         <div className="flex items-center gap-2">
           <span className="text-[11px] bg-indigo-500/10 text-indigo-400 font-bold px-2 py-0.5 rounded-full border border-indigo-500/25">
             {users.length}
           </span>
-          <span className="text-slate-500 text-xs">
-            {isCollapsed ? '➕' : '➖'}
+          <span className="text-slate-400">
+            <Icon name={isCollapsed ? "plus" : "minus"} className="w-3 h-3" />
           </span>
         </div>
       </button>

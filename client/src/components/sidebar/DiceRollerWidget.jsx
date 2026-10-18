@@ -1,4 +1,5 @@
 import DieIcon from '../common/DieIcon.jsx';
+import Icon from '../common/Icon.jsx';
 
 export default function DiceRollerWidget({
   showDiceRoller,
@@ -44,8 +45,9 @@ export default function DiceRollerWidget({
     >
       {/* Card Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <h2 className="text-sm font-bold text-slate-205 flex items-center gap-2">
-          <span>🎲 Dice Roller</span>
+        <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <Icon name="dices" className="w-4 h-4 text-indigo-400" />
+          <span>Dice Roller</span>
         </h2>
         <button
           type="button"
@@ -56,7 +58,7 @@ export default function DiceRollerWidget({
           className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-900 border border-slate-800 transition cursor-pointer active:scale-95 flex items-center justify-center"
           title="Close Roller"
         >
-          ✕
+          <Icon name="x" className="w-4 h-4" />
         </button>
       </div>
 
@@ -175,9 +177,10 @@ export default function DiceRollerWidget({
                       }));
                     }}
                     disabled={count === 0}
-                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 transition text-[11px] font-black text-slate-350 cursor-pointer disabled:cursor-not-allowed"
+                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 transition text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                    title="Decrease count"
                   >
-                    －
+                    <Icon name="minus" className="w-3 h-3" />
                   </button>
                   <span className="text-sm font-bold w-4 text-center text-slate-205">
                     {count}
@@ -190,9 +193,10 @@ export default function DiceRollerWidget({
                         [type]: Math.min(30, count + 1)
                       }));
                     }}
-                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition text-[11px] font-black text-slate-355 cursor-pointer"
+                    className="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-800 transition text-slate-355 cursor-pointer"
+                    title="Increase count"
                   >
-                    ＋
+                    <Icon name="plus" className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -208,7 +212,8 @@ export default function DiceRollerWidget({
         disabled={isDisabled}
         className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm rounded-xl shadow-xl shadow-indigo-950/40 hover:shadow-indigo-600/10 border border-indigo-500/30 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-97 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:from-indigo-600 disabled:hover:to-violet-600"
       >
-        <span>🎲</span> {isDisabled ? 'Select Dice to Roll' : `Roll ${formula}`}
+        <Icon name="dices" className="w-4 h-4" />
+        <span>{isDisabled ? 'Select Dice to Roll' : `Roll ${formula}`}</span>
       </button>
 
       {/* Roll History logs */}
@@ -224,9 +229,10 @@ export default function DiceRollerWidget({
                 setRollHistory([]);
                 setHoveredRoll(null);
               }}
-              className="text-xs text-slate-500 hover:text-slate-400 cursor-pointer font-bold"
+              className="text-xs text-slate-500 hover:text-slate-400 cursor-pointer font-bold flex items-center gap-1"
             >
-              Clear
+              <Icon name="trash" className="w-3 h-3" />
+              <span>Clear</span>
             </button>
           )}
         </div>

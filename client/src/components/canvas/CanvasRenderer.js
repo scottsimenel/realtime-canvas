@@ -316,8 +316,8 @@ export const drawElements = (ctx, elements, locks, users, currentUser, getOrLoad
 
       if (isLockedByOther && lockHolder) {
         ctx.fillStyle = lockColor;
-        ctx.font = `500 ${11 / scale}px Inter, system-ui, sans-serif`;
-        const labelText = `🔒 Locked by ${lockHolder.name}`;
+        ctx.font = `600 ${11 / scale}px Inter, system-ui, sans-serif`;
+        const labelText = `Locked by ${lockHolder.name}`;
         const textWidth = ctx.measureText(labelText).width;
 
         ctx.fillRect(
@@ -333,8 +333,8 @@ export const drawElements = (ctx, elements, locks, users, currentUser, getOrLoad
         ctx.fillText(labelText, -w / 2, -h / 2 - 20 / scale);
       } else if (isLockedByMe) {
         ctx.fillStyle = lockColor;
-        ctx.font = `500 ${11 / scale}px Inter, system-ui, sans-serif`;
-        const labelText = '✨ Transforming';
+        ctx.font = `600 ${11 / scale}px Inter, system-ui, sans-serif`;
+        const labelText = 'Transforming';
         const textWidth = ctx.measureText(labelText).width;
 
         ctx.fillRect(

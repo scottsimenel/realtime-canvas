@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import ActiveUsersWidget from '../sidebar/ActiveUsersWidget.jsx';
+import Icon from '../common/Icon.jsx';
 
 export default function Header({
   showHeader,
@@ -73,7 +74,7 @@ export default function Header({
               }`}
               title="Copy room invite link"
             >
-              <span>{copied ? '✓' : '🔗'}</span>
+              <Icon name={copied ? "check" : "link"} className="w-3 h-3" />
               <span>{copied ? 'Copied' : 'Invite'}</span>
             </button>
           </div>
@@ -94,7 +95,7 @@ export default function Header({
             }`}
             title="Undo last action (Ctrl+Z)"
           >
-            <span className="text-xs">↩️</span>
+            <Icon name="undo" className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Undo</span>
           </button>
 
@@ -109,7 +110,7 @@ export default function Header({
             }`}
             title="Redo last action (Ctrl+Shift+Z)"
           >
-            <span className="text-xs">↪️</span>
+            <Icon name="redo" className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Redo</span>
           </button>
 
@@ -119,7 +120,7 @@ export default function Header({
             className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 cursor-pointer shadow-md"
             title="Manage saved states"
           >
-            <span className="text-xs">💾</span>
+            <Icon name="save" className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Saves</span>
           </button>
 
@@ -130,7 +131,7 @@ export default function Header({
               className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-semibold border transition select-none active:scale-95 bg-slate-950/60 border-slate-800 text-slate-350 hover:bg-slate-900 hover:border-slate-700 hover:text-indigo-300 cursor-pointer shadow-md"
               title="Return to room browser lobby"
             >
-              <span className="text-xs">🚪</span>
+              <Icon name="log-out" className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Lobby</span>
             </button>
           )}
@@ -161,7 +162,9 @@ export default function Header({
             className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-slate-950/60 border border-slate-800/60 text-xs text-slate-300 cursor-pointer hover:bg-slate-900 transition"
             title="Toggle online users list"
           >
-            👥 <span className="font-bold">{users.length}</span><span className="hidden sm:inline"> online</span>
+            <Icon name="users" className="w-3.5 h-3.5 text-slate-400" />
+            <span className="font-bold">{users.length}</span>
+            <span className="hidden sm:inline"> online</span>
           </button>
           {showUsersPopover && (
             <div 
@@ -235,8 +238,8 @@ export default function Header({
               <span className="font-semibold text-xs sm:text-sm text-slate-200 hover:text-white transition truncate">
                 {currentUser?.name}
               </span>
-              <span className="text-slate-500 hover:text-slate-350 text-[10px] sm:text-[11px] opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
-                ✏️
+              <span className="text-slate-500 hover:text-slate-350 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
+                <Icon name="pencil" className="w-2.5 h-2.5" />
               </span>
             </div>
           )}

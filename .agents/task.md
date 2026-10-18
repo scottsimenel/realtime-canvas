@@ -200,4 +200,9 @@
 - `[x]` 23.5 Verification loop: Verify ESLint (0 errors, 0 warnings), Vitest client test suite (96/96 passing), server tests (10/10 passing), and Vite production build.
 - `[x]` 23.6 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
 
-
+## 📦 WS24 — Full-App Iconography Modernization & Vector Unification
+- `[x]` 24.1 Create zero-dependency unified vector icon component `client/src/components/common/Icon.jsx` and enhance `DieIcon.jsx` with subtle polyhedral inner facet lines.
+- `[x]` 24.2 Overhaul primary toolbars: replace broken/strange SVGs and emojis in `CanvasDock.jsx`, `Header.jsx`, `TabButton.jsx`, and `Canvas.jsx` zoom controls.
+- `[x]` 24.3 Overhaul left & right sidebars: fix malformed background SVG, replace shape emojis with vector geometric icons in `LeftSidebar.jsx`, replace emojis and arrows in `RightSidebar.jsx`, `InspectorWidget.jsx`, `TooltipInspector.jsx`, and `ActiveUsersWidget.jsx`.
+- `[x]` 24.4 Overhaul modals, widgets & lobby: replace cyclone spinner, emojis, and math characters in `Lobby.jsx`, `DiceRollerWidget.jsx`, and `SavesModal.jsx`.
+- `[x]` 24.5 Automated verification, test suite for `Icon.jsx`, linter check, production build, server syntax check, documentation sync (`STRUCTURE.md`, `walkthrough.md`), git commit, and push.

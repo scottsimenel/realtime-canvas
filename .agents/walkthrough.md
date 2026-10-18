@@ -745,6 +745,69 @@ We implemented touch-controlled pinch resizing for canvas tokens and images whil
 - **Vite Build**: Production build bundled successfully in 2.27s.
 - **Server Syntax**: `node --check server/server.js` passed with exit code 0.
 
+---
+
+## 🎨 WS24 — Full-App Iconography Modernization & Vector Unification
+
+We conducted an end-to-end audit and comprehensive modernization of iconography across the entire application, eliminating broken SVGs, OS-dependent emojis, non-standard symbols, and clashing icon styles in favor of a clean, cohesive, Lucide-style vector SVG iconography design.
+
+### 1. Centralized Vector Iconography System ([Icon.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/Icon.jsx))
+- **Zero Third-Party Dependencies**: Hand-crafted 45+ optimized vector SVG paths conforming strictly to Guardrail 4.
+- **Unified Standardized Geometry**:
+  - `viewBox="0 0 24 24"`
+  - `fill="none"` (default)
+  - `stroke="currentColor"`
+  - `strokeWidth={strokeWidth || 2}`
+  - `strokeLinecap="round"`
+  - `strokeLinejoin="round"`
+- **Enhanced Polyhedral Dice Wireframes ([DieIcon.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/DieIcon.jsx))**:
+  - Added subtle 3D polyhedral inner facet wireframes (`opacity: 0.25`, `strokeWidth: 2.5`) for d4 (tetrahedron), d6 (cube), d8 (octahedron), d10 (decahedron), d12 (dodecahedron), d20 (icosahedron), and d100 (zocchihedron).
+- **Consistent Size Tokens**:
+  - Main Toolbar Dock: `w-5 h-5`
+  - Sidebar & Modal Headers: `w-4 h-4` / `w-5 h-5`
+  - Inline Action Buttons (trash, copy, edit, close, search): `w-3.5 h-3.5` / `w-3 h-3`
+  - User Presence & Badges: `w-2.5 h-2.5` / `w-3 h-3`
+  - Large Empty States / Dropzones: `w-7 h-7` to `w-8 h-8`
+
+### 2. Full Application Component Overhaul
+- **Primary Toolbars & Viewport Controls**:
+  - [CanvasDock.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasDock.jsx): Replaced all tools and toggles (`mouse-pointer`, `hand`, `pencil`, `eraser`, `ruler`, `trash`, `sparkles`, `shapes`, `dices`, `sliders`, `maximize`, `minimize`, `plus`).
+  - [Header.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/header/Header.jsx): Modernized invite link (`link`/`check`), undo/redo (`undo`/`redo`), save state trigger (`save`), lobby navigation (`log-out`), user count (`users`), and profile editing (`pencil`).
+  - [TabButton.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/TabButton.jsx): Renaming (`pencil`) and tab closure (`x`).
+  - [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx): Floating zoom in/out buttons (`plus`, `minus`).
+- **Sidebars & Layer Inspectors**:
+  - [LeftSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/LeftSidebar.jsx):
+    - Fixed broken mountain background SVG button with crisp `image` icon.
+    - Replaced shape emojis with geometric vectors (`shape-rectangle`, `shape-circle`, `shape-triangle`, `shape-star`, `shape-hexagon`).
+    - Modernized folder tree navigation (`chevron-right`/`chevron-down`, `folder`, `folder-plus`, `folder-up`, `pencil`, `trash`).
+    - Standardized dropzone icons (`upload`), pipettes (`pipette`), and upload alerts (`alert-circle`).
+  - [RightSidebar.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/RightSidebar.jsx):
+    - Replaced search input icons (`search`, `x`), drag handles (`grip-vertical`), layer movement (`chevrons-up`, `chevron-up`, `chevron-down`, `chevrons-down`), locate (`locate`), lock states (`lock`, `unlock`), delete (`trash`), and empty state search indicator (`search`).
+  - [InspectorWidget.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/InspectorWidget.jsx): Replaced layer shifting buttons (`chevrons-up`, `chevron-up`, `chevron-down`, `chevrons-down`), color picker pipettes (`pipette`), and cleaned shape option labels.
+  - [TooltipInspector.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/TooltipInspector.jsx): Replaced message square header (`message-square`), add triggers (`plus`), and deletion (`trash`).
+  - [ActiveUsersWidget.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/ActiveUsersWidget.jsx): Replaced header icon (`users`) and accordion toggles (`plus`/`minus`).
+- **Modals, Lobby & Overlays**:
+  - [DiceRollerWidget.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/sidebar/DiceRollerWidget.jsx): Replaced dice emoji header (`dices`), close button (`x`), stepper buttons (`minus`, `plus`), roll trigger (`dices`), and roll history clear (`trash`).
+  - [SavesModal.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/saves/SavesModal.jsx): Modernized header (`save`), close button (`x`), and save deletion (`trash`).
+  - [Lobby.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/lobby/Lobby.jsx): Replaced invite banner (`mail`), random room/name generators (`dices`), refresh button (`refresh`), saved filter tab (`save`), loading spinner (`loader`), and empty search icon (`search`).
+  - [CanvasRenderer.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasRenderer.js): Cleaned canvas text overlays (`Locked by ${user}` and `Transforming`) to prevent missing glyphs on systems without emoji fallback fonts.
+
+### 3. Automated Unit Test Suite ([Icon.test.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/__tests__/Icon.test.jsx))
+- Added 5 comprehensive tests:
+  - Validates all 45+ registered icon keys in `ICONS`.
+  - Verifies standard SVG element properties (`viewBox`, `strokeWidth`, `stroke`, `fill`, `className`, `aria-hidden`).
+  - Verifies custom className and strokeWidth overrides.
+  - Verifies custom numeric pixel dimensions and fill color overrides.
+  - Verifies unknown icon fallback logging and null return.
+
+### Verification Suite:
+- **Client Tests**: 15/15 test files passed, 101/101 tests passed (100% pass rate).
+- **Server Tests**: 10/10 tests passed (100% pass rate).
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production build bundled successfully in 2.19s.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
+
 
 
 

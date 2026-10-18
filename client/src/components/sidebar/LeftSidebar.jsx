@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { SAMPLE_IMAGES } from '../../constants.js';
 import ActiveUsersWidget from './ActiveUsersWidget.jsx';
+import Icon from '../common/Icon.jsx';
 import { useUploadStore } from '../../state/uploadStore.js';
 import {
   MAX_FOLDER_DEPTH,
@@ -306,9 +307,7 @@ export default function LeftSidebar({
                 className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
                 title="Rename Image"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                </svg>
+                <Icon name="pencil" className="w-3 h-3" />
               </button>
             )}
           </div>
@@ -325,9 +324,7 @@ export default function LeftSidebar({
         }`}
         title="Set as Canvas Background"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a6 6 0 018.486 0l5.16 5.159m-16.5 0h16.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <Icon name="image" className="w-3.5 h-3.5" />
       </button>
 
       <button
@@ -336,9 +333,7 @@ export default function LeftSidebar({
         className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-400 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto flex items-center justify-center hover:bg-slate-800 hover:text-rose-455 active:scale-95 transition cursor-pointer z-10"
         title="Hide Image"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.893 7.893L21 21m-4.228-4.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
-        </svg>
+        <Icon name="eye-off" className="w-3.5 h-3.5" />
       </button>
 
       {!img.isPreset && (
@@ -354,9 +349,7 @@ export default function LeftSidebar({
           className="absolute top-1.5 right-8 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
           title="Delete Permanently"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
+          <Icon name="trash" className="w-3.5 h-3.5" />
         </button>
       )}
 
@@ -376,10 +369,10 @@ export default function LeftSidebar({
             className="text-[9px] bg-slate-900/95 border border-slate-700/80 text-slate-300 rounded px-1 py-0.5 max-w-[84px] cursor-pointer focus:outline-none"
             title="Move to folder"
           >
-            <option value="">📁 Root</option>
+            <option value="">/ (Root)</option>
             {flattenedFolders.map((f) => (
               <option key={f.id} value={f.id}>
-                {f.indentPrefix}📁 {f.name}
+                {f.indentPrefix}/ {f.name}
               </option>
             ))}
           </select>
@@ -437,10 +430,11 @@ export default function LeftSidebar({
           className="flex items-center justify-between p-2 bg-slate-950/40 hover:bg-slate-950/70 transition cursor-pointer select-none border-b border-slate-900/40"
         >
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="text-[10px] text-slate-500 shrink-0">
-              {isCollapsed ? '▶' : '▼'}
-            </span>
-            <span className="text-xs shrink-0">📁</span>
+            <Icon
+              name={isCollapsed ? "chevron-right" : "chevron-down"}
+              className="w-3 h-3 text-slate-500 shrink-0"
+            />
+            <Icon name="folder" className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             {editingFolderId === folder.id ? (
               <input
                 type="text"
@@ -489,9 +483,7 @@ export default function LeftSidebar({
                 className="text-slate-500 hover:text-sky-400 transition cursor-pointer p-0.5"
                 title="Add Subfolder"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
+                <Icon name="folder-plus" className="w-3.5 h-3.5" />
               </button>
             )}
             <button
@@ -500,9 +492,7 @@ export default function LeftSidebar({
               className="text-slate-500 hover:text-slate-300 transition cursor-pointer p-0.5"
               title="Rename Folder"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-              </svg>
+              <Icon name="pencil" className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
@@ -519,9 +509,7 @@ export default function LeftSidebar({
               className="text-slate-500 hover:text-rose-500 transition cursor-pointer p-0.5"
               title="Delete Folder"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <Icon name="trash" className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -674,9 +662,7 @@ export default function LeftSidebar({
           className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-900 border border-slate-800 transition cursor-pointer active:scale-95 flex items-center justify-center animate-in duration-200"
           title="Close Panel"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="x" className="w-4 h-4" />
         </button>
       </div>
 
@@ -729,11 +715,11 @@ export default function LeftSidebar({
                 </h4>
                 <div className="grid grid-cols-5 gap-1.5">
                   {[
-                    { type: 'rectangle', label: 'Rect', icon: '⬜' },
-                    { type: 'circle', label: 'Circle', icon: '⚪' },
-                    { type: 'triangle', label: 'Tri', icon: '🔺' },
-                    { type: 'star', label: 'Star', icon: '⭐' },
-                    { type: 'hexagon', label: 'Hex', icon: '⬢' },
+                    { type: 'rectangle', label: 'Rect' },
+                    { type: 'circle', label: 'Circle' },
+                    { type: 'triangle', label: 'Tri' },
+                    { type: 'star', label: 'Star' },
+                    { type: 'hexagon', label: 'Hex' },
                   ].map((s) => (
                     <button
                       key={s.type}
@@ -746,7 +732,7 @@ export default function LeftSidebar({
                       }`}
                       title={s.label}
                     >
-                      <span className="text-sm">{s.icon}</span>
+                      <Icon name={`shape-${s.type}`} className="w-4 h-4" />
                       <span className="text-[8px] font-bold uppercase tracking-wider">{s.label}</span>
                     </button>
                   ))}
@@ -784,7 +770,7 @@ export default function LeftSidebar({
                       onChange={(e) => setSpawnFillColor(e.target.value)}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     />
-                    <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                    <Icon name="pipette" className="w-3 h-3 text-slate-400 pointer-events-none select-none" />
                   </div>
                 </div>
 
@@ -842,7 +828,7 @@ export default function LeftSidebar({
                           onChange={(e) => setSpawnStrokeColor(e.target.value)}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
-                        <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                        <Icon name="pipette" className="w-3 h-3 text-slate-400 pointer-events-none select-none" />
                       </div>
                     </div>
 
@@ -901,7 +887,8 @@ export default function LeftSidebar({
                 }}
                 className="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition active:scale-[0.98] shadow-lg shadow-sky-500/20 hover:shadow-sky-500/30 flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
-                ➕ Spawn Shape
+                <Icon name="plus" className="w-4 h-4" />
+                <span>Spawn Shape</span>
               </button>
             </div>
 
@@ -970,9 +957,10 @@ export default function LeftSidebar({
 
               <div className="space-y-2">
                 <div className="relative">
+                  <Icon name="search" className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5 pointer-events-none" />
                   <input
                     type="text"
-                    placeholder="🔍 Search library..."
+                    placeholder="Search library..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-7 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-355 placeholder-slate-600 focus:outline-none focus:border-slate-700 transition"
@@ -1076,7 +1064,8 @@ export default function LeftSidebar({
                         onClick={() => setShowNewFolderForm(true)}
                         className="text-[10px] font-bold text-sky-400 hover:text-sky-350 transition cursor-pointer flex items-center gap-1 select-none"
                       >
-                        📁+ New Folder
+                        <Icon name="folder-plus" className="w-3.5 h-3.5" />
+                        <span>New Folder</span>
                       </button>
                     </div>
                   )}
@@ -1099,7 +1088,10 @@ export default function LeftSidebar({
                         : 'border-slate-800 text-slate-500 bg-slate-950/20 hover:border-slate-700'
                     }`}
                   >
-                    📥 Drop here to move back to Root Library
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Icon name="folder-up" className="w-3.5 h-3.5" />
+                      Drop here to move back to Root Library
+                    </span>
                   </div>
                 )}
 
@@ -1154,9 +1146,7 @@ export default function LeftSidebar({
                                   className="pointer-events-auto opacity-0 group-hover:opacity-100 text-slate-450 hover:text-white transition cursor-pointer ml-1 z-20"
                                   title="Rename Image"
                                 >
-                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                                  </svg>
+                                  <Icon name="pencil" className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
@@ -1168,10 +1158,7 @@ export default function LeftSidebar({
                             className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-400 hover:scale-105 active:scale-95 transition cursor-pointer z-10"
                             title="Restore Image"
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
+                            <Icon name="eye" className="w-3.5 h-3.5" />
                           </button>
 
                           {!img.isPreset && (
@@ -1187,9 +1174,7 @@ export default function LeftSidebar({
                               className="absolute top-1.5 left-1.5 w-6 h-6 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-455 opacity-0 group-hover:opacity-100 flex items-center justify-center hover:bg-slate-800 hover:text-rose-600 active:scale-95 transition cursor-pointer z-10"
                               title="Delete Permanently"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
+                              <Icon name="trash" className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </div>
@@ -1301,15 +1286,7 @@ export default function LeftSidebar({
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1.5">
-                    <svg
-                      className="w-7 h-7 text-slate-500 group-hover:text-slate-400 transition"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
+                    <Icon name="upload" className="w-7 h-7 text-slate-500 group-hover:text-slate-400 transition" />
                     <span className="text-xs font-bold text-slate-400 group-hover:text-slate-350 transition">
                       Drag images here or browse
                     </span>
@@ -1319,7 +1296,8 @@ export default function LeftSidebar({
               </div>
               {uploadError && (
                 <p className="text-[10px] text-rose-455 font-semibold flex items-center gap-1">
-                  ⚠️ {uploadError}
+                  <Icon name="alert-circle" className="w-3.5 h-3.5 shrink-0" />
+                  <span>{uploadError}</span>
                 </p>
               )}
             </div>
@@ -1611,7 +1589,7 @@ export default function LeftSidebar({
                           onChange={(e) => handleUpdateRoomSettings({ gridColor: e.target.value })}
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
-                        <span className="text-[10px] pointer-events-none select-none text-slate-400">🎨</span>
+                        <Icon name="pipette" className="w-3 h-3 text-slate-400 pointer-events-none select-none" />
                       </div>
                     </div>
                   </div>

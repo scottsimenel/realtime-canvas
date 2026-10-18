@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import InspectorWidget from './InspectorWidget.jsx';
+import Icon from '../common/Icon.jsx';
 import { EVENTS } from '../../../../shared/protocol.js';
 import { getFullUrl } from '../../lib/url.js';
 
@@ -86,6 +87,7 @@ export default function RightSidebar({
 
         {/* Search Input */}
         <div className="relative">
+          <Icon name="search" className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-500 pointer-events-none" />
           <input
             type="text"
             placeholder="Search elements..."
@@ -93,14 +95,13 @@ export default function RightSidebar({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-3 py-2 pl-9 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-slate-205 placeholder-slate-650 focus:outline-none focus:border-sky-500 transition"
           />
-          <span className="absolute left-3 top-2.5 text-slate-500 text-xs">🔍</span>
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2 text-slate-400 hover:text-slate-200 text-xs"
+              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200 cursor-pointer"
               title="Clear Search"
             >
-              ✕
+              <Icon name="x" className="w-3 h-3" />
             </button>
           )}
         </div>
@@ -223,7 +224,7 @@ export default function RightSidebar({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="text-slate-600 hover:text-slate-400 cursor-grab text-[13px] select-none mr-0.5 flex-shrink-0">
-                        ⋮⋮
+                        <Icon name="grip-vertical" className="w-3.5 h-3.5" />
                       </div>
                       {renderPreview()}
                       <span className="text-xs font-bold text-slate-350 truncate">
@@ -247,7 +248,7 @@ export default function RightSidebar({
                         title="Bring to Front"
                         draggable="false"
                       >
-                        ⏫
+                        <Icon name="chevrons-up" className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
@@ -264,7 +265,7 @@ export default function RightSidebar({
                         title="Bring Forward"
                         draggable="false"
                       >
-                        ▲
+                        <Icon name="chevron-up" className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
@@ -281,7 +282,7 @@ export default function RightSidebar({
                         title="Send Backward"
                         draggable="false"
                       >
-                        ▼
+                        <Icon name="chevron-down" className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
@@ -298,7 +299,7 @@ export default function RightSidebar({
                         title="Send to Back"
                         draggable="false"
                       >
-                        ⏬
+                        <Icon name="chevrons-down" className="w-3 h-3" />
                       </button>
                       <button
                         type="button"
@@ -314,7 +315,7 @@ export default function RightSidebar({
                         title="Locate on Canvas"
                         draggable="false"
                       >
-                        👁️
+                        <Icon name="locate" className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -333,7 +334,7 @@ export default function RightSidebar({
                         title={isLockedByOther ? "Cannot lock/unlock: currently being edited" : el.properties?.locked ? "Click to unlock selection on canvas" : "Click to lock selection on canvas (Sidebar only)"}
                         draggable="false"
                       >
-                        {el.properties?.locked ? '🔒' : '🔓'}
+                        <Icon name={el.properties?.locked ? "lock" : "unlock"} className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -348,7 +349,8 @@ export default function RightSidebar({
                       className="flex items-center justify-between border rounded-lg px-2.5 py-1 text-xs"
                     >
                       <span className="text-slate-400 flex items-center gap-1.5">
-                        🔒 Editing: Locked by{' '}
+                        <Icon name="lock" className="w-3 h-3 text-slate-400" />
+                        <span>Editing: Locked by </span>
                         <span
                           style={{ color: lockHolder?.color }}
                           className="font-extrabold"
@@ -360,12 +362,16 @@ export default function RightSidebar({
                   ) : el.properties?.locked ? (
                     <div className="flex items-center justify-between border border-amber-500/25 bg-amber-500/5 rounded-lg px-2.5 py-1 text-xs text-amber-400">
                       <span className="flex items-center gap-1">
-                        🔒 Canvas Selection Locked
+                        <Icon name="lock" className="w-3 h-3 text-amber-400" />
+                        <span>Canvas Selection Locked</span>
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between border border-slate-800/80 bg-slate-950/20 rounded-lg px-2.5 py-1 text-xs text-slate-500">
-                      <span>🔓 Unlocked & Editable</span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="unlock" className="w-3 h-3 text-slate-500" />
+                        <span>Unlocked & Editable</span>
+                      </span>
                     </div>
                   )}
 
@@ -397,10 +403,11 @@ export default function RightSidebar({
                           });
                         }
                       }}
-                      className="mt-1 w-full py-2 px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-xs text-rose-400 font-bold transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      className="mt-1 w-full py-2 px-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 text-xs text-rose-400 font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                       draggable="false"
                     >
-                      🗑️ Delete Element
+                      <Icon name="trash" className="w-3.5 h-3.5" />
+                      <span>Delete Element</span>
                     </button>
                   )}
                 </div>
@@ -440,9 +447,7 @@ export default function RightSidebar({
           className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg bg-slate-900 border border-slate-800 transition cursor-pointer active:scale-95 flex items-center justify-center animate-in duration-200"
           title="Close Panel"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="x" className="w-4 h-4" />
         </button>
       </div>
 
@@ -473,7 +478,7 @@ export default function RightSidebar({
         ) : (
           <div className="space-y-5 animate-in fade-in duration-200">
             <div className="flex flex-col justify-center items-center text-center p-6 text-slate-550">
-              <span className="text-3xl mb-3">🔍</span>
+              <Icon name="search" className="w-8 h-8 text-slate-600 mb-3" strokeWidth={1.5} />
               <p className="text-sm font-semibold text-slate-400">No Selection</p>
               <p className="text-xs text-slate-500 max-w-[200px] leading-relaxed mt-1">
                 Select an element on the canvas or from the layers list below to inspect.

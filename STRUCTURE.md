@@ -87,7 +87,8 @@ graph TD
         *   `useDiceEvents.js`: Listens to dice roll broadcasts.
         *   `useSaveEvents.js`: Listens to room state loading and handles save CRUD requests.
 *   `/client/src/components/common/`:
-    *   `DieIcon.jsx`: Renders scalable vector SVG representations for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
+    *   `Icon.jsx`: Centralized Lucide-style vector SVG iconography component providing 45+ standardized icons with consistent 24x24 viewBox, stroke widths, and responsive sizing.
+    *   `DieIcon.jsx`: Renders scalable vector SVG representations with subtle 3D polyhedral facet wireframes for d4, d6, d8, d10, d12, d20, and d100 dice shapes.
     *   `TabButton.jsx`: Render tab capsules in the workspace header supporting double-click renaming, custom delete controls, and inline active user indicators.
 *   `/client/src/components/lobby/`:
     *   `Lobby.jsx`: The welcome and discovery portal. Features live available rooms browser, user presence counts, 1-click room joining, random room identifier generation, profile customization, and deep link invite handling.

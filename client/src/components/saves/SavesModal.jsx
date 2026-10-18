@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Icon from '../common/Icon.jsx';
 
 export default function SavesModal({
   saves,
@@ -53,17 +54,17 @@ export default function SavesModal({
         {/* Header Title */}
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-lg">💾</span>
+            <Icon name="save" className="w-5 h-5 text-indigo-400" />
             <h2 className="text-sm sm:text-base font-bold text-slate-200">
               Saved Canvas States
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition cursor-pointer text-lg font-bold"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition cursor-pointer"
             title="Close"
           >
-            ✕
+            <Icon name="x" className="w-4 h-4" />
           </button>
         </div>
 
@@ -133,10 +134,10 @@ export default function SavesModal({
                     {save.id !== 'autosave' && (
                       <button
                         onClick={() => onDeleteSave(save.id)}
-                        className="p-1.5 bg-slate-900 border border-slate-800/80 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20 rounded-lg text-xs transition active:scale-95 cursor-pointer"
+                        className="p-1.5 bg-slate-900 border border-slate-800/80 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/20 rounded-lg text-xs transition active:scale-95 cursor-pointer flex items-center justify-center"
                         title="Delete this save state"
                       >
-                        🗑️
+                        <Icon name="trash" className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>

@@ -1,5 +1,6 @@
 import { useUiStore } from '../../state/uiStore.js';
 import { useSelectionStore } from '../../state/selectionStore.js';
+import Icon from '../common/Icon.jsx';
 
 /**
  * CanvasDock Component.
@@ -50,7 +51,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
                 onChange={(e) => setPenColor(e.target.value)}
                 className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
               />
-              <span className="text-[10px] text-slate-400 font-bold select-none">+</span>
+              <Icon name="plus" className="w-2.5 h-2.5 text-slate-400 pointer-events-none" />
             </div>
           </div>
 
@@ -107,9 +108,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Select Tool"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.303.197-1.593 1.593M21.75 12h-2.25m-.197 5.303-1.593-1.593M3.071 6.25 4.664 4.664M12 19.75v2.25M6.25 3.071 4.664 4.664M4.5 12H2.25" />
-          </svg>
+          <Icon name="mouse-pointer" className="w-5 h-5" />
         </button>
         <button
           type="button"
@@ -121,9 +120,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Pan Tool (Hand)"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a2 2 0 114 0v4m0 0V5a2 2 0 114 0v6m0 0V3a2 2 0 114 0v8m0 0V9a2 2 0 114 0v10a7 7 0 01-7 7H9a7 7 0 01-7-7V11a2 2 0 114 0v4m0 0v-4" />
-          </svg>
+          <Icon name="hand" className="w-5 h-5" />
         </button>
         <button
           type="button"
@@ -135,9 +132,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Pen Tool"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-          </svg>
+          <Icon name="pencil" className="w-5 h-5" />
         </button>
         <button
           type="button"
@@ -149,9 +144,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Eraser Tool"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <Icon name="eraser" className="w-5 h-5" />
         </button>
         <button
           type="button"
@@ -163,9 +156,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Measurement Tool (Ruler)"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-          </svg>
+          <Icon name="ruler" className="w-5 h-5" />
         </button>
 
         <div className="w-px h-6 bg-slate-800 self-center mx-1 shrink-0" />
@@ -182,9 +173,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Delete Selected Elements (Delete/Backspace)"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
+          <Icon name="trash" className="w-5 h-5" />
         </button>
         <button
           type="button"
@@ -192,9 +181,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           className="p-2 sm:p-2.5 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer active:scale-95 shrink-0"
           title="Clear All Drawings"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 20h16M7 16h10M9 12h6M11 8h2M12 4v4" />
-          </svg>
+          <Icon name="sparkles" className="w-5 h-5" />
         </button>
 
         <div className="w-px h-6 bg-slate-800 self-center mx-1 shrink-0" />
@@ -216,9 +203,9 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
               ? 'bg-sky-500 border-sky-400 text-white shadow-md shadow-sky-500/20'
               : 'text-slate-400 border-transparent hover:bg-slate-800/80 hover:text-slate-200'
           }`}
-          title="Toggle Library Panel (🎨)"
+          title="Toggle Library Panel"
         >
-          <span className="text-base leading-none">🎨</span>
+          <Icon name="shapes" className="w-5 h-5" />
         </button>
 
         {/* Dice Toggle */}
@@ -230,9 +217,9 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
               ? 'bg-indigo-650 border-indigo-500 text-white shadow-md shadow-indigo-650/20'
               : 'text-slate-400 border-transparent hover:bg-slate-800/80 hover:text-slate-200'
           }`}
-          title="Toggle Dice Roller Panel (🎲)"
+          title="Toggle Dice Roller Panel"
         >
-          <span className="text-base leading-none">🎲</span>
+          <Icon name="dices" className="w-5 h-5" />
         </button>
 
         {/* Properties Toggle */}
@@ -251,9 +238,9 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
               ? 'bg-sky-500 border-sky-400 text-white shadow-md shadow-sky-500/20'
               : 'text-slate-400 border-transparent hover:bg-slate-800/80 hover:text-slate-200'
           }`}
-          title="Toggle Inspector Panel (⚙️)"
+          title="Toggle Inspector Panel"
         >
-          <span className="text-base leading-none">⚙️</span>
+          <Icon name="sliders" className="w-5 h-5" />
         </button>
 
         <div className="w-px h-6 bg-slate-800 self-center mx-1 shrink-0" />
@@ -269,13 +256,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
           }`}
           title="Toggle Zen Mode (Press \)"
         >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            {isZenMode ? (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3 3m12 6V4.5m0 4.5h4.5M15 9l6-6m-6 12v4.5m0-4.5h4.5m-4.5 0l6 6m-6-12v4.5m0-4.5H4.5M9 15l-6 6" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 0v4.5m0-4.5h-4.5m4.5 0l-6-6" />
-            )}
-          </svg>
+          <Icon name={isZenMode ? "minimize" : "maximize"} className="w-5 h-5" />
         </button>
       </div>
     </div>
