@@ -10,7 +10,9 @@ import {
   getGroupHandleAtCoords,
   checkElementIntersectsBox,
   calculateFocalZoomPan,
-  scalePanOffsetForZoom
+  scalePanOffsetForZoom,
+  getPinchTargetElement,
+  calculateTokenPinchResize,
 } from './CanvasSelection.js';
 import {
   drawBackground,
@@ -90,6 +92,7 @@ const getCanvasCursorClass = (activeTool, isSpacePressed, activeDragMode, hoverC
     if (activeDragMode === 'pan' || activeDragMode === 'touch-gesture') return 'cursor-grabbing';
     if (activeDragMode === 'move' || activeDragMode === 'group-move') return 'cursor-move';
     if (activeDragMode === 'rotate' || activeDragMode === 'group-rotate') return 'cursor-grabbing';
+    if (activeDragMode === 'token-pinch-resize') return 'cursor-nwse-resize';
     if (activeDragMode.includes('resize')) return 'cursor-crosshair';
     if (activeDragMode === 'select') return 'cursor-crosshair';
   }
@@ -341,6 +344,25 @@ export default function Canvas({
     return { scale, offsetX, offsetY, virtualWidth, virtualHeight };
   }, [canvasSize, virtualDimensions, userZoom, panOffset]);
 
+  // Convert client screen coordinates to virtual canvas coordinates
+  const clientToCanvasCoords = useCallback((clientX, clientY) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const screenX = clientX - rect.left;
+    const screenY = clientY - rect.top;
+
+    const { scale, offsetX, offsetY } = getViewportTransform();
+    return {
+      x: Math.round((screenX - offsetX) / scale),
+      y: Math.round((screenY - offsetY) / scale),
+    };
+  }, [getViewportTransform]);
+
+  const getCanvasCoords = useCallback((e) => {
+    return clientToCanvasCoords(e.clientX, e.clientY);
+  }, [clientToCanvasCoords]);
+
   // Drawing loop
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -533,7 +555,97 @@ export default function Canvas({
       if (dragStateRef.current && dragStateRef.current.mode === 'measure') {
         setMeasurePoints(null);
       }
-      if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds.length > 0) {
+
+      const [p1, p2] = activePointerIds.map((id) => activePointersRef.current[id]);
+      const coords1 = clientToCanvasCoords(p1.clientX, p1.clientY);
+      const coords2 = clientToCanvasCoords(p2.clientX, p2.clientY);
+      const pinchTarget = activeTool === 'select'
+        ? getPinchTargetElement(coords1, coords2, elements, locks, currentUser?.id)
+        : null;
+
+      if (pinchTarget) {
+        // Unlock any other elements previously locked by single touch
+        if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds?.length > 0) {
+          socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: dragStateRef.current.lockedIds, tabId });
+          setLocks((prev) => {
+            const next = { ...prev };
+            dragStateRef.current.lockedIds.forEach((id) => delete next[id]);
+            return next;
+          });
+        } else if (dragStateRef.current && dragStateRef.current.hasLock && dragStateRef.current.elementId !== pinchTarget.id) {
+          socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: dragStateRef.current.elementId, tabId });
+          setLocks((prev) => {
+            const next = { ...prev };
+            delete next[dragStateRef.current.elementId];
+            return next;
+          });
+        }
+
+        const distance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+        const startMidpoint = { x: (coords1.x + coords2.x) / 2, y: (coords1.y + coords2.y) / 2 };
+
+        const hasExistingLock = Boolean(
+          dragStateRef.current &&
+          dragStateRef.current.elementId === pinchTarget.id &&
+          dragStateRef.current.hasLock
+        );
+
+        const originalElements = (
+          dragStateRef.current &&
+          dragStateRef.current.elementId === pinchTarget.id &&
+          dragStateRef.current.originalElements
+        ) || [JSON.parse(JSON.stringify(pinchTarget))];
+
+        touchStartRef.current = {
+          distance,
+          startMidpoint,
+          token: {
+            id: pinchTarget.id,
+            x: pinchTarget.x,
+            y: pinchTarget.y,
+            width: pinchTarget.width,
+            height: pinchTarget.height,
+            initialCx: pinchTarget.x + pinchTarget.width / 2,
+            initialCy: pinchTarget.y + pinchTarget.height / 2,
+            aspectRatio: pinchTarget.width / pinchTarget.height,
+            type: pinchTarget.type,
+            properties: pinchTarget.properties,
+          },
+        };
+
+        setSelectedElementIds([pinchTarget.id]);
+        adjustElementsToFront?.([pinchTarget.id]);
+
+        setDragState({
+          mode: 'token-pinch-resize',
+          elementId: pinchTarget.id,
+          hasLock: hasExistingLock,
+          originalElements,
+        });
+
+        if (!hasExistingLock) {
+          socket.emit(EVENTS.ELEMENT_LOCK, { elementId: pinchTarget.id, tabId }, (response) => {
+            if (response && response.success) {
+              if (dragStateRef.current && dragStateRef.current.elementId === pinchTarget.id) {
+                dragStateRef.current.hasLock = true;
+                setLocks((prev) => ({ ...prev, [pinchTarget.id]: currentUser.id }));
+              } else {
+                const currentElement = elementsRef.current.find((el) => el.id === pinchTarget.id);
+                if (currentElement) {
+                  socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+                }
+                socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: pinchTarget.id, tabId });
+              }
+            }
+          });
+        }
+
+        triggerRedraw();
+        return;
+      }
+
+      // Fall back to viewport pinch-to-zoom / pan
+      if (dragStateRef.current && dragStateRef.current.mode.startsWith('group-') && dragStateRef.current.lockedIds?.length > 0) {
         socket.emit(EVENTS.ELEMENT_UNLOCK, { elementIds: dragStateRef.current.lockedIds, tabId });
         setLocks((prev) => {
           const next = { ...prev };
@@ -549,7 +661,6 @@ export default function Canvas({
         });
       }
 
-      const [p1, p2] = activePointerIds.map(id => activePointersRef.current[id]);
       const distance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
       const midpoint = { x: (p1.clientX + p2.clientX) / 2, y: (p1.clientY + p2.clientY) / 2 };
 
@@ -557,7 +668,7 @@ export default function Canvas({
         distance,
         midpoint,
         userZoom,
-        panOffset: { ...panOffset }
+        panOffset: { ...panOffset },
       };
       setDragState({ mode: 'touch-gesture' });
       triggerRedraw();
@@ -588,6 +699,51 @@ export default function Canvas({
     const drag = dragStateRef.current;
 
     if (drag) {
+      if (drag.mode === 'token-pinch-resize' && activePointerIds.length === 2) {
+        const [p1, p2] = activePointerIds.map((id) => activePointersRef.current[id]);
+        const newDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+        const c1 = clientToCanvasCoords(p1.clientX, p1.clientY);
+        const c2 = clientToCanvasCoords(p2.clientX, p2.clientY);
+        const newMidpoint = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
+
+        const start = touchStartRef.current;
+        if (start && start.token) {
+          const resized = calculateTokenPinchResize(
+            start.token,
+            start.distance,
+            newDistance,
+            start.startMidpoint,
+            newMidpoint
+          );
+
+          const el = elementsRef.current.find((item) => item.id === drag.elementId);
+          if (el) {
+            const updated = {
+              ...el,
+              x: resized.x,
+              y: resized.y,
+              width: resized.width,
+              height: resized.height,
+            };
+
+            setElements((prev) =>
+              prev.map((item) => (item.id === drag.elementId ? updated : item))
+            );
+
+            const socket = socketRef.current;
+            if (drag.hasLock && socket && socket.connected) {
+              socket.emit(EVENTS.ELEMENT_UPDATE, {
+                element: updated,
+                tabId,
+              });
+            }
+
+            triggerRedraw();
+          }
+        }
+        return;
+      }
+
       if (drag.mode === 'touch-gesture' && activePointerIds.length === 2) {
         const [p1, p2] = activePointerIds.map(id => activePointersRef.current[id]);
         const newDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
@@ -1702,10 +1858,10 @@ export default function Canvas({
             });
           }
         }
-      } else if (drag.hasLock || drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate') {
+      } else if (drag.hasLock || drag.mode === 'move' || drag.mode === 'resize' || drag.mode === 'rotate' || drag.mode === 'token-pinch-resize') {
         const socket = socketRef.current;
         if (socket && socket.connected && drag.hasLock) {
-          const currentElement = elements.find((el) => el.id === drag.elementId);
+          const currentElement = elementsRef.current.find((el) => el.id === drag.elementId) || elements.find((el) => el.id === drag.elementId);
           if (currentElement) {
             socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
           }
@@ -1718,7 +1874,7 @@ export default function Canvas({
         });
 
         if (pushHistoryAction && drag.originalElements) {
-          const currentElement = elements.find((el) => el.id === drag.elementId);
+          const currentElement = elementsRef.current.find((el) => el.id === drag.elementId) || elements.find((el) => el.id === drag.elementId);
           if (currentElement) {
             const elCopy = JSON.parse(JSON.stringify(currentElement));
             if (hasElementsChanged(drag.originalElements, [elCopy])) {
@@ -1735,20 +1891,6 @@ export default function Canvas({
       setDragState(null);
       triggerRedraw();
     }
-  };
-
-  const getCanvasCoords = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-
-    const { scale, offsetX, offsetY } = getViewportTransform();
-    return {
-      x: Math.round((screenX - offsetX) / scale),
-      y: Math.round((screenY - offsetY) / scale),
-    };
   };
 
   const handleAssetDrop = (e) => {

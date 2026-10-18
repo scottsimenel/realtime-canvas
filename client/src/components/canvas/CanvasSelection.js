@@ -521,3 +521,126 @@ export const scalePanOffsetForZoom = (currentPan, currentZoom, nextZoom) => {
   };
 };
 
+/**
+ * Checks whether both touch points of a 2-finger pinch fall onto the exact same unlocked element.
+ *
+ * @param {{x: number, y: number}} coords1 - First touch point in virtual coordinates.
+ * @param {{x: number, y: number}} coords2 - Second touch point in virtual coordinates.
+ * @param {Array<Object>} elements - List of canvas elements.
+ * @param {Object} [locks] - Active locks dictionary.
+ * @param {string} [currentUserId] - Current user ID.
+ * @returns {Object|null} The target element if both points hit the same unlocked element, otherwise null.
+ */
+export const getPinchTargetElement = (coords1, coords2, elements, locks = {}, currentUserId = null) => {
+  if (!coords1 || !coords2 || !elements || elements.length === 0) return null;
+
+  const el1 = getElementAtCoords(coords1.x, coords1.y, elements);
+  const el2 = getElementAtCoords(coords2.x, coords2.y, elements);
+
+  if (!el1 || !el2 || el1.id !== el2.id) {
+    return null;
+  }
+
+  // Check if permanently locked via element properties
+  if (el1.properties?.locked) {
+    return null;
+  }
+
+  // Check if locked by another user
+  const lockHolderId = locks[el1.id];
+  if (lockHolderId && lockHolderId !== currentUserId) {
+    return null;
+  }
+
+  return el1;
+};
+
+/**
+ * Calculates new dimensions and position for a token during a pinch-to-resize touch gesture.
+ * Resizes around the pinch midpoint and clamps to min/max dimensions while preserving aspect ratio.
+ *
+ * @param {Object} token - Initial token state before pinch started ({ width, height, x, y, initialCx, initialCy, aspectRatio }).
+ * @param {number} startDistance - Initial Euclidean distance between touch points.
+ * @param {number} currentDistance - Current Euclidean distance between touch points.
+ * @param {{x: number, y: number}} [startMidpoint] - Initial midpoint in virtual coordinates.
+ * @param {{x: number, y: number}} [currentMidpoint] - Current midpoint in virtual coordinates.
+ * @param {Object} [options] - Optional constraints { minDimension: 20, maxDimension: 5000, preserveAspectRatio: true }.
+ * @returns {{ x: number, y: number, width: number, height: number, scaleFactor: number }}
+ */
+export const calculateTokenPinchResize = (
+  token,
+  startDistance,
+  currentDistance,
+  startMidpoint = { x: 0, y: 0 },
+  currentMidpoint = { x: 0, y: 0 },
+  options = {}
+) => {
+  if (!token) {
+    return { x: 0, y: 0, width: 24, height: 24, scaleFactor: 1 };
+  }
+
+  if (!startDistance || startDistance <= 0 || !currentDistance || currentDistance <= 0) {
+    return {
+      x: token.x ?? 0,
+      y: token.y ?? 0,
+      width: token.width ?? 24,
+      height: token.height ?? 24,
+      scaleFactor: 1,
+    };
+  }
+
+  const minDim = options.minDimension || 20;
+  const maxDim = options.maxDimension || 5000;
+
+  const scaleFactor = currentDistance / startDistance;
+  let newWidth = Math.round(token.width * scaleFactor);
+  let newHeight = Math.round(token.height * scaleFactor);
+
+  const aspectRatio = token.aspectRatio || (token.width && token.height ? token.width / token.height : 1);
+  const preserveAspect = token.type === 'image' || Boolean(token.properties?.url) || Boolean(options.preserveAspectRatio ?? true);
+
+  if (preserveAspect && aspectRatio > 0) {
+    if (token.width >= token.height) {
+      newWidth = Math.max(minDim, Math.min(maxDim, newWidth));
+      newHeight = Math.round(newWidth / aspectRatio);
+      if (newHeight < minDim) {
+        newHeight = minDim;
+        newWidth = Math.round(minDim * aspectRatio);
+      } else if (newHeight > maxDim) {
+        newHeight = maxDim;
+        newWidth = Math.round(maxDim * aspectRatio);
+      }
+    } else {
+      newHeight = Math.max(minDim, Math.min(maxDim, newHeight));
+      newWidth = Math.round(newHeight * aspectRatio);
+      if (newWidth < minDim) {
+        newWidth = minDim;
+        newHeight = Math.round(minDim / aspectRatio);
+      } else if (newWidth > maxDim) {
+        newWidth = maxDim;
+        newHeight = Math.round(maxDim / aspectRatio);
+      }
+    }
+  } else {
+    newWidth = Math.max(minDim, Math.min(maxDim, newWidth));
+    newHeight = Math.max(minDim, Math.min(maxDim, newHeight));
+  }
+
+  const initialCx = token.initialCx !== undefined ? token.initialCx : token.x + token.width / 2;
+  const initialCy = token.initialCy !== undefined ? token.initialCy : token.y + token.height / 2;
+
+  const deltaX = (currentMidpoint?.x ?? 0) - (startMidpoint?.x ?? 0);
+  const deltaY = (currentMidpoint?.y ?? 0) - (startMidpoint?.y ?? 0);
+
+  const newCx = initialCx + deltaX;
+  const newCy = initialCy + deltaY;
+
+  return {
+    x: Math.round(newCx - newWidth / 2),
+    y: Math.round(newCy - newHeight / 2),
+    width: newWidth,
+    height: newHeight,
+    scaleFactor,
+  };
+};
+

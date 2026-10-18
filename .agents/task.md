@@ -192,3 +192,12 @@
 - `[x]` 22.7 Verify linting (0 errors, 0 warnings), client Vitest tests (82/82), server tests (10/10), and Vite production build.
 - `[x]` 22.8 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
 
+## 📦 WS23 — Pinch-Controlled Token Resizing on Touchscreen
+- `[x]` 23.1 Pure hit-testing & math: Implement `getPinchTargetElement` and `calculateTokenPinchResize` in `client/src/components/canvas/CanvasSelection.js`.
+- `[x]` 23.2 Canvas touch integration: Update `client/src/components/canvas/Canvas.jsx` to detect 2-pointer pinch over token, isolate token resize mode (`token-pinch-resize`), retain overall viewport pinch-zoom fallback when pinching empty canvas or cross-elements, and set appropriate cursor styles.
+- `[x]` 23.3 Real-time sync & history: Acquire/maintain collaborative element locks, emit `ELEMENT_UPDATE` broadcasts, release locks on pointerup/cancel, and push `'transform'` action to `historyStore` for complete Ctrl+Z undo/redo support.
+- `[x]` 23.4 Unit test suite: Add comprehensive behavioral tests in `client/src/components/canvas/__tests__/CanvasSelection.test.js` covering single-token touch detection, empty-canvas fallback, cross-element fallback, locked element rejection, aspect ratio preservation, scale-up/down, midpoint translation, bounds clamping, and edge cases.
+- `[x]` 23.5 Verification loop: Verify ESLint (0 errors, 0 warnings), Vitest client test suite (96/96 passing), server tests (10/10 passing), and Vite production build.
+- `[x]` 23.6 Sync artifacts (`task.md`, `walkthrough.md`), commit, and push.
+
+

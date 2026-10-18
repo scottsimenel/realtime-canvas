@@ -689,6 +689,63 @@ We added automatic layer elevation so that whenever a token is selected, it auto
 - **Vite Build**: Production build bundled successfully in 2.10s.
 - **Server Syntax**: `node --check server/server.js` passed with exit code 0.
 
+---
+
+## 🤏 WS23 — Pinch-Controlled Token Resizing on Touchscreen
+
+We implemented touch-controlled pinch resizing for canvas tokens and images while fully preserving overall canvas viewport pinch-to-zoom controls:
+
+### 1. Pure Hit-Testing & Mathematics ([CanvasSelection.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasSelection.js))
+- **`getPinchTargetElement(coords1, coords2, elements, locks, currentUserId)`**:
+  - Evaluates both virtual touch points `coords1` and `coords2`.
+  - Confirms both touch points hit the exact same element (`el1.id === el2.id`).
+  - Guards against permanently locked elements (`el.properties?.locked`).
+  - Guards against collaborative locks held by other users (`locks[el.id] !== currentUserId`).
+  - Returns target element if and only if both touch points fall solely over the same unlocked element, otherwise returns `null` for clean fallback to canvas viewport zoom.
+- **`calculateTokenPinchResize(token, startDistance, currentDistance, startMidpoint, currentMidpoint, options)`**:
+  - Computes scale factor `currentDistance / startDistance`.
+  - Preserves token aspect ratio (`width / height`) for image tokens and tokens with URLs.
+  - Clamps dimensions safely between `minDimension` (default 20px) and `maxDimension` (default 5000px).
+  - Tracks touch midpoint delta `(currentMidpoint - startMidpoint)` so tokens naturally translate with finger movement while resizing.
+  - Returns `{ x, y, width, height, scaleFactor }`.
+
+### 2. Canvas Touch Lifecycle Integration ([Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx))
+- **Two-Finger Gesture Branching**:
+  - In `handlePointerDown` when `activePointerIds.length === 2`:
+    - Checks `getPinchTargetElement(coords1, coords2, elements, locks, currentUser?.id)`.
+    - If target element exists and tool is `select`: activates `mode: 'token-pinch-resize'`, selects the token, brings it to front via `adjustElementsToFront`, and preserves/acquires element lock.
+    - If target element is null (empty canvas, cross-element pinch, drawing tool active, or locked token): cleanly releases any single-pointer lock and activates standard `mode: 'touch-gesture'` (focal-point viewport zoom/pan).
+- **Smooth Drag Updates**:
+  - In `handlePointerMove`: computes new touch distance and virtual midpoint, resizes token via `calculateTokenPinchResize`, updates local React state, and broadcasts `EVENTS.ELEMENT_UPDATE` over Socket.io if lock is held.
+- **Release, Unlocking & Undo/Redo**:
+  - In `handleMouseUp`: includes `drag.mode === 'token-pinch-resize'`, emits final `EVENTS.ELEMENT_UPDATE`, releases `EVENTS.ELEMENT_UNLOCK`, and pushes `'transform'` action to `historyStore` so resizing is fully undoable (`Ctrl+Z`).
+- **Cursor State**:
+  - `getCanvasCursorClass` updated to return `'cursor-nwse-resize'` during `token-pinch-resize`.
+
+### 3. Comprehensive Behavioral Test Suite ([CanvasSelection.test.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/__tests__/CanvasSelection.test.js))
+- Added 14 new behavioral unit tests covering:
+  - Both points on same token returns target.
+  - Points on empty canvas returns null.
+  - One point on token and one outside returns null.
+  - Points on two different tokens returns null.
+  - Permanently locked element returns null.
+  - Element locked by another user returns null.
+  - Element locked by current user returns target.
+  - Invalid / empty arguments return null.
+  - Scale up and scale down resizing.
+  - Midpoint translation delta.
+  - Aspect ratio preservation for non-square tokens.
+  - Min/max dimension clamping bounds.
+  - Graceful fallback for non-positive touch distances.
+
+### Verification Suite:
+- **Client Tests**: 14/14 test files passed, 96/96 tests passed.
+- **Server Tests**: 10/10 tests passed.
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production build bundled successfully in 2.27s.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
+
 
 
 

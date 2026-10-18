@@ -11,6 +11,8 @@ import {
   checkElementIntersectsBox,
   calculateFocalZoomPan,
   scalePanOffsetForZoom,
+  getPinchTargetElement,
+  calculateTokenPinchResize,
 } from '../CanvasSelection.js';
 
 describe('CanvasSelection math', () => {
@@ -251,5 +253,186 @@ describe('CanvasSelection math', () => {
     // Invalid zoom returns current pan safely
     expect(scalePanOffsetForZoom({ x: 10, y: 20 }, 0, 1.5)).toEqual({ x: 10, y: 20 });
     expect(scalePanOffsetForZoom({ x: 10, y: 20 }, 1.0, 0)).toEqual({ x: 10, y: 20 });
+  });
+
+  describe('getPinchTargetElement', () => {
+    const el1 = { id: 'el-1', type: 'image', x: 100, y: 100, width: 100, height: 100, properties: { rotation: 0 } };
+    const el2 = { id: 'el-2', type: 'image', x: 300, y: 100, width: 100, height: 100, properties: { rotation: 0 } };
+    const lockedEl = { id: 'el-3', type: 'image', x: 500, y: 100, width: 100, height: 100, properties: { rotation: 0, locked: true } };
+    const elementsList = [el1, el2, lockedEl];
+
+    test('returns target element when both touch points hit the same unlocked element', () => {
+      const target = getPinchTargetElement({ x: 120, y: 120 }, { x: 180, y: 180 }, elementsList);
+      expect(target).toEqual(el1);
+    });
+
+    test('returns null when both touch points hit empty canvas', () => {
+      const target = getPinchTargetElement({ x: 10, y: 10 }, { x: 50, y: 50 }, elementsList);
+      expect(target).toBeNull();
+    });
+
+    test('returns null when one touch point hits an element and the other is outside', () => {
+      const target = getPinchTargetElement({ x: 120, y: 120 }, { x: 10, y: 10 }, elementsList);
+      expect(target).toBeNull();
+    });
+
+    test('returns null when touch points hit two different elements', () => {
+      const target = getPinchTargetElement({ x: 120, y: 120 }, { x: 320, y: 120 }, elementsList);
+      expect(target).toBeNull();
+    });
+
+    test('returns null when element is permanently locked in properties', () => {
+      const target = getPinchTargetElement({ x: 520, y: 120 }, { x: 580, y: 180 }, elementsList);
+      expect(target).toBeNull();
+    });
+
+    test('returns null when element is actively locked by another collaborator', () => {
+      const locks = { 'el-1': 'other-user-999' };
+      const target = getPinchTargetElement({ x: 120, y: 120 }, { x: 180, y: 180 }, elementsList, locks, 'current-user-123');
+      expect(target).toBeNull();
+    });
+
+    test('returns element when active lock is held by current user', () => {
+      const locks = { 'el-1': 'current-user-123' };
+      const target = getPinchTargetElement({ x: 120, y: 120 }, { x: 180, y: 180 }, elementsList, locks, 'current-user-123');
+      expect(target).toEqual(el1);
+    });
+
+    test('returns null for missing arguments or empty elements', () => {
+      expect(getPinchTargetElement(null, { x: 10, y: 10 }, elementsList)).toBeNull();
+      expect(getPinchTargetElement({ x: 10, y: 10 }, null, elementsList)).toBeNull();
+      expect(getPinchTargetElement({ x: 10, y: 10 }, { x: 10, y: 10 }, [])).toBeNull();
+    });
+  });
+
+  describe('calculateTokenPinchResize', () => {
+    const token = {
+      id: 'token-1',
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+      initialCx: 150,
+      initialCy: 150,
+      aspectRatio: 1,
+      type: 'image',
+    };
+
+    test('scales token up when currentDistance > startDistance', () => {
+      const result = calculateTokenPinchResize(
+        token,
+        100, // start distance
+        150, // current distance (1.5x)
+        { x: 150, y: 150 },
+        { x: 150, y: 150 }
+      );
+      expect(result.width).toBe(150);
+      expect(result.height).toBe(150);
+      expect(result.scaleFactor).toBe(1.5);
+      // Center remains (150, 150) -> x = 150 - 75 = 75, y = 150 - 75 = 75
+      expect(result.x).toBe(75);
+      expect(result.y).toBe(75);
+    });
+
+    test('scales token down when currentDistance < startDistance', () => {
+      const result = calculateTokenPinchResize(
+        token,
+        200, // start distance
+        100, // current distance (0.5x)
+        { x: 150, y: 150 },
+        { x: 150, y: 150 }
+      );
+      expect(result.width).toBe(50);
+      expect(result.height).toBe(50);
+      expect(result.scaleFactor).toBe(0.5);
+      expect(result.x).toBe(125);
+      expect(result.y).toBe(125);
+    });
+
+    test('translates token center along with touch midpoint delta', () => {
+      const result = calculateTokenPinchResize(
+        token,
+        100,
+        100, // 1x scale
+        { x: 150, y: 150 }, // start midpoint
+        { x: 170, y: 180 }  // moved +20 in x, +30 in y
+      );
+      expect(result.width).toBe(100);
+      expect(result.height).toBe(100);
+      // New center = (150+20, 150+30) = (170, 180) -> x = 170 - 50 = 120, y = 180 - 50 = 130
+      expect(result.x).toBe(120);
+      expect(result.y).toBe(130);
+    });
+
+    test('preserves aspect ratio for non-square image token', () => {
+      const rectToken = {
+        id: 'rect-token',
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+        initialCx: 200,
+        initialCy: 150,
+        aspectRatio: 2,
+        type: 'image',
+      };
+      const result = calculateTokenPinchResize(
+        rectToken,
+        100,
+        200, // 2x
+        { x: 200, y: 150 },
+        { x: 200, y: 150 }
+      );
+      expect(result.width).toBe(400);
+      expect(result.height).toBe(200);
+    });
+
+    test('clamps token resizing to minDimension and maxDimension bounds', () => {
+      const minClamped = calculateTokenPinchResize(
+        token,
+        100,
+        5, // would scale to 5px
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        { minDimension: 25 }
+      );
+      expect(minClamped.width).toBe(25);
+      expect(minClamped.height).toBe(25);
+
+      const maxClamped = calculateTokenPinchResize(
+        token,
+        10,
+        500, // 50x -> would scale to 5000px
+        { x: 150, y: 150 },
+        { x: 150, y: 150 },
+        { maxDimension: 600 }
+      );
+      expect(maxClamped.width).toBe(600);
+      expect(maxClamped.height).toBe(600);
+    });
+
+    test('handles missing token or non-positive distances gracefully', () => {
+      expect(calculateTokenPinchResize(null, 100, 100)).toEqual({
+        x: 0,
+        y: 0,
+        width: 24,
+        height: 24,
+        scaleFactor: 1,
+      });
+      expect(calculateTokenPinchResize(token, 0, 100)).toEqual({
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+        scaleFactor: 1,
+      });
+      expect(calculateTokenPinchResize(token, 100, -5)).toEqual({
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+        scaleFactor: 1,
+      });
+    });
   });
 });
