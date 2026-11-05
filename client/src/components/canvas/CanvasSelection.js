@@ -644,3 +644,147 @@ export const calculateTokenPinchResize = (
   };
 };
 
+/**
+ * Calculates the snapped center coordinate on a square or flat-topped hexagonal grid.
+ *
+ * @param {number} cx - Target center x coordinate in virtual space.
+ * @param {number} cy - Target center y coordinate in virtual space.
+ * @param {string} [gridType='square'] - Grid geometry ('square' | 'hexagon').
+ * @param {number} [gridSize=40] - Grid spacing factor.
+ * @returns {{ x: number, y: number }} Snapped center coordinates.
+ */
+export const getSnappedCenter = (cx, cy, gridType = 'square', gridSize = 40) => {
+  const safeSize = gridSize > 0 ? gridSize : 40;
+  if (gridType === 'hexagon') {
+    const R = safeSize;
+    const hSpacing = 1.5 * R;
+    const vSpacing = Math.sqrt(3) * R;
+
+    const approxCol = Math.round(cx / hSpacing);
+
+    let minDistance = Infinity;
+    let snapCx = cx;
+    let snapCy = cy;
+
+    for (let dCol = -2; dCol <= 2; dCol++) {
+      const col = approxCol + dCol;
+      if (col < 0) continue;
+      const tcx = col * hSpacing;
+      const isOdd = Math.abs(col) % 2 === 1;
+      const yOffset = isOdd ? vSpacing / 2 : 0;
+
+      const approxRow = Math.round((cy - yOffset) / vSpacing);
+      for (let dRow = -2; dRow <= 2; dRow++) {
+        const row = approxRow + dRow;
+        if (row < 0) continue;
+        const tcy = row * vSpacing + yOffset;
+
+        const dist = Math.hypot(cx - tcx, cy - tcy);
+        if (dist < minDistance) {
+          minDistance = dist;
+          snapCx = tcx;
+          snapCy = tcy;
+        }
+      }
+    }
+    return { x: snapCx, y: snapCy };
+  }
+
+  const snapCx = Math.round((cx - safeSize / 2) / safeSize) * safeSize + safeSize / 2;
+  const snapCy = Math.round((cy - safeSize / 2) / safeSize) * safeSize + safeSize / 2;
+  return { x: snapCx, y: snapCy };
+};
+
+/**
+ * Determines whether a new touch/pointer contact can start an independent token drag
+ * in Continuous Touchscreen / Tabletop Mode.
+ *
+ * @param {{x: number, y: number}} coords - Virtual canvas coordinates of the pointer down event.
+ * @param {Array<Object>} elements - Ordered list of canvas elements.
+ * @param {Object} [locks={}] - Active collaborative locks map ({ [elementId]: userId }).
+ * @param {string|null} [currentUserId=null] - Current user's socket/session ID.
+ * @param {Object} [activePointerDrags={}] - Map of currently active local pointer drags ({ [pointerId]: { elementId } }).
+ * @returns {{ element: Object, offsetX: number, offsetY: number } | null} Drag target and offsets, or null if passive/blocked.
+ */
+export const canStartPointerTokenDrag = (
+  coords,
+  elements,
+  locks = {},
+  currentUserId = null,
+  activePointerDrags = {}
+) => {
+  if (!coords || !elements || elements.length === 0) return null;
+
+  const element = getElementAtCoords(coords.x, coords.y, elements);
+  if (!element || element.properties?.locked) {
+    return null;
+  }
+
+  const lockHolderId = locks[element.id];
+  if (lockHolderId && lockHolderId !== currentUserId) {
+    return null;
+  }
+
+  const activeSessions = Object.values(activePointerDrags || {});
+  const isAlreadyDraggedLocally = activeSessions.some(
+    (session) => session && session.elementId === element.id
+  );
+  if (isAlreadyDraggedLocally) {
+    return null;
+  }
+
+  return {
+    element,
+    offsetX: Math.round(coords.x - element.x),
+    offsetY: Math.round(coords.y - element.y),
+  };
+};
+
+/**
+ * Calculates the updated top-left { x, y } coordinates for a dragged element,
+ * applying square or hexagonal grid center snapping when enabled.
+ *
+ * @param {Object} element - Element being dragged ({ width, height, properties }).
+ * @param {{x: number, y: number}} coords - Current pointer virtual coordinates.
+ * @param {number} offsetX - Initial horizontal grab offset from element.x.
+ * @param {number} offsetY - Initial vertical grab offset from element.y.
+ * @param {Object} [roomSettings] - Room grid configuration ({ gridSnapping, showGrid, gridType, gridSize }).
+ * @returns {{ x: number, y: number }} New top-left position for the element.
+ */
+export const calculateSnappedDragPosition = (
+  element,
+  coords,
+  offsetX = 0,
+  offsetY = 0,
+  roomSettings = {}
+) => {
+  if (!element || !coords) {
+    return { x: element?.x ?? 0, y: element?.y ?? 0 };
+  }
+
+  let newX = Math.round(coords.x - offsetX);
+  let newY = Math.round(coords.y - offsetY);
+
+  const globalGridSnapping = roomSettings?.gridSnapping === true;
+  const showGrid = roomSettings?.showGrid === true;
+  const isSnapEnabled = globalGridSnapping && element.properties?.snapToGrid !== false;
+
+  if (isSnapEnabled && showGrid) {
+    const w = element.width || 0;
+    const h = element.height || 0;
+    const cx = newX + w / 2;
+    const cy = newY + h / 2;
+    const snapped = getSnappedCenter(
+      cx,
+      cy,
+      roomSettings?.gridType || 'square',
+      roomSettings?.gridSize || 40
+    );
+    newX = Math.round(snapped.x - w / 2);
+    newY = Math.round(snapped.y - h / 2);
+  }
+
+  return { x: newX, y: newY };
+};
+
+

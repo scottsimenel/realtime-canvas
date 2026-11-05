@@ -807,6 +807,43 @@ We conducted an end-to-end audit and comprehensive modernization of iconography 
 - **Vite Build**: Production build bundled successfully in 2.19s.
 - **Server Syntax**: `node --check server/server.js` passed with exit code 0.
 
+---
+
+## 🖐️ WS25 — Continuous Touchscreen / Tabletop Mode
+
+We implemented **Tabletop Touchscreen Mode** (`isTabletopMode`) to support continuous multi-touch usage on large horizontal touchscreens where physical miniatures rest directly on the screen and multiple users/fingers interact with tokens simultaneously.
+
+### 1. Pure Multi-Touch Hit-Testing & Grid Snapping Math ([CanvasSelection.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasSelection.js))
+- **`getSnappedCenter(cx, cy, gridType, gridSize)`**: Consolidated square and hexagonal grid center snapping into `CanvasSelection.js` with full JSDoc contracts.
+- **`canStartPointerTokenDrag(coords, elements, locks, currentUserId, activePointerDrags)`**:
+  - Resolves top-most unlocked element at `coords`.
+  - Rejects empty-canvas touches (passive contacts from resting miniatures/palms), permanently locked elements, elements locked by another collaborator, and elements already being dragged by another pointer on the same device.
+  - Returns `{ element, offsetX, offsetY }` for valid independent token drags.
+- **`calculateSnappedDragPosition(element, coords, offsetX, offsetY, roomSettings)`**:
+  - Calculates new top-left `{ x, y }` coordinates for any pointer drag, applying square or hexagonal grid center snapping when `roomSettings.gridSnapping && roomSettings.showGrid` is enabled and `element.properties?.snapToGrid !== false`.
+
+### 2. UI State Store & Persistence ([uiStore.js](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/state/uiStore.js))
+- Added `isTabletopMode`, `setIsTabletopMode`, and `handleToggleTabletopMode` to `UiProvider`, persisted automatically in `localStorage` under `'canvas_tabletop_mode'`.
+
+### 3. Toolbar & Viewport Controls ([Icon.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/common/Icon.jsx), [CanvasDock.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/CanvasDock.jsx), [Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx), [AppContent.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/app/AppContent.jsx))
+- Added `'touchscreen'` vector icon to `ICONS` in `Icon.jsx`.
+- Added a 1-tap Tabletop Mode toggle button in the main bottom `CanvasDock` (highlighted in emerald when active) and a compact status/toggle button in the bottom-right floating Zoom pill in `Canvas.jsx`.
+
+### 4. Per-Pointer Multi-Touch Lifecycle & Gesture Suppression ([Canvas.jsx](file:///c:/Users/Scott%20Simenel/.gemini/antigravity/scratch/realtime-canvas/client/src/components/canvas/Canvas.jsx))
+- **Gesture Suppression**: When `isTabletopMode` is active, 2-finger viewport pinch-to-zoom/pan (`touch-gesture`), 2-finger token pinch-to-resize (`token-pinch-resize`), and empty-canvas marquee drag-box selection (`mode: 'select'`) are bypassed.
+- **Per-Pointer Independent Token Dragging (`multiTouchDragsRef`)**:
+  - Tracks active token drags by `pointerId`, allowing tokens to be selected and moved smoothly even while $N$ other touch points (physical miniatures or palms) rest continuously on the screen, and supporting simultaneous dragging of multiple distinct tokens.
+  - Acquires and releases collaborative mutex locks (`EVENTS.ELEMENT_LOCK` / `EVENTS.ELEMENT_UNLOCK`) per pointer with fast-flick race protection, mode-toggle cleanup, and unmount cleanup.
+  - Pushes per-pointer `'transform'` actions to `historyStore` on pointer release for full Undo/Redo support.
+
+### 5. Automated Verification Suite
+- **Client Tests**: 15/15 test files passed, 105/105 tests passed (including new behavioral tests in `CanvasSelection.test.js`, `stores.test.js`, and `Icon.test.jsx`).
+- **Server Tests**: 10/10 tests passed.
+- **ESLint**: 0 errors, 0 warnings.
+- **Vite Build**: Production bundle compiled cleanly in 2.40s.
+- **Server Syntax**: `node --check server/server.js` passed with exit code 0.
+
+
 
 
 

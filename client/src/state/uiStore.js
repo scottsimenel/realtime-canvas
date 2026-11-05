@@ -41,6 +41,27 @@ export function UiProvider({ children }) {
     }
   }, [showCursorNames]);
 
+  const [isTabletopMode, setIsTabletopMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('canvas_tabletop_mode');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('canvas_tabletop_mode', JSON.stringify(isTabletopMode));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [isTabletopMode]);
+
+  const handleToggleTabletopMode = useCallback(() => {
+    setIsTabletopMode((prev) => !prev);
+  }, []);
+
   const isZenMode = !showHeader && !showLeftSidebar && !showRightSidebar && !showTabsBar;
 
   const handleToggleZenMode = useCallback(() => {
@@ -100,6 +121,9 @@ export function UiProvider({ children }) {
     setEraserSize,
     showCursorNames,
     setShowCursorNames,
+    isTabletopMode,
+    setIsTabletopMode,
+    handleToggleTabletopMode,
     locateElementTrigger,
     setLocateElementTrigger
   };

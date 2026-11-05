@@ -206,3 +206,12 @@
 - `[x]` 24.3 Overhaul left & right sidebars: fix malformed background SVG, replace shape emojis with vector geometric icons in `LeftSidebar.jsx`, replace emojis and arrows in `RightSidebar.jsx`, `InspectorWidget.jsx`, `TooltipInspector.jsx`, and `ActiveUsersWidget.jsx`.
 - `[x]` 24.4 Overhaul modals, widgets & lobby: replace cyclone spinner, emojis, and math characters in `Lobby.jsx`, `DiceRollerWidget.jsx`, and `SavesModal.jsx`.
 - `[x]` 24.5 Automated verification, test suite for `Icon.jsx`, linter check, production build, server syntax check, documentation sync (`STRUCTURE.md`, `walkthrough.md`), git commit, and push.
+
+## 📦 WS25 — Continuous Touchscreen / Tabletop Mode
+- `[x]` 25.1 Pure multi-touch hit-testing & grid snapping math: Implement `getSnappedCenter`, `canStartPointerTokenDrag`, and `calculateSnappedDragPosition` in `client/src/components/canvas/CanvasSelection.js`.
+- `[x]` 25.2 UI state store: Add `isTabletopMode`, `setIsTabletopMode`, and `handleToggleTabletopMode` (persisted in `localStorage`) in `client/src/state/uiStore.js`.
+- `[x]` 25.3 Iconography & toolbars: Add `'touchscreen'` icon in `client/src/components/common/Icon.jsx`, add 1-tap toggle to `client/src/components/canvas/CanvasDock.jsx`, and wire props in `client/src/app/AppContent.jsx`.
+- `[x]` 25.4 Canvas multi-touch lifecycle & gesture suppression: Implement per-pointer independent token dragging (`multiTouchDragsRef`), suppress 2-finger pinch-zoom / pinch-resize / empty-canvas marquee box when `isTabletopMode` is active, and add bottom-right viewport toggle indicator in `client/src/components/canvas/Canvas.jsx`.
+- `[x]` 25.5 Automated unit tests: Add tests in `CanvasSelection.test.js`, `stores.test.js`, and `Icon.test.jsx`.
+- `[x]` 25.6 Verification loop: Run ESLint, client Vitest test suite, server Node test suite, and Vite production build.
+- `[x]` 25.7 Documentation & Git: Update `STRUCTURE.md` and `walkthrough.md`, sync artifacts (`task.md`, `walkthrough.md`, `implementation_plan.md`), commit, and push.

@@ -61,6 +61,7 @@ export default function AppContent({
     penSize,
     eraserSize,
     showCursorNames, setShowCursorNames,
+    isTabletopMode, handleToggleTabletopMode,
     locateElementTrigger, setLocateElementTrigger
   } = useUiStore();
 
@@ -377,6 +378,8 @@ export default function AppContent({
               setLocateElementTrigger={setLocateElementTrigger}
               handleSpawnImage={handleSpawnImage}
               adjustElementsToFront={adjustElementsToFront}
+              isTabletopMode={isTabletopMode}
+              onToggleTabletopMode={handleToggleTabletopMode}
             />
           </div>
         </main>

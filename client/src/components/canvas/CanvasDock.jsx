@@ -15,6 +15,7 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
     leftPanelCollapsed, setLeftPanelCollapsed,
     rightPanelCollapsed, setRightPanelCollapsed,
     isZenMode, handleToggleZenMode,
+    isTabletopMode, handleToggleTabletopMode,
     activeTool, setActiveTool,
     penColor, setPenColor,
     penSize, setPenSize,
@@ -245,11 +246,29 @@ export default function CanvasDock({ handleDeleteSelected, handleClearDrawings }
 
         <div className="w-px h-6 bg-slate-800 self-center mx-1 shrink-0" />
 
-        {/* 4. Zen Mode */}
+        {/* 4. Tabletop Multi-Touch Mode & Zen Mode */}
+        <button
+          type="button"
+          onClick={handleToggleTabletopMode}
+          aria-pressed={isTabletopMode}
+          className={`p-2 sm:p-2.5 rounded-xl transition-all cursor-pointer border shrink-0 ${
+            isTabletopMode
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-md shadow-emerald-500/10'
+              : 'text-slate-400 border-transparent hover:bg-slate-800/80 hover:text-slate-200'
+          }`}
+          title={
+            isTabletopMode
+              ? 'Tabletop Touchscreen Mode: ON (Multi-touch token dragging active; pinch-zoom & marquee box disabled)'
+              : 'Toggle Tabletop Touchscreen Mode (Enable continuous multi-touch for physical figures & disable pinch gestures)'
+          }
+        >
+          <Icon name="touchscreen" className="w-5 h-5" />
+        </button>
+
         <button
           type="button"
           onClick={handleToggleZenMode}
-          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+          className={`p-2 sm:p-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
             isZenMode
               ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
               : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-200'

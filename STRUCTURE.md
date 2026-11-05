@@ -64,7 +64,7 @@ graph TD
     *   `ids.js`: Handles element, tab, asset, and roll ID template generation.
     *   `mergeElement.js`: Standardizes deep element and properties updates merging.
 *   `/client/src/state/`: Modular context stores mapping states.
-    *   `uiStore.js`: Layout panel visibility state triggers and toggles.
+    *   `uiStore.js`: Layout panel visibility state triggers, active tools, and Tabletop Touchscreen Mode (`isTabletopMode`) toggles.
     *   `diceStore.js`: Mixed dice roller bag totals, animations data, and roll triggers.
     *   `canvasStore.js`: Collaborative tabs, elements, locks, and room settings state.
     *   `selectionStore.js`: Selected elements, inspector focus, and dimension inputs.
@@ -102,9 +102,9 @@ graph TD
         *   `TooltipInspector.jsx`: HP numeric bars tracker, attribute stat grids editor.
         *   `DiceRollerWidget.jsx`: RPG dice bag and live rolls log.
 *   `/client/src/components/canvas/`:
-    *   `Canvas.jsx`: Core viewport wrapper. Tracks mouse/pointer event listeners, keydown presses, viewport scales, pan offsets, and pinch-to-zoom multi-touch gestures.
+    *   `Canvas.jsx`: Core viewport wrapper. Tracks mouse/pointer event listeners, keydown presses, viewport scales, pan offsets, pinch-to-zoom multi-touch gestures, and Tabletop Mode per-pointer simultaneous multi-touch token dragging (`multiTouchDragsRef`).
     *   `CanvasRenderer.js`: Pure functions containing HTML5 2D Canvas context rendering steps (`drawGrid`, `drawShapes`, `drawSelectionFrame`, `drawCursorTags`).
-    *   `CanvasSelection.js`: Pure hit-detection and vector math functions (rotated coordinate translations, corner scale handle detection, focal-point-preserving pinch-to-zoom calculation `calculateFocalZoomPan`, and viewport zoom pan scaling `scalePanOffsetForZoom`).
+    *   `CanvasSelection.js`: Pure hit-detection and vector math functions (rotated coordinate translations, corner scale handle detection, focal-point-preserving pinch-to-zoom calculation `calculateFocalZoomPan`, viewport zoom pan scaling `scalePanOffsetForZoom`, token pinch resize math `calculateTokenPinchResize`, square/hex grid snapping `getSnappedCenter`, and Tabletop multi-touch drag validation/positioning `canStartPointerTokenDrag` & `calculateSnappedDragPosition`).
 *   `/client/src/components/dice/`:
     *   `DiceEffects.jsx`: WebGL Three.js overlay initializer. Manages perspective projection setups, mesh lists, and runs the animation loop using high-precision frame rate decoupled delta time (`dt`).
     *   `DiceMath.js`: Pure quaternion mathematics modules (multiplication, normalization, interpolation `qLerp`, rotation calculations).

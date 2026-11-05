@@ -169,6 +169,14 @@ describe('State stores behavioral unit tests (Node mode)', () => {
     UiProvider({ children: null });
     value = reactMockValueCapture.captured;
     expect(value.locateElementTrigger).toBe('el_test_123');
+
+    // Test Tabletop / Continuous Touchscreen Mode toggle
+    expect(value.isTabletopMode).toBe(false);
+    value.handleToggleTabletopMode();
+    stateIndex = 0;
+    UiProvider({ children: null });
+    value = reactMockValueCapture.captured;
+    expect(value.isTabletopMode).toBe(true);
   });
 
   test('ClipboardProvider copy and paste calculations', () => {

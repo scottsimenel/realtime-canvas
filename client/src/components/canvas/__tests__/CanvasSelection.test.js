@@ -13,6 +13,9 @@ import {
   scalePanOffsetForZoom,
   getPinchTargetElement,
   calculateTokenPinchResize,
+  getSnappedCenter,
+  canStartPointerTokenDrag,
+  calculateSnappedDragPosition,
 } from '../CanvasSelection.js';
 
 describe('CanvasSelection math', () => {
@@ -433,6 +436,116 @@ describe('CanvasSelection math', () => {
         height: 100,
         scaleFactor: 1,
       });
+    });
+  });
+
+  describe('Tabletop / Multi-Touch Token Dragging & Grid Snapping Math', () => {
+    const tokenA = { id: 'tok-a', type: 'image', x: 100, y: 100, width: 60, height: 60, properties: {} };
+    const tokenB = { id: 'tok-b', type: 'circle', x: 300, y: 200, width: 80, height: 80, properties: {} };
+    const lockedToken = { id: 'tok-locked', type: 'rectangle', x: 500, y: 100, width: 50, height: 50, properties: { locked: true } };
+    const elementsList = [tokenA, tokenB, lockedToken];
+
+    test('getSnappedCenter snaps to square and hexagonal grid centers', () => {
+      // Square grid (size 40 -> cell centers at 20, 60, 100, ...)
+      expect(getSnappedCenter(52, 68, 'square', 40)).toEqual({ x: 60, y: 60 });
+      expect(getSnappedCenter(15, 19, 'square', 40)).toEqual({ x: 20, y: 20 });
+
+      // Hexagonal grid (size 40 -> col 0 at x=0, y=0, 40*sqrt(3)=69.28...)
+      const hexCenter = getSnappedCenter(5, 5, 'hexagon', 40);
+      expect(hexCenter.x).toBeCloseTo(0, 5);
+      expect(hexCenter.y).toBeCloseTo(0, 5);
+    });
+
+    test('canStartPointerTokenDrag allows independent drags on distinct unlocked tokens', () => {
+      // First pointer touches tokenA at (120, 130)
+      const firstDrag = canStartPointerTokenDrag(
+        { x: 120, y: 130 },
+        elementsList,
+        {},
+        'user-1',
+        {}
+      );
+      expect(firstDrag).toEqual({
+        element: tokenA,
+        offsetX: 20,
+        offsetY: 30,
+      });
+
+      // Second pointer simultaneously touches tokenB at (340, 240) while pointer 1 holds tokenA
+      const activePointerDrags = {
+        1: { pointerId: 1, elementId: 'tok-a' },
+      };
+      const secondDrag = canStartPointerTokenDrag(
+        { x: 340, y: 240 },
+        elementsList,
+        { 'tok-a': 'user-1' },
+        'user-1',
+        activePointerDrags
+      );
+      expect(secondDrag).toEqual({
+        element: tokenB,
+        offsetX: 40,
+        offsetY: 40,
+      });
+    });
+
+    test('canStartPointerTokenDrag returns null for empty canvas, locked tokens, or already-dragged token', () => {
+      // Empty canvas (e.g. resting palm or physical figure on map background)
+      expect(canStartPointerTokenDrag({ x: 10, y: 10 }, elementsList, {}, 'user-1', {})).toBeNull();
+
+      // Permanently locked token
+      expect(canStartPointerTokenDrag({ x: 520, y: 120 }, elementsList, {}, 'user-1', {})).toBeNull();
+
+      // Token locked by another collaborator
+      expect(
+        canStartPointerTokenDrag({ x: 120, y: 120 }, elementsList, { 'tok-a': 'user-2' }, 'user-1', {})
+      ).toBeNull();
+
+      // Second contact landing on the exact same token already being dragged by pointer 1
+      const activePointerDrags = {
+        1: { pointerId: 1, elementId: 'tok-a' },
+      };
+      expect(
+        canStartPointerTokenDrag({ x: 130, y: 130 }, elementsList, { 'tok-a': 'user-1' }, 'user-1', activePointerDrags)
+      ).toBeNull();
+
+      // Invalid/empty inputs
+      expect(canStartPointerTokenDrag(null, elementsList)).toBeNull();
+      expect(canStartPointerTokenDrag({ x: 120, y: 120 }, [])).toBeNull();
+    });
+
+    test('calculateSnappedDragPosition computes free and grid-snapped coordinates', () => {
+      // Free movement (gridSnapping disabled)
+      const freePos = calculateSnappedDragPosition(
+        tokenA,
+        { x: 200, y: 250 },
+        20,
+        30,
+        { gridSnapping: false, showGrid: true, gridSize: 40 }
+      );
+      expect(freePos).toEqual({ x: 180, y: 220 });
+
+      // Square grid snapping enabled (size 40 -> centers at 20, 60, 100, 140, 180, 220...)
+      // Raw top-left: (183, 217) -> center (213, 247) -> nearest grid center (220, 260) -> top-left (190, 230)
+      const snappedPos = calculateSnappedDragPosition(
+        tokenA,
+        { x: 203, y: 247 },
+        20,
+        30,
+        { gridSnapping: true, showGrid: true, gridType: 'square', gridSize: 40 }
+      );
+      expect(snappedPos).toEqual({ x: 190, y: 230 });
+
+      // Element with snapToGrid: false ignores global gridSnapping
+      const unsnappedToken = { ...tokenA, properties: { snapToGrid: false } };
+      const overridePos = calculateSnappedDragPosition(
+        unsnappedToken,
+        { x: 203, y: 247 },
+        20,
+        30,
+        { gridSnapping: true, showGrid: true, gridType: 'square', gridSize: 40 }
+      );
+      expect(overridePos).toEqual({ x: 183, y: 217 });
     });
   });
 });

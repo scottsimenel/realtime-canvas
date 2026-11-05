@@ -14,6 +14,9 @@ import {
   scalePanOffsetForZoom,
   getPinchTargetElement,
   calculateTokenPinchResize,
+  getSnappedCenter,
+  canStartPointerTokenDrag,
+  calculateSnappedDragPosition,
 } from './CanvasSelection.js';
 import {
   drawBackground,
@@ -25,47 +28,6 @@ import {
   drawDragSelectBox,
   drawMeasurementRule
 } from './CanvasRenderer.js';
-
-const getSnappedCenter = (cx, cy, gridType, gridSize) => {
-  if (gridType === 'hexagon') {
-    const R = gridSize;
-    const hSpacing = 1.5 * R;
-    const vSpacing = Math.sqrt(3) * R;
-
-    const approxCol = Math.round(cx / hSpacing);
-    
-    let minDistance = Infinity;
-    let snapCx = cx;
-    let snapCy = cy;
-
-    for (let dCol = -2; dCol <= 2; dCol++) {
-      const col = approxCol + dCol;
-      if (col < 0) continue;
-      const tcx = col * hSpacing;
-      const isOdd = Math.abs(col) % 2 === 1;
-      const yOffset = isOdd ? vSpacing / 2 : 0;
-      
-      const approxRow = Math.round((cy - yOffset) / vSpacing);
-      for (let dRow = -2; dRow <= 2; dRow++) {
-        const row = approxRow + dRow;
-        if (row < 0) continue;
-        const tcy = row * vSpacing + yOffset;
-        
-        const dist = Math.hypot(cx - tcx, cy - tcy);
-        if (dist < minDistance) {
-          minDistance = dist;
-          snapCx = tcx;
-          snapCy = tcy;
-        }
-      }
-    }
-    return { x: snapCx, y: snapCy };
-  } else {
-    const snapCx = Math.round((cx - gridSize / 2) / gridSize) * gridSize + gridSize / 2;
-    const snapCy = Math.round((cy - gridSize / 2) / gridSize) * gridSize + gridSize / 2;
-    return { x: snapCx, y: snapCy };
-  }
-};
 
 const hasElementsChanged = (before, after) => {
   if (before.length !== after.length) return true;
@@ -91,7 +53,7 @@ const getCanvasCursorClass = (activeTool, isSpacePressed, activeDragMode, hoverC
   if (activeTool === 'pen' || activeTool === 'measure') return 'cursor-crosshair';
   if (activeDragMode) {
     if (activeDragMode === 'pan' || activeDragMode === 'touch-gesture') return 'cursor-grabbing';
-    if (activeDragMode === 'move' || activeDragMode === 'group-move') return 'cursor-move';
+    if (activeDragMode === 'move' || activeDragMode === 'group-move' || activeDragMode === 'multi-touch-move') return 'cursor-move';
     if (activeDragMode === 'rotate' || activeDragMode === 'group-rotate') return 'cursor-grabbing';
     if (activeDragMode === 'token-pinch-resize') return 'cursor-nwse-resize';
     if (activeDragMode.includes('resize')) return 'cursor-crosshair';
@@ -126,10 +88,13 @@ export default function Canvas({
   setLocateElementTrigger,
   handleSpawnImage,
   adjustElementsToFront,
+  isTabletopMode = false,
+  onToggleTabletopMode,
 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const dragStateRef = useRef(null);
+  const multiTouchDragsRef = useRef({}); // maps pointerId -> { pointerId, elementId, offsetX, offsetY, hasLock, originalElement }
   const lastCursorEmitRef = useRef(0);
   const imageCache = useRef({});
   const tempDrawingPathRef = useRef(null); // Ref for local drawing stroke: { points, stroke, strokeWidth }
@@ -198,6 +163,78 @@ export default function Canvas({
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  const finishMultiTouchDrag = useCallback((pointerId) => {
+    const session = multiTouchDragsRef.current[pointerId];
+    if (!session) return false;
+
+    delete multiTouchDragsRef.current[pointerId];
+    if (
+      Object.keys(multiTouchDragsRef.current).length === 0 &&
+      dragStateRef.current?.mode === 'multi-touch-move'
+    ) {
+      setDragState(null);
+    }
+
+    const currentElement =
+      elementsRef.current.find((el) => el.id === session.elementId) ||
+      elements.find((el) => el.id === session.elementId);
+
+    const socket = socketRef.current;
+    if (socket && socket.connected && session.hasLock) {
+      if (currentElement) {
+        socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+      }
+      socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: session.elementId, tabId });
+    }
+
+    setLocks((prev) => {
+      const next = { ...prev };
+      delete next[session.elementId];
+      return next;
+    });
+
+    if (pushHistoryAction && session.originalElement && currentElement) {
+      const elCopy = JSON.parse(JSON.stringify(currentElement));
+      if (hasElementsChanged([session.originalElement], [elCopy])) {
+        pushHistoryAction({
+          type: 'transform',
+          elementsBefore: [session.originalElement],
+          elementsAfter: [elCopy],
+          tabId,
+        });
+      }
+    }
+
+    return true;
+  }, [elements, pushHistoryAction, setDragState, setLocks, socketRef, tabId]);
+
+  // Clean up any active multi-touch locks if Tabletop Mode is turned off or on unmount
+  useEffect(() => {
+    if (!isTabletopMode) {
+      const activeIds = Object.keys(multiTouchDragsRef.current);
+      if (activeIds.length > 0) {
+        activeIds.forEach((pId) => finishMultiTouchDrag(pId));
+      }
+    }
+  }, [isTabletopMode, finishMultiTouchDrag]);
+
+  useEffect(() => {
+    const multiDrags = multiTouchDragsRef;
+    const sockRef = socketRef;
+    return () => {
+      const sessions = Object.values(multiDrags.current);
+      if (sessions.length > 0) {
+        const socket = sockRef.current;
+        sessions.forEach((session) => {
+          if (session.hasLock && socket && socket.connected) {
+            socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: session.elementId, tabId });
+          }
+        });
+        multiDrags.current = {};
+      }
+    };
+  }, [socketRef, tabId]);
 
   // Load background image to set virtual dimensions state
   useEffect(() => {
@@ -549,6 +586,131 @@ export default function Canvas({
 
     const activePointerIds = Object.keys(activePointersRef.current);
 
+    if (isTabletopMode) {
+      if (activeTool === 'pan' || isSpacePressedRef.current || e.button === 1 || e.button === 4) {
+        if (!dragStateRef.current) {
+          setDragState({
+            mode: 'pan',
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            startPanOffset: { ...panOffset },
+          });
+        }
+        return;
+      }
+
+      if (activeTool === 'select') {
+        const coords = getCanvasCoords(e);
+        const { scale } = getViewportTransform();
+
+        // Allow single-element resize/rotate handles when no conflicting drag is active
+        if (
+          selectedElementIds.length === 1 &&
+          (!dragStateRef.current || dragStateRef.current.mode === 'multi-touch-move') &&
+          Object.keys(multiTouchDragsRef.current).length === 0
+        ) {
+          const activeElement = elements.find((el) => el.id === selectedElementIds[0]);
+          if (activeElement && !activeElement.properties?.locked) {
+            const lockHolderId = locks[activeElement.id];
+            const isLockedBySomeoneElse = lockHolderId && lockHolderId !== currentUser?.id;
+            if (!isLockedBySomeoneElse) {
+              const handle = getHandleAtCoords(coords.x, coords.y, activeElement, scale);
+              if (handle) {
+                handleMouseDown(e);
+                if (dragStateRef.current) {
+                  dragStateRef.current.pointerId = e.pointerId;
+                }
+                return;
+              }
+            }
+          }
+        }
+
+        const dragCandidate = canStartPointerTokenDrag(
+          coords,
+          elements,
+          locks,
+          currentUser?.id,
+          multiTouchDragsRef.current
+        );
+
+        if (dragCandidate) {
+          const { element, offsetX, offsetY } = dragCandidate;
+          const pId = e.pointerId;
+          const targetId = element.id;
+
+          multiTouchDragsRef.current[pId] = {
+            pointerId: pId,
+            elementId: targetId,
+            offsetX,
+            offsetY,
+            hasLock: false,
+            originalElement: JSON.parse(JSON.stringify(element)),
+          };
+
+          const activeDraggedIds = Object.values(multiTouchDragsRef.current).map((s) => s.elementId);
+          setSelectedElementIds(activeDraggedIds);
+          adjustElementsToFront?.([targetId]);
+
+          if (!dragStateRef.current) {
+            setDragState({ mode: 'multi-touch-move' });
+          }
+
+          socket.emit(EVENTS.ELEMENT_LOCK, { elementId: targetId, tabId }, (response) => {
+            if (response && response.success) {
+              const activeSession = multiTouchDragsRef.current[pId];
+              if (activeSession && activeSession.elementId === targetId) {
+                activeSession.hasLock = true;
+                setLocks((prev) => ({ ...prev, [targetId]: currentUser.id }));
+              } else {
+                const currentElement = elementsRef.current.find((el) => el.id === targetId);
+                if (currentElement) {
+                  socket.emit(EVENTS.ELEMENT_UPDATE, { element: currentElement, tabId });
+                }
+                socket.emit(EVENTS.ELEMENT_UNLOCK, { elementId: targetId, tabId });
+              }
+            } else {
+              if (multiTouchDragsRef.current[pId]?.elementId === targetId) {
+                delete multiTouchDragsRef.current[pId];
+                if (
+                  Object.keys(multiTouchDragsRef.current).length === 0 &&
+                  dragStateRef.current?.mode === 'multi-touch-move'
+                ) {
+                  setDragState(null);
+                }
+              }
+            }
+          });
+
+          triggerRedraw();
+          return;
+        }
+
+        // Empty canvas or locked element touched in Tabletop Mode:
+        // Do NOT start marquee drag-selection box ('select' mode).
+        const hitElement = getElementAtCoords(coords.x, coords.y, elements);
+        if (hitElement) {
+          if (Object.keys(multiTouchDragsRef.current).length === 0) {
+            setSelectedElementIds([hitElement.id]);
+          }
+        } else if (Object.keys(multiTouchDragsRef.current).length === 0 && !e.shiftKey) {
+          setSelectedElementIds([]);
+        }
+        triggerRedraw();
+        return;
+      }
+
+      // Other tools ('pen', 'eraser', 'measure') in Tabletop Mode:
+      if (!dragStateRef.current) {
+        handleMouseDown(e);
+        if (dragStateRef.current) {
+          dragStateRef.current.pointerId = e.pointerId;
+        }
+      }
+      return;
+    }
+
     if (activePointerIds.length === 2) {
       if (dragStateRef.current && dragStateRef.current.mode === 'draw') {
         tempDrawingPathRef.current = null;
@@ -699,7 +861,53 @@ export default function Canvas({
     const activePointerIds = Object.keys(activePointersRef.current);
     const drag = dragStateRef.current;
 
+    if (multiTouchDragsRef.current[e.pointerId]) {
+      const session = multiTouchDragsRef.current[e.pointerId];
+      const coords = getCanvasCoords(e);
+      throttleCursorMove(coords.x, coords.y);
+
+      if (hoveredElementId !== null) {
+        setHoveredElementId(null);
+      }
+
+      const element =
+        elementsRef.current.find((el) => el.id === session.elementId) ||
+        elements.find((el) => el.id === session.elementId);
+      if (!element) return;
+
+      const { x: newX, y: newY } = calculateSnappedDragPosition(
+        element,
+        coords,
+        session.offsetX,
+        session.offsetY,
+        roomSettings
+      );
+
+      if (element.x !== newX || element.y !== newY) {
+        setElements((prev) =>
+          prev.map((el) => (el.id === session.elementId ? { ...el, x: newX, y: newY } : el))
+        );
+
+        const socket = socketRef.current;
+        if (session.hasLock && socket && socket.connected) {
+          socket.emit(EVENTS.ELEMENT_UPDATE, {
+            elementId: session.elementId,
+            updates: { x: newX, y: newY },
+            tabId,
+          });
+        }
+        triggerRedraw();
+      }
+      return;
+    }
+
     if (drag) {
+      if (drag.mode === 'multi-touch-move') {
+        return;
+      }
+      if (drag.pointerId !== undefined && drag.pointerId !== e.pointerId) {
+        return;
+      }
       if (drag.mode === 'token-pinch-resize' && activePointerIds.length === 2) {
         const [p1, p2] = activePointerIds.map((id) => activePointersRef.current[id]);
         const newDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
@@ -891,9 +1099,17 @@ export default function Canvas({
     }
     delete activePointersRef.current[e.pointerId];
 
+    if (finishMultiTouchDrag(e.pointerId)) {
+      triggerRedraw();
+      return;
+    }
+
     const drag = dragStateRef.current;
     if (drag) {
-      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+      if (drag.pointerId !== undefined && drag.pointerId !== e.pointerId) {
+        return;
+      }
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan' || drag.mode === 'multi-touch-move') {
         setDragState(null);
         triggerRedraw();
         return;
@@ -914,9 +1130,17 @@ export default function Canvas({
     delete activePointersRef.current[e.pointerId];
     setHoverCursor(null);
 
+    if (finishMultiTouchDrag(e.pointerId)) {
+      triggerRedraw();
+      return;
+    }
+
     const drag = dragStateRef.current;
     if (drag) {
-      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+      if (drag.pointerId !== undefined && drag.pointerId !== e.pointerId) {
+        return;
+      }
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan' || drag.mode === 'multi-touch-move') {
         setDragState(null);
         triggerRedraw();
         return;
@@ -935,9 +1159,17 @@ export default function Canvas({
     delete activePointersRef.current[e.pointerId];
     setHoverCursor(null);
 
+    if (finishMultiTouchDrag(e.pointerId)) {
+      triggerRedraw();
+      return;
+    }
+
     const drag = dragStateRef.current;
     if (drag) {
-      if (drag.mode === 'touch-gesture' || drag.mode === 'pan') {
+      if (drag.pointerId !== undefined && drag.pointerId !== e.pointerId) {
+        return;
+      }
+      if (drag.mode === 'touch-gesture' || drag.mode === 'pan' || drag.mode === 'multi-touch-move') {
         setDragState(null);
         triggerRedraw();
         return;
@@ -1516,24 +1748,13 @@ export default function Canvas({
         let updates = {};
 
         if (drag.mode === 'move') {
-          let newX = Math.round(coords.x - drag.offsetX);
-          let newY = Math.round(coords.y - drag.offsetY);
-
-          const globalGridSnapping = roomSettings?.gridSnapping === true;
-          const showGrid = roomSettings?.showGrid === true;
-          const isSnapEnabled = globalGridSnapping && (element.properties?.snapToGrid !== false);
-
-          if (isSnapEnabled && showGrid) {
-            const w = element.width;
-            const h = element.height;
-            const cx = newX + w / 2;
-            const cy = newY + h / 2;
-            const snapped = getSnappedCenter(cx, cy, roomSettings?.gridType || 'square', roomSettings?.gridSize || 40);
-            newX = Math.round(snapped.x - w / 2);
-            newY = Math.round(snapped.y - h / 2);
-          }
-
-          updates = { x: newX, y: newY };
+          updates = calculateSnappedDragPosition(
+            element,
+            coords,
+            drag.offsetX,
+            drag.offsetY,
+            roomSettings
+          );
         } else if (drag.mode === 'rotate') {
           const cx = drag.initialX + drag.initialWidth / 2;
           const cy = drag.initialY + drag.initialHeight / 2;
@@ -2092,6 +2313,29 @@ export default function Canvas({
         onPointerDown={(e) => e.stopPropagation()}
         className="absolute bottom-20 sm:bottom-4 right-4 z-20 flex items-center gap-1 sm:gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-xl p-1 sm:p-1.5 shadow-lg select-none"
       >
+        {onToggleTabletopMode && (
+          <>
+            <button
+              type="button"
+              onClick={onToggleTabletopMode}
+              aria-pressed={isTabletopMode}
+              className={`h-8 px-2 rounded-lg transition flex items-center gap-1.5 text-xs font-semibold select-none cursor-pointer active:scale-95 border ${
+                isTabletopMode
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-slate-200'
+              }`}
+              title={
+                isTabletopMode
+                  ? 'Tabletop Touchscreen Mode: ON (Multi-touch token dragging active; pinch-zoom & marquee box disabled)'
+                  : 'Enable Tabletop Touchscreen Mode (Continuous multi-touch for physical figures)'
+              }
+            >
+              <Icon name="touchscreen" className="w-4 h-4" />
+              <span className="hidden sm:inline">{isTabletopMode ? 'Tabletop ON' : 'Tabletop'}</span>
+            </button>
+            <div className="w-px h-5 bg-slate-800 shrink-0" />
+          </>
+        )}
         <button
           type="button"
           onClick={() => {

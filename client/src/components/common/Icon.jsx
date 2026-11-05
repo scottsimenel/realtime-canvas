@@ -99,6 +99,15 @@ const ICONS = {
       <line x1="3" y1="21" x2="10" y2="14" />
     </>
   ),
+  'touchscreen': (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="10.5" r="1.5" />
+      <circle cx="15.5" cy="13.5" r="1.5" />
+      <path d="M8.5 14v2" />
+      <path d="M15.5 9.5v-1.5" />
+    </>
+  ),
 
   // Header, Navigation & Collaboration
   'undo': (
